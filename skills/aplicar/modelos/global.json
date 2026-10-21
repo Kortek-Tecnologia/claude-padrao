@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "autoMemoryEnabled": false,
+  "statusLine": {
+    "type": "command",
+    "command": "<PYTHON> -I \"<HOME>/.claude/statusline.py\"",
+    "refreshInterval": 30
+  },
+  "subagentStatusLine": {
+    "type": "command",
+    "command": "<PYTHON> -I \"<HOME>/.claude/subagent-statusline.py\""
+  }
+}

@@ -1,0 +1,10 @@
+.claude/settings.local.json
+.claude/backup-global-*/
+_audit/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+Thumbs.db
+desktop.ini
+.DS_Store

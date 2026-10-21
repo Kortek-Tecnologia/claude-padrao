@@ -1,0 +1,8 @@
+{
+  "name": "claude-padrao",
+  "description": "Padrão de Claude Code para qualquer projeto: Opus decide, Sonnet executa, Haiku coleta; tudo no projeto, global limpo.",
+  "owner": { "name": "Kortek" },
+  "plugins": [
+    { "name": "padrao", "source": "./", "description": "Padrão de Claude Code: Opus 5.5 1M decide, Sonnet executa, Haiku coleta; coletor só lê; tudo no projeto, global limpo.", "category": "claude-code" }
+  ]
+}

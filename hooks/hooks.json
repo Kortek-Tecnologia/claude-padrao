@@ -1,0 +1,44 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/guarda-global.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/escolher-modelo-subagente.sh\"",
+            "timeout": 10,
+            "statusMessage": "Modelo do subagent"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/coletor-so-le.sh\"",
+            "timeout": 10,
+            "statusMessage": "Coletor só lê",
+            "onFailure": "block"
+          }
+        ]
+      }
+    ]
+  }
+}
