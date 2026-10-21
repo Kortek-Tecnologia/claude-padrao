@@ -46,8 +46,7 @@ Haiku coleta. Funciona no Windows (Git Bash) e no Linux.
   1M, effort em vermelho fora de medium, "sem padrão" na pasta sem o plugin — e atualização a
   cada 30 s (o contador do cache não congela com a sessão parada). Embutida de
   [Jhonatan-de-Souza/claude-code-statusline](https://github.com/Jhonatan-de-Souza/claude-code-statusline)
-  (commit 44e9e48) com crédito; o repositório de origem não declara licença — uso pessoal, não
-  publique este repositório sem a licença do autor.
+  (commit 44e9e48) com crédito e permissão do autor; fica fora da licença MIT deste repositório.
 - Status line dos subagents (`statusline/subagent-statusline.py`): uma linha por subagent no
   painel de agentes — tipo, modelo (cor por família; vermelho fora da 5.5), effort, contexto,
   tempo e descrição.

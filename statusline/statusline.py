@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # Claude Code status line — de Jhonatan de Souza:
 # https://github.com/Jhonatan-de-Souza/claude-code-statusline (commit 44e9e48).
-# Embutido no plugin padrao com crédito; o repositório de origem não declara
-# licença — uso pessoal, repositório privado. Não publique sem a licença do autor.
+# Embutido no plugin padrao com crédito e permissão do autor; fica fora da
+# licença MIT do repositório padrao.
 # Única mudança nossa: o bloco entre `padrao: início` e `padrao: fim` e as
 # linhas marcadas `# padrao` (cor do modelo, effort, "sem padrão").
 """Claude Code status line: model + dir + branch, then context, 5h/7d rate limits and prompt-cache warmth.

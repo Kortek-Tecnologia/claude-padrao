@@ -1,6 +1,7 @@
 {
   "name": "padrao",
-  "version": "1.0.2",
+  "version": "1.0.3",
+  "license": "MIT",
   "description": "Política de modelos e de configuração do Claude Code, igual em todos os projetos.",
   "author": {
     "name": "Christian Jorge"

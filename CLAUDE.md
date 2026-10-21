@@ -27,8 +27,8 @@ global limpo". Uso, instalação e migrações: `README.md`.
 - `version` no `.claude-plugin/plugin.json`: o aviso de versão nova compara com ela.
   Toda mudança publicada sobe a `version` (semver). O `marketplace.json` da raiz
   publica este mesmo diretório (`source: "./"`).
-- `statusline/statusline.py` é código de terceiro (Jhonatan de Souza) sem licença
-  declarada: mantenha o crédito e não publique o repositório.
+- Repositório público, licença MIT (`LICENSE`). `statusline/statusline.py` é código de
+  terceiro (Jhonatan de Souza), usado com permissão e fora da MIT: mantenha o crédito.
 - Settings de plugin descartam `model` e `effortLevel`; por isso a skill `aplicar`
   grava no `.claude/settings.json` do projeto.
 - Arquivos em LF (`.gitattributes`).
