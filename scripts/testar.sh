@@ -29,7 +29,7 @@ rodar() {
 }
 
 # Subagent sem model segue (o CLAUDE_CODE_SUBAGENT_MODEL do padrão o põe em
-# sonnet); Plan, Explore, coletor e leitor com outro model são corrigidos
+# sonnet); Plan, Explore e os agentes do plugin com outro model são corrigidos
 # (allow + updatedInput); model fora de haiku|sonnet|opus é recusado.
 rodar travar-modelo-subagent.sh raw <<'CASOS'
 PASSA	{"tool_input":{"prompt":"x","model":"haiku"}}
@@ -42,7 +42,9 @@ PASSA	{"tool_input":{"prompt":"x","subagent_type":"padrao:coletor"}}
 PASSA	{"tool_input":{"prompt":"x","subagent_type":"padrao:leitor","model":"haiku"}}
 allow	{"tool_input":{"prompt":"x","subagent_type":"padrao:coletor","model":"sonnet"}}
 allow	{"tool_input":{"prompt":"x","subagent_type":"padrao:leitor","model":"opus"}}
-PASSA	{"tool_input":{"prompt":"x","subagent_type":"padrao:revisor","model":"opus"}}
+PASSA	{"tool_input":{"prompt":"x","subagent_type":"padrao:revisor","model":"sonnet"}}
+allow	{"tool_input":{"prompt":"x","subagent_type":"padrao:revisor","model":"opus"}}
+allow	{"tool_input":{"prompt":"x","subagent_type":"padrao:executor","model":"haiku"}}
 PASSA	{"tool_input":{"prompt":"x","subagent_type":"padrao:executor"}}
 PASSA	{"tool_input":{"prompt":"usa \"model\": \"opus\" aqui","subagent_type":"general-purpose"}}
 PASSA	{"tool_input":{"prompt":"x"}}
@@ -141,7 +143,7 @@ if ! PATH="$SEMJQ_PATH" command -v sh >/dev/null 2>&1; then
 fi
 semjq() { printf '%s' "$2" | PATH="$SEMJQ_PATH" sh "$D/$1" | grep -o '"permissionDecision":"[a-z]*"' | cut -d'"' -f4; }
 confere() { [ "${3:-PASSA}" = "$1" ] || { echo "divergiu (sem jq): esperado $1, veio ${3:-PASSA} - $2"; FALHAS=$((FALHAS + 1)); }; }
-for caso in 'deny|trava-leitura.sh|{"agent_type":"Explore","tool_input":{"command":"ls"}}'   'PASSA|trava-leitura.sh|{"agent_type":"general-purpose","tool_input":{"command":"touch f"}}'   'PASSA|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"Explore","model":"haiku"}}'   'PASSA|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x \"model\": \"opus\""}}'   'deny|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"Explore"}}'   'deny|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"Plan","model":"sonnet"}}'   'PASSA|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"padrao:coletor"}}'   'deny|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"padrao:leitor","model":"sonnet"}}'; do
+for caso in 'deny|trava-leitura.sh|{"agent_type":"Explore","tool_input":{"command":"ls"}}'   'PASSA|trava-leitura.sh|{"agent_type":"general-purpose","tool_input":{"command":"touch f"}}'   'PASSA|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"Explore","model":"haiku"}}'   'PASSA|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x \"model\": \"opus\""}}'   'deny|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"Explore"}}'   'deny|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"Plan","model":"sonnet"}}'   'PASSA|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"padrao:coletor"}}'   'deny|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"padrao:leitor","model":"sonnet"}}'   'deny|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"padrao:executor","model":"opus"}}'; do
   esperado=${caso%%|*}; resto=${caso#*|}; hook=${resto%%|*}; entrada=${resto#*|}
   confere "$esperado" "$hook $entrada" "$(semjq "$hook" "$entrada")"
 done

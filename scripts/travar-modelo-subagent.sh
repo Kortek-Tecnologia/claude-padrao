@@ -5,11 +5,12 @@
 # Subagent sem `model` não herda o Opus: o CLAUDE_CODE_SUBAGENT_MODEL=sonnet do
 # .claude/settings.json do padrão vale para chamada sem `model` e agente sem
 # `model:` no frontmatter (o frontmatter, quando há, vence o env). Este hook só:
-# - corrige `Plan` para opus e `Explore`, `padrao:coletor` e `padrao:leitor`
-#   para haiku (papel fixo): devolve a chamada reescrita (updatedInput) em vez de
-#   recusar — o Explore sem `model` rodaria no modelo da sessão, e o env não o
-#   alcança; coletor e leitor sem `model` passam (o frontmatter já é haiku), mas
-#   o `model` da chamada venceria o frontmatter;
+# - corrige `Plan` para opus, `Explore`, `padrao:coletor` e `padrao:leitor` para
+#   haiku e `padrao:revisor` e `padrao:executor` para sonnet (papel fixo):
+#   devolve a chamada reescrita (updatedInput) em vez de recusar — o Explore sem
+#   `model` rodaria no modelo da sessão, e o env não o alcança; os agentes do
+#   plugin sem `model` passam (o frontmatter já tem o modelo certo), mas o
+#   `model` da chamada venceria o frontmatter;
 # - recusa `model` fora de haiku|sonnet|opus (fable, `inherit`, ID completo): os
 #   aliases são os que o padrão fixa na família 5.5;
 # - deixa o `fork` passar (roda no modelo da sessão e ignora `model`).
@@ -43,6 +44,7 @@ case "$tipo" in
   Plan) exigido=opus ;;
   Explore) exigido=haiku ;;
   padrao:coletor | padrao:leitor) [ -z "$modelo" ] && exit 0; exigido=haiku ;;
+  padrao:revisor | padrao:executor) [ -z "$modelo" ] && exit 0; exigido=sonnet ;;
   *) exigido= ;;
 esac
 if [ -n "$exigido" ]; then

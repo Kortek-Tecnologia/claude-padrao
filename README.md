@@ -9,8 +9,9 @@ Haiku coleta. Funciona no Windows (Git Bash) e no Linux.
 
 - Subagent sem `model` roda em Sonnet, não no Opus da sessão (`CLAUDE_CODE_SUBAGENT_MODEL`
   no `.claude/settings.json`; o `model:` do frontmatter do agente vence). Hook que corrige
-  `Plan` para opus e `Explore`, `padrao:coletor` e `padrao:leitor` para haiku (o Explore
-  rodaria no modelo da sessão; o `model` da chamada venceria o frontmatter) e recusa
+  `Plan` para opus, `Explore`, `padrao:coletor` e `padrao:leitor` para haiku e
+  `padrao:revisor` e `padrao:executor` para sonnet (o Explore rodaria no modelo da sessão; o
+  `model` da chamada venceria o frontmatter) e recusa
   `model` fora de `haiku|sonnet|opus`; `fork` passa.
 - Agentes `padrao:coletor` (haiku), `padrao:leitor` (haiku), `padrao:executor` (sonnet) e
   `padrao:revisor` (sonnet), todos com effort medium; teto de turnos (`maxTurns` 30/30/100/40)

@@ -10,7 +10,7 @@ global limpo". Uso, instalação e migrações: `README.md`.
 |---|---|
 | `hooks/hooks.json` | SessionStart → `conferir-padrao.sh`; PreToolUse `Agent` → `travar-modelo-subagent.sh`; PreToolUse `Bash\|PowerShell` → `trava-leitura.sh` |
 | `scripts/conferir-padrao.sh` | só avisa (nunca corrige): global sujo, modelos fora da 5.5, conectores/plugins do app claude.ai ligados, auto memory ligado ou `fallbackModel` no projeto, versão nova no marketplace |
-| `scripts/travar-modelo-subagent.sh` | corrige `Plan`=opus e `Explore`, `padrao:coletor` e `padrao:leitor`=haiku (`updatedInput`); recusa `model` fora de haiku/sonnet/opus; sem `model` vale o `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`; `fork` passa |
+| `scripts/travar-modelo-subagent.sh` | corrige `Plan`=opus, `Explore`/`coletor`/`leitor`=haiku e `revisor`/`executor`=sonnet (`updatedInput`); recusa `model` fora de haiku/sonnet/opus; sem `model` vale o `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`; `fork` passa |
 | `scripts/trava-leitura.sh`, `so-le.sh`, `segmentos.sh` | trava de leitura dos agentes que só leem (coletor, revisor, leitor, `Explore`): Bash por segmento contra uma lista de comandos de leitura, PowerShell fechado |
 | `scripts/py.sh` | acha `python3`/`python`/`py` 3.9+ e roda com `-I` |
 | `agents/` | `coletor` (haiku), `leitor` (haiku, sem CLAUDE.md), `revisor` (sonnet), `executor` (sonnet) |
