@@ -50,10 +50,10 @@ Mostre uma tabela item → destino → ação, cobrindo TODO o inventário. Mexe
 
 | Item global | Vai para |
 |---|---|
-| `model`, `effortLevel`, `modelSettings`, `fallbackModel` (destino `padrao`) | descartados: o `modelos/settings.json` fixa Opus 5.5 1M, effort medium, subagents Sonnet/Haiku 5.5 effort medium, e sem `fallbackModel` (sem a chave não há fallback) |
-| `autoMemoryDirectory` (destino `descartar`) | descartado: auto memory desligado |
+| `model`, `effortLevel`, `modelSettings`, `fallbackModel`, `cleanupPeriodDays`, `disableClaudeAiConnectors` (destino `padrao`) | descartados: o `modelos/settings.json` fixa Opus 5.5 1M, effort medium, subagents Sonnet/Haiku 5.5 effort medium, transcripts por 14 dias, conectores do claude.ai desligados, e sem `fallbackModel` (sem a chave não há fallback) |
+| `autoMemoryDirectory`, `autoDreamEnabled` (destino `descartar`) | descartados: auto memory desligado |
 | chaves `time` (`env`, `hooks`, `permissions.allow/deny/ask`, `enabledPlugins`, `extraKnownMarketplaces`) | `.claude/settings.json` dos projetos que usam |
-| chaves `local` (`statusLine`, `language`, `tui`, `theme`, `outputStyle`, `switchModelsOnFlag`…) | `.claude/settings.local.json` |
+| chaves `local` (`language`, `tui`, `theme`, `outputStyle`, `switchModelsOnFlag`…) | `.claude/settings.local.json` |
 | `permissions.defaultMode`, `skipDangerousModePermissionPrompt` | ficam no global (únicas) |
 | `autoMode` (só vale em user/managed) | descartar se desatualizado (repo confiável que não existe mais etc.); senão pergunte |
 | destino `avaliar` | pergunte |
@@ -156,10 +156,10 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
 1. Grave `~/.claude/settings.json` como `modelos/global.json`, mantendo o `defaultMode` que o
    usuário já usa, `<PYTHON>` = o interpretador que o `py.sh` acha nesta máquina (`python3`,
    `python` ou `py`) e `<HOME>` = o home com `/`. Copie `<plugin>/statusline/statusline.py` e
-   `subagent-statusline.py` para `~/.claude/` (rodar a skill de novo os atualiza; a guarda
-   avisa se ficarem velhos). Apague as sobras e o que foi migrado.
+   `subagent-statusline.py` para `~/.claude/` (rodar a skill de novo os atualiza; o hook
+   de abertura avisa se ficarem velhos). Apague as sobras e o que foi migrado.
 2. Valide todo JSON tocado (`jq empty <arquivo>`).
-3. Confira: `printf '{}' | CLAUDE_PROJECT_DIR=<raiz> sh <plugin>/scripts/guarda-global.sh` não
+3. Confira: `printf '{}' | CLAUDE_PROJECT_DIR=<raiz> sh <plugin>/scripts/conferir-padrao.sh` não
    imprime nada, e rodar o inventário de novo mostra o global vazio.
 4. Resuma o que mudou em cada arquivo/projeto, o que ficou no global e por quê.
 5. Diga que vale a partir da PRÓXIMA sessão (confira com `/status` → "Setting sources"), que na

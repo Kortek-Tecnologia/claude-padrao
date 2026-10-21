@@ -9,7 +9,7 @@ disable-model-invocation: true
 Rode do diretório do projeto (`<plugin>` = dois níveis acima desta skill; o `py.sh` acha
 `python3`/`python`/`py`, no Windows e no Linux):
 
-    sh <plugin>/scripts/py.sh <diretório desta skill>/medir-modelos.py --dias 7
+    sh <plugin>/scripts/py.sh <diretório desta skill>/medir-modelos.py --dias 14
 
 Leitura:
 - `haiku` em zero com sessões longas = coleta feita pelo Opus ou pelo Sonnet.

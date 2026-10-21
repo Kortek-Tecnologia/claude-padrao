@@ -1,6 +1,6 @@
 {
   "name": "padrao",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Política de modelos e de configuração do Claude Code, igual em todos os projetos.",
   "author": {
     "name": "Christian Jorge"

@@ -34,10 +34,22 @@ from pathlib import Path
 RECUSA = ("fora da politica", "roda em model=", "Subagent sem modelo", "e travado em model=")
 
 
-def pasta_do_projeto(raiz: Path) -> str:
+def chave_projeto(caminho: str) -> str:
     """Nome da pasta em ~/.claude/projects: todo caractere não alfanumérico do
     caminho vira "-" (C:/Users/x → C--Users-x; /home/x/meu.proj → -home-x-meu-proj)."""
-    return re.sub(r"[^A-Za-z0-9]", "-", str(raiz))
+    return re.sub(r"[^A-Za-z0-9]", "-", caminho)
+
+
+def turno_novo(o: dict, vistos: set[str]) -> bool:
+    """O transcript grava cada bloco da resposta (thinking, texto, tool_use) numa
+    linha com o mesmo message.id: conta a resposta uma vez só."""
+    mid = (o.get("message") or {}).get("id")
+    if not mid:
+        return True
+    if mid in vistos:
+        return False
+    vistos.add(mid)
+    return True
 
 
 def linhas(arquivo: Path, desde: str):
@@ -60,7 +72,7 @@ def main() -> None:
     dias = args.dias
     raiz = (args.projeto or Path.cwd()).resolve()
     desde = (datetime.now(timezone.utc) - timedelta(days=dias)).strftime("%Y-%m-%dT%H:%M:%S")
-    pasta = Path.home() / ".claude" / "projects" / pasta_do_projeto(raiz)
+    pasta = Path.home() / ".claude" / "projects" / chave_projeto(str(raiz))
     if not pasta.is_dir():
         raise SystemExit(f"sem transcripts em {pasta}")
 
@@ -68,6 +80,7 @@ def main() -> None:
     turnos_principal: Counter[str] = Counter()
     turnos_sub: Counter[str] = Counter()
     recusas = sessoes = sem_delegar = 0
+    vistos: set[str] = set()
 
     for arq in pasta.glob("*.jsonl"):
         delegou = ativa = False
@@ -88,7 +101,7 @@ def main() -> None:
                         recusas += 1
             if o.get("type") != "assistant" or not isinstance(msg, dict):
                 continue
-            if msg.get("model"):
+            if msg.get("model") and turno_novo(o, vistos):
                 turnos_principal[msg["model"]] += 1
             for c in msg.get("content") or []:
                 if (
@@ -109,7 +122,7 @@ def main() -> None:
     for arq in pasta.glob("*/subagents/*.jsonl"):
         for o, _ in linhas(arq, desde):
             msg = o.get("message")
-            if o.get("type") == "assistant" and isinstance(msg, dict) and msg.get("model"):
+            if o.get("type") == "assistant" and isinstance(msg, dict) and msg.get("model") and turno_novo(o, vistos):
                 turnos_sub[msg["model"]] += 1
 
     print(f"últimos {dias} dias · {sessoes} sessão(ões) · {sem_delegar} sem nenhuma delegação")

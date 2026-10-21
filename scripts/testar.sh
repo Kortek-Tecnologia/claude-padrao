@@ -29,9 +29,9 @@ rodar() {
 }
 
 # Subagent sem model segue (o CLAUDE_CODE_SUBAGENT_MODEL do padrão o põe em
-# sonnet); Plan/Explore fora do modelo são corrigidos (allow + updatedInput);
-# model fora de haiku|sonnet|opus é recusado.
-rodar escolher-modelo-subagente.sh raw <<'CASOS'
+# sonnet); Plan, Explore, coletor e leitor com outro model são corrigidos
+# (allow + updatedInput); model fora de haiku|sonnet|opus é recusado.
+rodar travar-modelo-subagent.sh raw <<'CASOS'
 PASSA	{"tool_input":{"prompt":"x","model":"haiku"}}
 PASSA	{"tool_input":{"prompt":"x","subagent_type":"general-purpose","model":"sonnet"}}
 PASSA	{"tool_input":{"prompt":"x","subagent_type":"Explore","model":"haiku"}}
@@ -39,6 +39,10 @@ PASSA	{"tool_input":{"prompt":"x","subagent_type":"Plan","model":"opus"}}
 PASSA	{"tool_input":{"prompt":"x","subagent_type":"fork"}}
 PASSA	{"tool_input":{"prompt":"x","subagent_type":"fork","model":"fable"}}
 PASSA	{"tool_input":{"prompt":"x","subagent_type":"padrao:coletor"}}
+PASSA	{"tool_input":{"prompt":"x","subagent_type":"padrao:leitor","model":"haiku"}}
+allow	{"tool_input":{"prompt":"x","subagent_type":"padrao:coletor","model":"sonnet"}}
+allow	{"tool_input":{"prompt":"x","subagent_type":"padrao:leitor","model":"opus"}}
+PASSA	{"tool_input":{"prompt":"x","subagent_type":"padrao:revisor","model":"opus"}}
 PASSA	{"tool_input":{"prompt":"x","subagent_type":"padrao:executor"}}
 PASSA	{"tool_input":{"prompt":"usa \"model\": \"opus\" aqui","subagent_type":"general-purpose"}}
 PASSA	{"tool_input":{"prompt":"x"}}
@@ -52,11 +56,11 @@ CASOS
 
 # A correção mantém o resto da chamada e só troca o model.
 corrigida=$(printf '%s' '{"tool_input":{"prompt":"p","description":"d","subagent_type":"Explore","model":"opus"}}' |
-  sh "$D/escolher-modelo-subagente.sh" | jq -c '.hookSpecificOutput.updatedInput')
+  sh "$D/travar-modelo-subagent.sh" | jq -c '.hookSpecificOutput.updatedInput')
 [ "$corrigida" = '{"prompt":"p","description":"d","subagent_type":"Explore","model":"haiku"}' ] ||
   { echo "divergiu: Explore corrigido para $corrigida"; FALHAS=$((FALHAS + 1)); }
 
-rodar coletor-so-le.sh raw <<'CASOS'
+rodar trava-leitura.sh raw <<'CASOS'
 PASSA	{"agent_type":"Explore","tool_name":"Bash","tool_input":{"command":"grep -rn x src | head"}}
 PASSA	{"agent_type":"padrao:revisor","tool_name":"Bash","tool_input":{"command":"git diff HEAD"}}
 PASSA	{"agent_type":"general-purpose","tool_name":"PowerShell","tool_input":{"command":"Set-Content f x"}}
@@ -137,7 +141,7 @@ if ! PATH="$SEMJQ_PATH" command -v sh >/dev/null 2>&1; then
 fi
 semjq() { printf '%s' "$2" | PATH="$SEMJQ_PATH" sh "$D/$1" | grep -o '"permissionDecision":"[a-z]*"' | cut -d'"' -f4; }
 confere() { [ "${3:-PASSA}" = "$1" ] || { echo "divergiu (sem jq): esperado $1, veio ${3:-PASSA} - $2"; FALHAS=$((FALHAS + 1)); }; }
-for caso in 'deny|coletor-so-le.sh|{"agent_type":"Explore","tool_input":{"command":"ls"}}'   'PASSA|coletor-so-le.sh|{"agent_type":"general-purpose","tool_input":{"command":"touch f"}}'   'PASSA|escolher-modelo-subagente.sh|{"tool_input":{"prompt":"x","subagent_type":"Explore","model":"haiku"}}'   'PASSA|escolher-modelo-subagente.sh|{"tool_input":{"prompt":"x \"model\": \"opus\""}}'   'deny|escolher-modelo-subagente.sh|{"tool_input":{"prompt":"x","subagent_type":"Explore"}}'   'deny|escolher-modelo-subagente.sh|{"tool_input":{"prompt":"x","subagent_type":"Plan","model":"sonnet"}}'; do
+for caso in 'deny|trava-leitura.sh|{"agent_type":"Explore","tool_input":{"command":"ls"}}'   'PASSA|trava-leitura.sh|{"agent_type":"general-purpose","tool_input":{"command":"touch f"}}'   'PASSA|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"Explore","model":"haiku"}}'   'PASSA|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x \"model\": \"opus\""}}'   'deny|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"Explore"}}'   'deny|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"Plan","model":"sonnet"}}'   'PASSA|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"padrao:coletor"}}'   'deny|travar-modelo-subagent.sh|{"tool_input":{"prompt":"x","subagent_type":"padrao:leitor","model":"sonnet"}}'; do
   esperado=${caso%%|*}; resto=${caso#*|}; hook=${resto%%|*}; entrada=${resto#*|}
   confere "$esperado" "$hook $entrada" "$(semjq "$hook" "$entrada")"
 done
@@ -151,8 +155,8 @@ cp skills/aplicar/modelos/settings.local.json "$PROJ/.claude/settings.local.json
 cp skills/aplicar/modelos/global.json "$CASA/.claude/settings.json"
 cp statusline/statusline.py statusline/subagent-statusline.py "$CASA/.claude/"
 mkdir -p "$CASA/.claude/skills/synced/x" "$CASA/.claude/skills/.trash/1-x/morning"
-guarda() { printf '{}' | HOME="$CASA" CLAUDE_PROJECT_DIR="$PROJ" sh "$D/guarda-global.sh"; }
-[ -z "$(guarda)" ] || { echo "divergiu: guarda-global acusou um ambiente limpo: $(guarda)"; FALHAS=$((FALHAS + 1)); }
+conferir() { printf '{}' | HOME="$CASA" CLAUDE_PROJECT_DIR="$PROJ" sh "$D/conferir-padrao.sh"; }
+[ -z "$(conferir)" ] || { echo "divergiu: conferir-padrao acusou um ambiente limpo: $(conferir)"; FALHAS=$((FALHAS + 1)); }
 jq '.fallbackModel = [] | .modelSettings["claude-sonnet-5-5"].effortLevel = "high" | del(.env.ANTHROPIC_DEFAULT_HAIKU_MODEL) | del(.extraKnownMarketplaces["claude-padrao"].autoUpdate) | del(.disableClaudeAiConnectors) | del(.env.CLAUDE_CODE_SUBAGENT_MODEL)' "$PROJ/.claude/settings.json" >"$PROJ/s" && mv "$PROJ/s" "$PROJ/.claude/settings.json"
 jq '. + {model: "opus", fallbackModel: []}' "$CASA/.claude/settings.json" >"$CASA/s" && mv "$CASA/s" "$CASA/.claude/settings.json"
 mkdir -p "$CASA/.claude/projects/$(printf '%s' "$PROJ" | sed 's/[^A-Za-z0-9]/-/g')/memory" && touch "$CASA/.claude/projects/$(printf '%s' "$PROJ" | sed 's/[^A-Za-z0-9]/-/g')/memory/MEMORY.md"
@@ -163,9 +167,9 @@ mkdir -p "$CASA/.claude/plugins/marketplaces/claude-padrao/.claude-plugin"
 printf '{"version":"0.9.0"}' >"$CASA/.claude/plugins/marketplaces/claude-padrao/.claude-plugin/plugin.json"
 jq '.fallbackModel = "x" | del(.syncClaudeAiPlugins)' "$PROJ/.claude/settings.local.json" >"$PROJ/s" &&
   mv "$PROJ/s" "$PROJ/.claude/settings.local.json"
-saida=$(guarda | jq -r .systemMessage)
+saida=$(conferir | jq -r .systemMessage)
 for esperado in "chaves fora do padrao: fallbackModel, model" "statusline.py ausente ou diferente" "fallbackModel em .claude/settings.local.json" "fallbackModel em .claude/settings.json" "modelSettings[\"claude-sonnet-5-5\"].effortLevel do projeto e 'high', o padrao e 'medium'" "memoria deste projeto" "env.ANTHROPIC_DEFAULT_HAIKU_MODEL do projeto e ''" "env.CLAUDE_CODE_SUBAGENT_MODEL do projeto e ''" "atualizacao automatica do padrao desligada" "0.9.0 disponivel" "conectores MCP do claude.ai ligados" "plugins do app (claude.ai) sincronizados" "skills tem skills pessoais"; do
-  case "$saida" in *"$esperado"*) ;; *) echo "divergiu: guarda-global nao acusou '$esperado'"; FALHAS=$((FALHAS + 1)) ;; esac
+  case "$saida" in *"$esperado"*) ;; *) echo "divergiu: conferir-padrao nao acusou '$esperado'"; FALHAS=$((FALHAS + 1)) ;; esac
 done
 rm -rf "$CASA" "$PROJ"
 

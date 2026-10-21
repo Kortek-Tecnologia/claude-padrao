@@ -8,10 +8,10 @@ global limpo". Uso, instalação e migrações: `README.md`.
 
 | Caminho | Conteúdo |
 |---|---|
-| `hooks/hooks.json` | SessionStart → `guarda-global.sh`; PreToolUse `Agent` → `escolher-modelo-subagente.sh`; PreToolUse `Bash\|PowerShell` → `coletor-so-le.sh` |
-| `scripts/guarda-global.sh` | só avisa (nunca corrige): global sujo, modelos fora da 5.5, conectores/plugins do app claude.ai ligados, auto memory ligado ou `fallbackModel` no projeto, versão nova no marketplace |
-| `scripts/escolher-modelo-subagente.sh` | corrige `Plan`=opus e `Explore`=haiku (`updatedInput`); recusa `model` fora de haiku/sonnet/opus; sem `model` vale o `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`; `fork` passa |
-| `scripts/coletor-so-le.sh`, `so-le.sh`, `segmentos.sh` | trava de leitura dos agentes que só leem (coletor, revisor, leitor, `Explore`): Bash por segmento contra uma lista de comandos de leitura, PowerShell fechado |
+| `hooks/hooks.json` | SessionStart → `conferir-padrao.sh`; PreToolUse `Agent` → `travar-modelo-subagent.sh`; PreToolUse `Bash\|PowerShell` → `trava-leitura.sh` |
+| `scripts/conferir-padrao.sh` | só avisa (nunca corrige): global sujo, modelos fora da 5.5, conectores/plugins do app claude.ai ligados, auto memory ligado ou `fallbackModel` no projeto, versão nova no marketplace |
+| `scripts/travar-modelo-subagent.sh` | corrige `Plan`=opus e `Explore`, `padrao:coletor` e `padrao:leitor`=haiku (`updatedInput`); recusa `model` fora de haiku/sonnet/opus; sem `model` vale o `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`; `fork` passa |
+| `scripts/trava-leitura.sh`, `so-le.sh`, `segmentos.sh` | trava de leitura dos agentes que só leem (coletor, revisor, leitor, `Explore`): Bash por segmento contra uma lista de comandos de leitura, PowerShell fechado |
 | `scripts/py.sh` | acha `python3`/`python`/`py` 3.9+ e roda com `-I` |
 | `agents/` | `coletor` (haiku), `leitor` (haiku, sem CLAUDE.md), `revisor` (sonnet), `executor` (sonnet) |
 | `skills/` | `aplicar` (+ `inventariar.py`, `modelos/`), `atualizar-docs`, `auditar`, `enxugar-docs`, `executar-lote`, `medir` (+ `medir-modelos.py`) |
@@ -21,7 +21,7 @@ global limpo". Uso, instalação e migrações: `README.md`.
 ## Regras
 
 - Scripts em sh/bash POSIX com awk e sed; no Windows rodam no **Git Bash**. `jq` é
-  obrigatório: sem ele a trava fecha os coletores e a guarda do global se cala —
+  obrigatório: sem ele a trava fecha os agentes que só leem e a conferência do padrão se cala —
   mantenha esse comportamento (falhar fechado).
 - Python só biblioteca padrão, 3.9+, sempre via `scripts/py.sh`.
 - `version` no `.claude-plugin/plugin.json`: o aviso de versão nova compara com ela.
@@ -38,6 +38,6 @@ global limpo". Uso, instalação e migrações: `README.md`.
 ## Testes
 
 `bash scripts/testar.sh`: confere as decisões dos
-três hooks (inclusive sem `jq`), a guarda do global com HOME falso e as duas status
+três hooks (inclusive sem `jq`; o `conferir-padrao.sh` com HOME falso) e as duas status
 lines. Não cobre `inventariar.py`, `medir-modelos.py` nem o texto das skills.
 Depois: `claude plugin validate .`.

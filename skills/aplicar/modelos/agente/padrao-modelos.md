@@ -8,8 +8,8 @@ dos subagents apontam para `claude-opus-5-5`, `claude-sonnet-5-5` e `claude-haik
 (`env.ANTHROPIC_DEFAULT_*_MODEL`), então `model: haiku` é Haiku 5.5 1M — e não muda sozinho
 quando sair versão nova. Subagent sem `model` roda em sonnet (`CLAUDE_CODE_SUBAGENT_MODEL`), não
 no Opus da sessão; agente com `model:` no frontmatter usa o dele; o `fork` roda no da sessão.
-Coleta pede `haiku` explícito. O hook corrige `Plan` para opus e `Explore` para haiku e recusa
-`model` fora de `haiku|sonnet|opus`.
+Coleta pede `haiku` explícito. O hook corrige `Plan` para opus e `Explore`, coletor e leitor
+para haiku e recusa `model` fora de `haiku|sonnet|opus`.
 
 | Papel | Modelo | Agente |
 |---|---|---|
@@ -18,8 +18,8 @@ Coleta pede `haiku` explícito. O hook corrige `Plan` para opus e `Explore` para
 | revisar diff contra plano e critério de aceite | `sonnet` | `padrao:revisor` (só lê) |
 | coletar — busca, leitura, resumo de log, saída de CI | `haiku` | `padrao:coletor` (só lê); `Explore` |
 
-Travados no hook: `Plan` em opus, `Explore` em haiku. Coletor, revisor e `Explore` só LEEM: o
-Bash deles passa por uma trava que recusa gravar, redirecionar e executar programa; PowerShell
+Travados no hook: `Plan` em opus; `Explore`, coletor e leitor em haiku. Coletor, leitor,
+revisor e `Explore` só LEEM: o Bash deles passa por uma trava que recusa gravar, redirecionar e executar programa; PowerShell
 fechado. Coleta que exige julgamento ou escrita vai num `general-purpose` com sonnet.
 
 Delegue o que é grande, independente ou barulhento (leitura ampla, log longo, implementação de

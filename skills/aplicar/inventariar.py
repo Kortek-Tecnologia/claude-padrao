@@ -31,6 +31,7 @@ DESTINO = {
     "modelSettings": "padrao",
     "autoMemoryEnabled": "global",  # false no global: pasta sem o padrão não cria memória
     "autoMemoryDirectory": "descartar",  # auto memory desligado
+    "autoDreamEnabled": "descartar",  # idem
     "cleanupPeriodDays": "padrao",
     "env": "time",
     "hooks": "time",
@@ -144,11 +145,11 @@ def main() -> None:
         if servidores:
             mcp_local.append({"projeto": caminho, "projeto_existe": Path(caminho).is_dir(), "servidores": servidores})
 
-    padrao = []
+    projetos = []
     for chave, caminho in sorted(projetos_conhecidos.items()):
         cfg = ler_json(Path(caminho) / ".claude" / "settings.json") or {}
         if Path(caminho).is_dir():
-            padrao.append(
+            projetos.append(
                 {
                     "projeto": caminho,
                     "padrao_aplicado": any((cfg.get("enabledPlugins") or {}).get(p) for p in ("padrao@claude-padrao", "padrao@kortek-tools", "padrao@padrao")),
@@ -176,7 +177,7 @@ def main() -> None:
                 "mcp_user": resumo_mcp(estado.get("mcpServers")),
                 "mcp_local": mcp_local,
                 "memorias": memorias,
-                "projetos": padrao,
+                "projetos": projetos,
             },
             ensure_ascii=False,
             indent=2,

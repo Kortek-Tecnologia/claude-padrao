@@ -9,12 +9,13 @@ Haiku coleta. Funciona no Windows (Git Bash) e no Linux.
 
 - Subagent sem `model` roda em Sonnet, não no Opus da sessão (`CLAUDE_CODE_SUBAGENT_MODEL`
   no `.claude/settings.json`; o `model:` do frontmatter do agente vence). Hook que corrige
-  `Plan` para opus e `Explore` para haiku (o Explore rodaria no modelo da sessão) e recusa
+  `Plan` para opus e `Explore`, `padrao:coletor` e `padrao:leitor` para haiku (o Explore
+  rodaria no modelo da sessão; o `model` da chamada venceria o frontmatter) e recusa
   `model` fora de `haiku|sonnet|opus`; `fork` passa.
-- Agentes `padrao:coletor` (haiku), `padrao:executor` (sonnet) e `padrao:revisor` (sonnet),
-  todos com effort medium; teto de turnos (`maxTurns` 30/100/40) e, nos que só leem,
-  `disallowedTools: Write, Edit, NotebookEdit` além da lista `tools`.
-- Hook que deixa os coletores (`Explore`, `padrao:coletor`, `padrao:revisor`,
+- Agentes `padrao:coletor` (haiku), `padrao:leitor` (haiku), `padrao:executor` (sonnet) e
+  `padrao:revisor` (sonnet), todos com effort medium; teto de turnos (`maxTurns` 30/30/100/40)
+  e, nos que só leem, `disallowedTools: Write, Edit, NotebookEdit` além da lista `tools`.
+- Hook que deixa os agentes que só leem (`Explore`, `padrao:coletor`, `padrao:revisor`,
   `padrao:leitor`) só lerem: Bash fechado por padrão (sem gravar, redirecionar ou executar
   programa), PowerShell fechado. Se o próprio hook falhar ou estourar o tempo, o comando é
   bloqueado (`onFailure: "block"`) — para qualquer agente, já que o hook roda em todo Bash.
@@ -54,8 +55,8 @@ Haiku coleta. Funciona no Windows (Git Bash) e no Linux.
 
 - Claude Code **v2.1.295+** (Haiku 5.5; `onFailure` nos hooks).
 - Windows: **Git Bash** (os hooks rodam em `bash`).
-- **jq** — `winget install jqlang.jq` | `sudo apt install jq`. Sem ele, os coletores ficam
-  sem Bash/PowerShell (fechado por padrão) e a guarda do global se cala.
+- **jq** — `winget install jqlang.jq` | `sudo apt install jq`. Sem ele, os agentes que só leem
+  ficam sem Bash/PowerShell (fechado por padrão) e o hook de abertura se cala.
 - **Python 3.9+** para as skills (`scripts/py.sh` acha `python3`, `python` ou `py`).
 
 ## Instalar num projeto

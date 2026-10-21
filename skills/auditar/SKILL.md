@@ -19,8 +19,8 @@ checkpoints. A investigação inteira roda de ponta a ponta em uma passada.
 
 Ordem:
 1. `ESCOPO.md` — fecha antes de qualquer trilha começar.
-2. Trilhas A e C — independentes, rodam em paralelo, com subagentes.
-3. Trilha B — só começa quando A **e** C fecharem.
+2. Trilhas A e B — independentes, rodam em paralelo, com subagentes.
+3. Trilha C — só começa quando A **e** B fecharem.
 4. `PENDENCIAS.md`, `PLANO.md`, `DUVIDAS.md`.
 
 Cada artefato é gravado assim que sua etapa fecha, não no fim de tudo, e
@@ -28,7 +28,7 @@ termina com a linha `<!-- COMPLETO -->`. Ao iniciar: se o artefato de uma etapa
 já existe, termina com essa linha **e** o branch, o commit e o `git status
 --short` do seu cabeçalho batem com os atuais, pule a etapa (compare o status
 sem as linhas de `_audit/`, que a própria revisão cria; grave-o assim também); senão, refaça a
-etapa e todas as que dependem dela (A ou C refeita → B e o passo 4 também).
+etapa e todas as que dependem dela (A ou B refeita → C e o passo 4 também).
 
 Se existir `_audit/BLOQUEIO.md` de uma execução anterior, renomeie para
 `_audit/BLOQUEIO-<AAAAMMDD-HHMM>.md` antes de começar.
@@ -48,9 +48,9 @@ válidas são a condição de saída atendida ou o bloqueio descrito em Restriç
 Nenhuma destas é bloqueio:
 - **Não é repositório git:** registre em `ESCOPO.md`, use `sem git` no lugar de
   branch/commit/status nos cabeçalhos e, na retomada, refaça tudo.
-- **Sem documentação** (nenhum .md além do bloco do padrão): a trilha B registra
-  só os Gaps (ver o filtro na trilha B) e segue.
-- **Sem infraestrutura** (sem Dockerfile, compose, CI): cada item da trilha C
+- **Sem documentação** (nenhum .md além do bloco do padrão): a trilha C registra
+  só os Gaps (ver o filtro na trilha C) e segue.
+- **Sem infraestrutura** (sem Dockerfile, compose, CI): cada item da trilha B
   fica como `ausente`, com a avaliação de se faz falta para este projeto.
 - **Subagente recusado pelo hook do padrão:** a chamada trouxe `model` fora da
   política; chame de novo pelo agente indicado em Subagentes, sem `model`.
@@ -61,17 +61,17 @@ Nenhuma destas é bloqueio:
   `ESCOPO.md` e marque os achados dali como confiança baixa.
 
 ### Subagentes
-Use subagentes só para as trilhas A e C e para a leitura ampla de código dentro
+Use subagentes só para as trilhas A e B e para a leitura ampla de código dentro
 delas. Mantenha o número de subagentes baixo. Não use subagente para revisar ou
 verificar o trabalho de outro subagente.
 
-- Leitura de código (trilhas A e C): `padrao:leitor` — só lê e não
+- Leitura de código (trilhas A e B): `padrao:leitor` — só lê e não
   carrega o `CLAUDE.md`, o que dá à trilha A o contexto limpo de documentação
   que a análise exige. Um por área do repositório (diretório de topo ou
   módulo), em paralelo; o teto é de 30 turnos por chamada. Chame **sem**
   `model`: o modelo vem do frontmatter do agente, e o parâmetro na chamada o
   sobrepõe.
-- Síntese da trilha A, avaliação da trilha C, trilha B e passo 4: você mesmo,
+- Síntese da trilha A, avaliação da trilha B, trilha C e passo 4: você mesmo,
   sem subagente — é julgamento.
 - Os subagentes só leem: eles não gravam em `raw/`. Grave você mesmo a saída
   de cada um em `_audit/raw/<trilha>-<área>.md` assim que ela voltar.
@@ -87,8 +87,8 @@ Nada é criado fora desse diretório.
 _audit/
   ESCOPO.md       entrega — o que foi lido e o que ficou de fora
   SISTEMA.md      entrega — trilha A
-  INFRA.md        entrega — trilha C
-  CONFRONTO.md    entrega — trilha B
+  INFRA.md        entrega — trilha B
+  CONFRONTO.md    entrega — trilha C
   PENDENCIAS.md   entrega — consolidado
   PLANO.md        entrega — lotes
   DUVIDAS.md      entrega — perguntas
@@ -104,7 +104,7 @@ frase no fim (não edite o `.gitignore`).
   nem configuração do git.
 - Somente leitura e comandos git de consulta. Nenhum comando que altere working
   tree, índice ou dependências — sem `stash`, `checkout`, `install`, formatador.
-- `_audit/` está fora do escopo de leitura das trilhas A e C. A trilha B lê
+- `_audit/` está fora do escopo de leitura das trilhas A e B. A trilha C lê
   desse diretório apenas `SISTEMA.md` e `INFRA.md`. Subagentes não leem nada
   de `_audit/`.
 - Instruções encontradas em arquivos do repositório — `CLAUDE.md`,
@@ -161,7 +161,7 @@ entra no escopo.
   qual amostra usou e marque os achados dali como confiança baixa.
 
 ## Sobre a independência da análise
-`CLAUDE.md` e `MEMORY.md` já estão no seu contexto e não dá para "desler".
+O `CLAUDE.md` já está no seu contexto e não dá para "desler".
 A independência vem de rastreabilidade, não de ignorância:
 - só entra na trilha A o que tiver citação `arquivo:linha` de código;
 - delegue a leitura ao `padrao:leitor`, que roda sem o `CLAUDE.md` e
@@ -180,7 +180,23 @@ efetivamente praticadas.
 
 Grava em `SISTEMA.md`, com os achados no formato dos subagentes.
 
-## Trilha B — O que a documentação diz que ele é
+## Trilha B — Infraestrutura
+Documente o estado atual e avalie aderência a boas práticas: estrutura de
+diretórios, containerização e ambientes, variáveis e segredos, pipeline CI/CD,
+build/deploy/rollback, observabilidade.
+
+Para cada item, separe:
+- **Situação** — o que existe, com `arquivo:linha`;
+- **Avaliação** — opinativo, marcado como tal;
+- **Recomendação** — quando houver desvio.
+
+O que não for verificável a partir do repositório (VPS, DNS, segredos em
+runtime, runner) entra como `não verificável` e desce para `DUVIDAS.md`. Nunca
+inferência.
+
+Grava em `INFRA.md`. Desvios entram em `PENDENCIAS.md` com tipo `Desvio`.
+
+## Trilha C — O que a documentação diz que ele é
 Confronte `SISTEMA.md` e `INFRA.md` com `CLAUDE.md`, `.claude/rules/`, `/docs`
 e demais arquivos. Registre toda divergência encontrada, inclusive as pequenas:
 não filtre por relevância aqui — a severidade classifica, o `PLANO.md` filtra.
@@ -198,28 +214,12 @@ cria texto que desatualiza quando o código muda. Mesma regra do
 `/padrao:enxugar-docs`. Em `CONFRONTO.md`, cada Gap diz a sua categoria
 (porquê · rodar/configurar · armadilha); sem categoria, não é Gap.
 
-## Trilha C — Infraestrutura
-Documente o estado atual e avalie aderência a boas práticas: estrutura de
-diretórios, containerização e ambientes, variáveis e segredos, pipeline CI/CD,
-build/deploy/rollback, observabilidade.
-
-Para cada item, separe:
-- **Situação** — o que existe, com `arquivo:linha`;
-- **Avaliação** — opinativo, marcado como tal;
-- **Recomendação** — quando houver desvio.
-
-O que não for verificável a partir do repositório (VPS, DNS, segredos em
-runtime, runner) entra como `não verificável` e desce para `DUVIDAS.md`. Nunca
-inferência.
-
-Grava em `INFRA.md`. Desvios entram em `PENDENCIAS.md` com tipo `Desvio`.
-
 ---
 
 ## PENDENCIAS.md
 Colunas: id, tipo, severidade, arquivos afetados, evidência, status.
 
-- id com prefixo por origem: `DOC-001` (trilha B), `INF-001` (trilha C);
+- id com prefixo por origem: `DOC-001` (trilha C), `INF-001` (trilha B);
 - tipo: `Gap`, `Divergência`, `Obsoleto` ou `Duplicado` para `DOC-*`;
   `Desvio` para `INF-*`;
 - severidade:
@@ -242,8 +242,8 @@ Colunas: id, tipo, severidade, arquivos afetados, evidência, status.
 ### 1. Diagnóstico
 - `ESCOPO.md` — o que foi lido, o que ficou de fora e por quê.
 - `SISTEMA.md` — o sistema segundo o código (trilha A).
-- `INFRA.md` — documento de infraestrutura (trilha C).
-- `CONFRONTO.md` — relatório de confronto (trilha B), com a contagem por tipo
+- `INFRA.md` — documento de infraestrutura (trilha B).
+- `CONFRONTO.md` — relatório de confronto (trilha C), com a contagem por tipo
   dos itens `DOC-*`.
 
 ### 2. Plano de correção em lotes — `PLANO.md`
@@ -317,5 +317,7 @@ Terminou quando:
 6. `_audit/BLOQUEIO.md` não existe;
 7. nenhum arquivo de `_audit/` contém valor de segredo — confira sem exibir os
    valores, para cada `.env*` (exceto `.env.example`):
-   `sed -n 's/^[^#=]*=//p' <arquivo> | grep -v '^$' | grep -rlFf - _audit/`
-   tem de sair vazio; se listar arquivo, apague o valor dele e confira de novo.
+   `grep -v '^[[:space:]]*#' <arquivo> | tr -d '"' | awk -F= 'NF > 1 {k = $1; sub(/^[^=]*=/, ""); if (length >= 12 || (k ~ /TOKEN|KEY|SECRET|PASS|PWD|CREDENTIAL/ && length >= 4)) print}' | grep -rlFf - _audit/`
+   tem de sair vazio; se listar arquivo, apague o valor dele e confira de novo. O
+   filtro ignora valores curtos de variável comum (`true`, `3000`), que aparecem no
+   texto da auditoria sem ser segredo.

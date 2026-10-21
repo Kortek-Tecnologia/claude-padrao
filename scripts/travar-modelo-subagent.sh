@@ -5,14 +5,16 @@
 # Subagent sem `model` não herda o Opus: o CLAUDE_CODE_SUBAGENT_MODEL=sonnet do
 # .claude/settings.json do padrão vale para chamada sem `model` e agente sem
 # `model:` no frontmatter (o frontmatter, quando há, vence o env). Este hook só:
-# - corrige `Plan` para opus e `Explore` para haiku (papel fixo): devolve a
-#   chamada reescrita (updatedInput) em vez de recusar — o Explore sem `model`
-#   rodaria no modelo da sessão, e o env não o alcança;
+# - corrige `Plan` para opus e `Explore`, `padrao:coletor` e `padrao:leitor`
+#   para haiku (papel fixo): devolve a chamada reescrita (updatedInput) em vez de
+#   recusar — o Explore sem `model` rodaria no modelo da sessão, e o env não o
+#   alcança; coletor e leitor sem `model` passam (o frontmatter já é haiku), mas
+#   o `model` da chamada venceria o frontmatter;
 # - recusa `model` fora de haiku|sonnet|opus (fable, `inherit`, ID completo): os
 #   aliases são os que o padrão fixa na família 5.5;
 # - deixa o `fork` passar (roda no modelo da sessão e ignora `model`).
 #
-# Sem jq não dá para reescrever a chamada: Plan/Explore fora do modelo são
+# Sem jq não dá para reescrever a chamada: os de papel fixo fora do modelo são
 # recusados com o modelo certo na mensagem. Os campos saem por regex: dentro de
 # `prompt` as aspas vêm escapadas (\"model\"), então só as chaves de verdade casam.
 entrada=$(cat)
@@ -27,7 +29,7 @@ campo() {
   fi
 }
 
-nega() {
+negar() {
   r=$(printf '%s' "$1" | tr -d '"\\')
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$r"
   exit 0
@@ -40,11 +42,12 @@ modelo=$(campo model)
 case "$tipo" in
   Plan) exigido=opus ;;
   Explore) exigido=haiku ;;
+  padrao:coletor | padrao:leitor) [ -z "$modelo" ] && exit 0; exigido=haiku ;;
   *) exigido= ;;
 esac
 if [ -n "$exigido" ]; then
   [ "$modelo" = "$exigido" ] && exit 0
-  tem_jq || nega "O subagent '$tipo' roda em model=$exigido (papel fixo): chame de novo com model=$exigido."
+  tem_jq || negar "O subagent '$tipo' roda em model=$exigido (papel fixo): chame de novo com model=$exigido."
   printf '%s' "$entrada" | jq -c --arg m "$exigido" --arg t "$tipo" '{hookSpecificOutput: {
     hookEventName: "PreToolUse",
     permissionDecision: "allow",
@@ -55,4 +58,4 @@ if [ -n "$exigido" ]; then
 fi
 
 case "$modelo" in "" | haiku | sonnet | opus) exit 0 ;; esac
-nega "model='$modelo' fora da politica. Use opus (decidir, planejar, o dificil), sonnet (executar plano ja montado, revisar diff) ou haiku (coletar: busca, leitura, log); sem model o subagent roda em sonnet. Detalhes em docs/agente/padrao-modelos.md."
+negar "model='$modelo' fora da politica. Use opus (decidir, planejar, o dificil), sonnet (executar plano ja montado, revisar diff) ou haiku (coletar: busca, leitura, log); sem model o subagent roda em sonnet. Detalhes em docs/agente/padrao-modelos.md."

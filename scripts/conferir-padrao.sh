@@ -94,12 +94,12 @@ done
 # synced/ e as pastas ocultas (a .trash, lixeira do sync do claude.ai) sao estado do app
 [ -n "$(ls -A "$g/skills" 2>/dev/null | grep -v -e '^synced$' -e '^\.')" ] && anota "~/.claude/skills tem skills pessoais"
 
-chave=$(printf '%s' "$raiz" | sed 's/[^A-Za-z0-9]/-/g')
-[ -n "$(ls -A "$g/projects/$chave/memory" 2>/dev/null)" ] &&
-  anota "memoria deste projeto em ~/.claude/projects/$chave/memory"
+chave_projeto=$(printf '%s' "$raiz" | sed 's/[^A-Za-z0-9]/-/g')
+[ -n "$(ls -A "$g/projects/$chave_projeto/memory" 2>/dev/null)" ] &&
+  anota "memoria deste projeto em ~/.claude/projects/$chave_projeto/memory"
 
 if [ -r "$HOME/.claude.json" ]; then
-  mcp=$(jq -r --arg c "$chave" '
+  mcp=$(jq -r --arg c "$chave_projeto" '
     ((.mcpServers // {}) | keys | map("user:" + .)) +
     ((.projects // {}) | to_entries
       | map(select((.key | gsub("[^A-Za-z0-9]"; "-")) == $c))
