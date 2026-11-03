@@ -42,3 +42,9 @@ três hooks (inclusive sem `jq`; o `conferir-padrao.sh` com HOME falso), as duas
 lines, que o inventário não imprime valor do `env` e as contas do `medir-modelos.py`. Não cobre
 o texto das skills. Depois: `claude plugin validate .`. O CI (`.github/workflows/testes.yml`)
 roda o `testar.sh` no Ubuntu: lá o sh é dash e o awk pode ser mawk.
+
+Ponta a ponta (as skills): `claude -p --plugin-dir <este repo> --dangerously-skip-permissions`
+num projeto de exemplo no scratchpad, com `HOME` e `USERPROFILE` falsos, sem as variáveis
+`CLAUDE*` desta sessão e o login por `CLAUDE_CODE_OAUTH_TOKEN` (o `accessToken` do
+`.credentials.json`, só na env: não copie o arquivo, que tem tokens de MCP e o refresh token).
+Etapa que pede OK: `--resume <session_id> "<resposta>"`.

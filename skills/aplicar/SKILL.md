@@ -39,7 +39,9 @@ backups); `CLAUDE.md`, agents, commands, skills, output-styles, rules, workflows
 globais; plugins instalados no escopo user; MCP de escopo user e local (só nomes e NOMES de
 variáveis); memórias em `~/.claude/projects/*/memory` com o projeto de cada uma; projetos
 conhecidos e se já têm o padrão. Do `env` global vêm só os nomes (`valor: "(oculto)"`): nunca
-imprima um valor de variável — mova-o de arquivo para arquivo com `jq`, sem exibir.
+imprima um valor de variável — mova-o de arquivo para arquivo com `jq`, sem exibir. No Windows o
+Python não enxerga caminho com mais de 260 caracteres (projeto em pasta funda): se o hook de
+abertura acusar memória ou MCP que o inventário não traz, liste pelo Bash e inclua no plano.
 
 Leia também do projeto: `.claude/settings.json`, `.claude/settings.local.json`, `.mcp.json`,
 `CLAUDE.md`, `.gitignore`, `.claude/agents|skills|commands`.

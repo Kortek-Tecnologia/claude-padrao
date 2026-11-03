@@ -30,3 +30,13 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 - Erro: `jq ... > arquivo && mv` no Git Bash deixou hooks.json e settings.json com CRLF; o repositório exige LF.
 - Evitar: reescrever arquivo do repositório com saída de programa Windows sem conferir o fim de linha.
 - Fazer: depois de gerar, `sed -i 's/\r$//' <arquivo>`; temporários no scratchpad da sessão, não em /tmp.
+
+### Caminho de base vazio em script (2026-11-03)
+- Erro: `cygpath -u -l` falhou (o `-l` só vale com `-w`/`-m`), a variável saiu vazia e o sandbox de teste foi criado em `/sandbox` (C:\Program Files\Git\sandbox).
+- Evitar: montar caminho de trabalho com a saída de um comando sem conferir.
+- Fazer: `S="${B:?}/sandbox"` e conferir o prefixo (`case "$S" in */scratchpad/*)`) antes de criar ou apagar; caminho longo com `cygpath -m -l`.
+
+### Caminho acima de 260 caracteres no Windows (2026-11-03)
+- Erro: no sandbox (HOME falso no scratchpad), `inventariar.py`, `medir-modelos.py` e o `jq` não acharam `~/.claude/projects/<chave>/...`; o Bash achava.
+- Evitar: concluir "não existe" pela saída de Python ou jq nativos em caminho fundo.
+- Fazer: para testar `medir`/`inventariar`, copie os transcripts para um HOME curto e use `--projeto` curto; ler arquivo fundo, `cat arquivo | jq`.

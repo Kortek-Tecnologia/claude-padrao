@@ -21,6 +21,7 @@ grava no global), rode `/padrao:aplicar`.
   recomendaria, faça e conte depois.
 - **Irreversível → pare e pergunte:** commit, push, merge, deploy, publicar, apagar o que você
   não criou, dado de produção, mexer no global (`~/.claude`), mensagem a outra pessoa, gasto.
+  Antes de todo commit, a skill `padrao:atualizar-docs` acerta a doc que o diff deixou falsa.
   Autorizado uma vez, vale até o fim daquele trabalho (subagent incluso: cite a autorização);
   volte só se o risco for maior do que o usuário aprovou.
 - **Dúvida que um comando responde, rode o comando.** Pergunta cuja resposta só pode ser "sim",

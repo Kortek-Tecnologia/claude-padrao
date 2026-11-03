@@ -275,9 +275,12 @@ agora=$(date -u +%Y-%m-%dT%H:%M:%S)
 {
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m1","model":"claude-opus-5-5","usage":{"input_tokens":2000,"cache_read_input_tokens":5000,"output_tokens":200},"content":[{"type":"tool_use","id":"t1","name":"Agent","input":{"subagent_type":"Explore","prompt":"x"}}]}}\n' "$agora"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m2","model":"claude-opus-5-5","usage":{"input_tokens":1000,"output_tokens":100},"content":[{"type":"tool_use","id":"t2","name":"Agent","input":{"subagent_type":"padrao:coletor","prompt":"y"}}]}}\n' "$agora"
+  # chamada que o hook recusou: não conta como se tivesse rodado
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"m3","model":"claude-opus-5-5","content":[{"type":"tool_use","id":"t3","name":"Agent","input":{"subagent_type":"general-purpose","model":"fable","prompt":"z"}}]}}\n' "$agora"
+  printf '{"type":"user","timestamp":"%s","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t3","content":"model=fable fora da politica"}]}}\n' "$agora"
 } >"$CASA/.claude/projects/$chave/s.jsonl"
 med=$(HOME="$CASA" USERPROFILE="$(nativo "$CASA")" sh "$D/py.sh" skills/medir/medir-modelos.py --projeto "$PROJ" | tr -d '\r')
-for re in '1 correção\(ões\) de papel fixo \(Explore=1\)' '^  Explore +haiku=1$' '^  padrao:coletor +haiku=1$' '^  principal +claude-opus-5-5 +3k · 5k · 300$'; do
+for re in '1 correção\(ões\) de papel fixo \(Explore=1\) · 1 recusa\(s\)' '^  general-purpose +fable \(recusada\)=1$' '^  Explore +haiku=1$' '^  padrao:coletor +haiku=1$' '^  principal +claude-opus-5-5 +3k · 5k · 300$'; do
   printf '%s\n' "$med" | grep -Eq "$re" || { echo "divergiu: medir-modelos sem /$re/: $med"; FALHAS=$((FALHAS + 1)); }
 done
 rm -rf "$CASA" "$PROJ"

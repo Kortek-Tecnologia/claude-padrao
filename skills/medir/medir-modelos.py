@@ -142,7 +142,8 @@ def main() -> None:
 
     for arq in pasta.glob("*.jsonl"):
         delegou = ativa = False
-        ids_agent: set[str] = set()
+        # id da chamada Agent → (tipo, modelo), para tirar da conta a que foi recusada
+        ids_agent: dict[str, tuple[str, str]] = {}
         for o, _ in linhas(arq, desde):
             ativa = True
             msg = o.get("message")
@@ -157,6 +158,9 @@ def main() -> None:
                         and any(m in json.dumps(c.get("content"), ensure_ascii=False) for m in RECUSA)
                     ):
                         recusas += 1
+                        tipo, modelo = ids_agent[c["tool_use_id"]]
+                        chamadas[tipo][modelo] -= 1
+                        chamadas[tipo][f"{modelo} (recusada)"] += 1
             if o.get("type") != "assistant" or not isinstance(msg, dict):
                 continue
             guardar_uso(uso_principal, msg)
@@ -173,7 +177,7 @@ def main() -> None:
                     modelo, corrigida = modelo_efetivo(tipo, i.get("model") or "")
                     chamadas[tipo][modelo] += 1
                     corrigidas[tipo] += corrigida
-                    ids_agent.add(c.get("id"))
+                    ids_agent[c.get("id")] = (tipo, modelo)
                     delegou = True
         sessoes += ativa
         sem_delegar += ativa and not delegou
@@ -193,6 +197,7 @@ def main() -> None:
     total: Counter[str] = Counter()
     print("subagents (tipo: modelo em que rodou × chamadas):")
     for tipo, por_modelo in sorted(chamadas.items()):
+        por_modelo = +por_modelo  # some a contagem zerada pela recusa
         total.update(por_modelo)
         print(f"  {tipo:<20} " + "  ".join(f"{m}={n}" for m, n in por_modelo.most_common()))
     print("  total                " + "  ".join(f"{m}={n}" for m, n in total.most_common()))

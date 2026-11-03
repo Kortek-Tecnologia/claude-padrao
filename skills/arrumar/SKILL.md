@@ -215,7 +215,8 @@ usuário viaja junto e não entra em commit nenhum.
 1. **Dependência** parcial ou pulada → este lote fica `pulado`, com o motivo.
 2. **Executor** (`padrao:executor`): passe a ficha, as decisões do plano que ela usa e estas
    regras — mude só os arquivos da ficha; documentação segue as Regras de documentação abaixo;
-   não edite `_audit/`, não commite, não instale nada; rode a verificação e devolva a saída
+   não edite `_audit/`, não commite, não instale nada nem ligue serviço ou aplicativo (Docker
+   Desktop, banco, VM: o que não estiver rodando fica `não verificado`); rode a verificação e devolva a saída
    real; decisão que a ficha não cobre → pare e devolva a pergunta. Pergunta do executor:
    responda com o plano, `SISTEMA.md` ou `INFRA.md`; sem resposta lá, a opção que muda menos o
    repositório — e registre para o relatório.
@@ -223,9 +224,11 @@ usuário viaja junto e não entra em commit nenhum.
    com `arquivo:linha` — o que fugiu da ficha, quebrou ou faltou. Achado real → devolva ao MESMO
    executor com `SendMessage`, só aquele ponto (parou no teto de turnos: retome-o igual). No
    máximo duas voltas; o que sobrar fica aberto.
-4. **Verificação — você**: rode cada comando da ficha e guarde a saída real. Comando que o
-   ambiente não tem (ex.: `docker` ausente) = `não verificado`, nunca `passou`. Marque `resolvido`
-   em `PENDENCIAS.md` só os ids cuja verificação passou (só a coluna status).
+4. **Verificação — você**: rode cada comando da ficha e guarde a saída real, só com o que o
+   ambiente já tem rodando — não ligue serviço nem aplicativo para verificar (Docker Desktop
+   parado, banco fora do ar). Comando que o ambiente não tem ou serviço parado = `não verificado`,
+   nunca `passou`. Marque `resolvido` em `PENDENCIAS.md` só os ids cuja verificação passou (só a
+   coluna status); verifique antes do commit, para a mensagem e a situação baterem.
 5. **Commit**: `git add` só dos arquivos que o lote mudou (compare o `git status` de antes e de
    depois; nunca `-A` nem `.`) e `git commit -m "arrumar: lote <n> — <título>"`, com
    `(parcial)` no fim se algum id ficou aberto. Hook de commit recusou → volte ao executor uma
