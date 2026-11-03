@@ -14,3 +14,13 @@ jobs:
       - uses: actions/checkout@v4
       # jq e python3 já vêm no ubuntu-latest
       - run: bash scripts/testar.sh
+
+  diagramas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --no-audit --no-fund mermaid@11.4.1 jsdom@25.0.1
+      - run: node .github/scripts/validar-mermaid.mjs $(git ls-files '*.md')
