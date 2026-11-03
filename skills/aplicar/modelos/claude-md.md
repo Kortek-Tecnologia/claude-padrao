@@ -14,6 +14,21 @@ grava no global), rode `/padrao:aplicar`.
 | revisar diff contra o plano | `padrao:revisor` (sonnet, só lê) |
 | coletar — busca, leitura, log, saída de CI | `padrao:coletor` (haiku, só lê); `Explore` |
 
+### Decida e siga; pare só no irreversível
+
+- **Reversível → siga com a recomendada.** Editar código e arquivos do projeto, criar branch,
+  rodar teste, build e comando local, instalar dependência no projeto: escolha a opção que você
+  recomendaria, faça e conte depois.
+- **Irreversível → pare e pergunte:** commit, push, merge, deploy, publicar, apagar o que você
+  não criou, dado de produção, mexer no global (`~/.claude`), mensagem a outra pessoa, gasto.
+  Autorizado uma vez, vale até o fim daquele trabalho (subagent incluso: cite a autorização);
+  volte só se o risco for maior do que o usuário aprovou.
+- **Dúvida que um comando responde, rode o comando.** Pergunta cuja resposta só pode ser "sim",
+  siga sem perguntar.
+- **Pergunte só gosto ou produto que só o usuário decide:** uma pergunta por vez, no
+  `AskUserQuestion`, com a recomendada primeiro. Enquanto espera, adiante o que não depende dela.
+- **No relatório final, liste as decisões tomadas sozinho** que o usuário pode querer desfazer.
+
 ### Contexto sob demanda
 
 Estes arquivos NÃO carregam sozinhos: leia o que a tarefa pedir, quando pedir.

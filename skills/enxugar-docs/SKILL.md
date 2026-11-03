@@ -78,6 +78,12 @@ Mesmo com a carga abaixo de 200 linhas, é candidato a sair: seção com mais de
 ou lista longa de consulta, passo a passo, exemplo longo, detalhe de um único módulo ou ambiente.
 Carga acima de 200 linhas: a proposta TEM de trazê-la abaixo disso, e diga quanto fica.
 
+Mais dois testes, frase a frase, para toda instrução que fica:
+- **Instrução que o modelo já segue sozinho** ("seja claro", "escreva código limpo", "teste o
+  que mudar") não muda nada e custa em toda sessão: remover a frase inteira.
+- **Proibição** ("não faça X") deixa o X mais presente: reduzir para a forma positiva, o que fazer.
+  Fica a proibição só quando é trava dura sem forma positiva, e ainda assim junto do que fazer.
+
 Arquivo apontado bem feito:
 - um tema por arquivo, nome que diga o tema (`docs/agente/deploy.md`, não `notas.md`);
 - linha no índice `## Contexto sob demanda` do `CLAUDE.md`, fora do bloco do padrão:

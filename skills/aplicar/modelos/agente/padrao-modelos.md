@@ -35,6 +35,10 @@ o próprio trabalho. Um subagent basta? Use um. Subagent não abre subagent
   entradas de `AGENT_LEARNINGS.md` que valem para a tarefa (subagent não lê esse arquivo
   sozinho). Faltando, o sonnet decide — e decidir é do Opus.
 - **Coletor coleta, não conclui:** peça fatos com `arquivo:linha`; o Opus confere a linha antes de agir.
+- **Achado do revisor é insumo, não ordem:** o Opus decide o que entra; o diff não cresce só para
+  a revisão passar. Três rodadas achando a mesma família de bug: o problema está no desenho.
+- **Subagent em segundo plano que encerrou o turno terminou**, mesmo dizendo "aguardando": não
+  volta sozinho. Use o resultado ou mande mensagem (`SendMessage`) se precisar de mais.
 - **Workflow:** nomeie o modelo de cada `agent()` — o hook não alcança dentro do Workflow, e sem
   isso o agente herda o Opus.
 - **Medir:** `/padrao:medir` (haiku em zero = coleta não delegada).
