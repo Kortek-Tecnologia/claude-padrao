@@ -4,8 +4,9 @@ destino sugerido de cada item pelo padrão. Só LÊ; imprime JSON.
 
     sh <plugin>/scripts/py.sh <dir da skill>/inventariar.py [--projeto P]
 
-Segredos não saem: de MCP vêm nome, tipo e os NOMES das variáveis/cabeçalhos,
-nunca os valores. O projeto é o diretório corrente, ou o dado em --projeto.
+Segredos não saem: do `env` do settings global e de MCP vêm só os NOMES das
+variáveis/cabeçalhos, nunca os valores (o JSON vai para o transcript). O projeto
+é o diretório corrente, ou o dado em --projeto.
 """
 
 from __future__ import annotations
@@ -49,6 +50,17 @@ DESTINO = {
     "autoMode": "global",
 }
 
+# permissions.<chave>: `allow` pode ser regra do time ou liberação pessoal
+# (pergunte); diretórios extras são caminhos desta máquina; o resto é do time.
+PERMISSOES = {"defaultMode": "global", "allow": "avaliar", "additionalDirectories": "local"}
+
+# Variável de `env` com nome de segredo vai para o settings.local.json (fora do
+# git). Na dúvida, local: URL de banco costuma levar senha.
+SEGREDO = re.compile(r"TOKEN|KEY|SECRET|PASS|PWD|CREDENTIAL|AUTH|COOKIE|PRIVATE|DSN|URL", re.I)
+
+# As variáveis de `env` que o padrão já define: o valor global é descartado.
+MODELO = Path(__file__).resolve().parent / "modelos" / "settings.json"
+
 
 def chave_projeto(caminho: str) -> str:
     """Nome da pasta em ~/.claude/projects: não alfanumérico vira "-"."""
@@ -63,12 +75,17 @@ def ler_json(arq: Path):
 
 
 def destino_settings(cfg: dict) -> list[dict]:
+    env_padrao = set(((ler_json(MODELO) or {}).get("env") or {}))
     itens = []
     for k, v in cfg.items():
         if k == "permissions" and isinstance(v, dict):
             for pk, pv in v.items():
-                d = "global" if pk == "defaultMode" else "time"
-                itens.append({"chave": f"permissions.{pk}", "valor": pv, "destino": d})
+                itens.append({"chave": f"permissions.{pk}", "valor": pv, "destino": PERMISSOES.get(pk, "time")})
+            continue
+        if k == "env" and isinstance(v, dict):
+            for nome in sorted(v):
+                d = "padrao" if nome in env_padrao else "local" if SEGREDO.search(nome) else "time"
+                itens.append({"chave": f"env.{nome}", "valor": "(oculto)", "destino": d})
             continue
         itens.append({"chave": k, "valor": v, "destino": DESTINO.get(k, "avaliar")})
     return itens

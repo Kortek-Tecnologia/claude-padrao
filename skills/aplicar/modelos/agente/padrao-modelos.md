@@ -3,7 +3,9 @@
 
 Tudo na família **5.5, com 1M de contexto** (nativo nela), fixado no `.claude/settings.json`:
 a sessão principal é Opus 5.5 1M effort medium; subagents Sonnet 5.5 e Haiku 5.5 effort medium;
-sem fallback de modelo (sem a chave `fallbackModel`, nada troca de modelo sozinho). Os aliases
+sem fallback de modelo (sem a chave `fallbackModel`, nada troca de modelo sozinho). Toda sessão
+abre em medium: tarefa que peça mais raciocínio sobe com `/effort` na própria sessão (com `s` no
+seletor nem grava no global), e a próxima volta a medium — o projeto vence o global. Os aliases
 dos subagents apontam para `claude-opus-5-5`, `claude-sonnet-5-5` e `claude-haiku-5-5`
 (`env.ANTHROPIC_DEFAULT_*_MODEL`), então `model: haiku` é Haiku 5.5 1M — e não muda sozinho
 quando sair versão nova. Subagent sem `model` roda em sonnet (`CLAUDE_CODE_SUBAGENT_MODEL`), não
@@ -19,9 +21,10 @@ para haiku, revisor e executor para sonnet, e recusa `model` fora de `haiku|sonn
 | coletar — busca, leitura, resumo de log, saída de CI | `haiku` | `padrao:coletor` (só lê); `Explore` |
 
 Travados no hook: `Plan` em opus; `Explore`, coletor e leitor em haiku; revisor e executor
-em sonnet. Coletor, leitor,
-revisor e `Explore` só LEEM: o Bash deles passa por uma trava que recusa gravar, redirecionar e executar programa; PowerShell
-fechado. Coleta que exige julgamento ou escrita vai num `general-purpose` com sonnet.
+em sonnet. Coletor, leitor, revisor e `Explore` só LEEM: o Bash deles passa por uma trava que
+recusa gravar, redirecionar e executar programa (sed e awk só com `--sandbox` logo após o nome);
+PowerShell, MCP e as ferramentas que executam ou gravam (Monitor, Workflow, CronCreate…)
+fechados. Coleta que exige julgamento ou escrita vai num `general-purpose` com sonnet.
 
 Delegue o que é grande, independente ou barulhento (leitura ampla, log longo, implementação de
 plano pronto); não delegue o que você termina em poucas chamadas de ferramenta, nem para conferir
@@ -39,6 +42,7 @@ o próprio trabalho. Um subagent basta? Use um. Subagent não abre subagent
   a revisão passar. Três rodadas achando a mesma família de bug: o problema está no desenho.
 - **Subagent em segundo plano que encerrou o turno terminou**, mesmo dizendo "aguardando": não
   volta sozinho. Use o resultado ou mande mensagem (`SendMessage`) se precisar de mais.
-- **Workflow:** nomeie o modelo de cada `agent()` — o hook não alcança dentro do Workflow, e sem
-  isso o agente herda o Opus.
+- **Workflow:** nomeie o modelo de cada `agent()` (`haiku` na coleta) — sem ele o agente cai no
+  `CLAUDE_CODE_SUBAGENT_MODEL` (sonnet), e não há garantia de que o hook de modelo alcance dentro
+  do Workflow.
 - **Medir:** `/padrao:medir` (haiku em zero = coleta não delegada).

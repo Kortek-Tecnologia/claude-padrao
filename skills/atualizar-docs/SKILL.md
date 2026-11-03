@@ -2,6 +2,7 @@
 name: atualizar-docs
 description: Antes de commitar, acha a documentação que o diff atual deixou desatualizada — comando, porta, variável de ambiente, caminho, endpoint, chave de config, nome renomeado ou removido — e corrige só ela, no mínimo. Use quando o diff mexe em algo que docs, CLAUDE.md, comentários ou docstrings citam, ou quando o usuário pedir para conferir a doc do diff.
 argument-hint: "[ref, padrão HEAD — ex.: main...HEAD]"
+user-invocable: false
 ---
 
 # Documentação do diff
@@ -41,7 +42,8 @@ repositório grande → delegue a busca ao `padrao:coletor`, pedindo `arquivo:li
 ## 3. Corrija
 
 Para cada ocorrência, a edição mínima que deixa o trecho verdadeiro de novo: trocar o valor,
-ou remover a frase se o que ela descreve deixou de existir. Regras do `/padrao:enxugar-docs`:
+ou remover a frase se o que ela descreve deixou de existir. Regras de documentação do
+`/padrao:arrumar`:
 - não acrescente documentação do que o código já responde;
 - não crie CHANGELOG nem nota de "mudou em";
 - texto novo só se o diff criou o porquê de uma decisão, um jeito de rodar/configurar ou uma

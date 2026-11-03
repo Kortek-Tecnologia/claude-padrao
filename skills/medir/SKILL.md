@@ -1,6 +1,6 @@
 ---
 name: medir
-description: Mede se a política de modelos pegou — chamadas de subagent por tipo × modelo, recusas do hook e turnos por modelo, dos transcripts locais deste projeto.
+description: Mede se a política de modelos pegou — chamadas de subagent por tipo × modelo em que rodou, correções e recusas do hook, tokens e turnos por modelo, dos transcripts locais deste projeto.
 disable-model-invocation: true
 ---
 
@@ -15,8 +15,14 @@ Leitura:
 - `haiku` em zero com sessões longas = coleta feita pelo Opus ou pelo Sonnet.
 - Sessão sem delegação não é falha: tarefa que se resolve em poucas chamadas não deve delegar.
   Preocupa a sessão longa, de muitos turnos de Opus, sem nenhuma.
-- `(sem model)` = rodou no `CLAUDE_CODE_SUBAGENT_MODEL` (sonnet), salvo `Explore`/`Plan`, que o
-  hook corrige. `(frontmatter)` = agente de plugin (`padrao:coletor` etc.) com o modelo no
-  arquivo. O modelo real de cada um aparece em "turnos dos subagents".
+- O modelo de cada chamada é o que rodou pela regra atual do hook: papel fixo (`Plan`, `Explore`,
+  agentes `padrao:*`) já no modelo travado; `sonnet (env)` = `general-purpose` sem `model`, no
+  `CLAUDE_CODE_SUBAGENT_MODEL`; `(frontmatter)` = agente de outro plugin, com o modelo no arquivo;
+  `(sem model)` = outro agente, no modelo da própria definição. O modelo real aparece em "turnos
+  dos subagents".
+- Correções = chamadas de papel fixo que o Opus fez com outro `model` (ou `Explore`/`Plan` sem
+  `model`) e o hook trocou. Muitas = a delegação está pedindo o modelo errado.
+- Tokens: o custo está em "entrada" e "saída"; "cache lido" sai bem mais barato. Opus com muita
+  entrada e haiku perto de zero = leitura que devia ir ao coletor.
 - Os transcripts duram o `cleanupPeriodDays` do padrão (14 dias): `--dias` maior não acha mais.
   O número é desta máquina (os transcripts são locais).

@@ -8,13 +8,13 @@ global limpo". Uso, instalação e migrações: `README.md`.
 
 | Caminho | Conteúdo |
 |---|---|
-| `hooks/hooks.json` | SessionStart → `conferir-padrao.sh`; PreToolUse `Agent` → `travar-modelo-subagent.sh`; PreToolUse `Bash\|PowerShell` → `trava-leitura.sh` |
-| `scripts/conferir-padrao.sh` | só avisa (nunca corrige): global sujo, modelos fora da 5.5, conectores/plugins do app claude.ai ligados, auto memory ligado ou `fallbackModel` no projeto, versão nova no marketplace |
+| `hooks/hooks.json` | SessionStart → `conferir-padrao.sh`; PreToolUse `Agent` → `travar-modelo-subagent.sh`; PreToolUse Bash, PowerShell, `mcp__*` e as ferramentas que executam ou gravam (regex no matcher) → `trava-leitura.sh` |
+| `scripts/conferir-padrao.sh` | só avisa (nunca corrige): global sujo (o effort salvo pelo `/effort` passa: o projeto vence), modelos fora da 5.5, conectores/plugins do app claude.ai ligados, auto memory ligado, checkpoints desligados ou `fallbackModel` no projeto, versão nova no marketplace |
 | `scripts/travar-modelo-subagent.sh` | corrige `Plan`=opus, `Explore`/`coletor`/`leitor`=haiku e `revisor`/`executor`=sonnet (`updatedInput`); recusa `model` fora de haiku/sonnet/opus; sem `model` vale o `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`; `fork` passa |
-| `scripts/trava-leitura.sh`, `so-le.sh`, `segmentos.sh` | trava de leitura dos agentes que só leem (coletor, revisor, leitor, `Explore`): Bash por segmento contra uma lista de comandos de leitura, PowerShell fechado |
+| `scripts/trava-leitura.sh`, `so-le.sh`, `segmentos.sh` | trava de leitura dos agentes que só leem (coletor, revisor, leitor, `Explore`): Bash por segmento contra uma lista de comandos de leitura (sed e awk só com `--sandbox`), qualquer outra ferramenta do matcher fechada |
 | `scripts/py.sh` | acha `python3`/`python`/`py` 3.9+ e roda com `-I` |
 | `agents/` | `coletor` (haiku), `leitor` (haiku, sem CLAUDE.md), `revisor` (sonnet), `executor` (sonnet) |
-| `skills/` | `aplicar` (+ `inventariar.py`, `modelos/`), `atualizar-docs`, `auditar`, `enxugar-docs`, `executar-lote`, `medir` (+ `medir-modelos.py`) |
+| `skills/` | os três comandos — `aplicar` (+ `inventariar.py`, `modelos/`), `arrumar` (levanta, um OK, executa tudo) e `medir` (+ `medir-modelos.py`) — e `atualizar-docs`, fora do menu: o Claude a chama antes de commitar |
 | `statusline/` | `statusline.py` (principal) e `subagent-statusline.py`; instalados em `~/.claude/` pela skill `aplicar` |
 | `AGENT_LEARNINGS.md` | erros do agente neste repositório e a abordagem certa; lido sob demanda (modelo e `docs/agente/padrao-*.md` em `skills/aplicar/modelos/`) |
 
@@ -38,6 +38,7 @@ global limpo". Uso, instalação e migrações: `README.md`.
 ## Testes
 
 `bash scripts/testar.sh`: confere as decisões dos
-três hooks (inclusive sem `jq`; o `conferir-padrao.sh` com HOME falso) e as duas status
-lines. Não cobre `inventariar.py`, `medir-modelos.py` nem o texto das skills.
-Depois: `claude plugin validate .`.
+três hooks (inclusive sem `jq`; o `conferir-padrao.sh` com HOME falso), as duas status
+lines, que o inventário não imprime valor do `env` e as contas do `medir-modelos.py`. Não cobre
+o texto das skills. Depois: `claude plugin validate .`. O CI (`.github/workflows/testes.yml`)
+roda o `testar.sh` no Ubuntu: lá o sh é dash e o awk pode ser mawk.

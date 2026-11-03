@@ -7,11 +7,12 @@
 # quebra de linha só partem FORA de aspas (senão o `(escopo)` de uma mensagem
 # de commit vira segmento); `$(` e crase partem também dentro de aspas duplas,
 # porque lá ainda executam. Antes, some com os redirecionamentos inofensivos
-# (2>&1, >/dev/null), que partiriam o segmento no `&`. Todo `>` que sobra é
-# escrita em arquivo.
+# (2>&1, >/dev/null), que partiriam o segmento no `&`. O /dev/null precisa
+# terminar a palavra: `>/dev/nullX` grava arquivo (no Git Bash, de verdade).
+# Todo `>` que sobra é escrita em arquivo.
 segmentar() {
   printf '%s\n' "$1" |
-    sed -E -e 's/[0-9]*>&[0-9-]//g' -e 's/(&|[0-9]*)>>?[[:space:]]*\/dev\/null//g' |
+    sed -E -e 's/[0-9]*>&[0-9-]//g' -e 's/(&|[0-9]*)>>?[[:space:]]*\/dev\/null([[:space:];&|)]|$)/\2/g' |
     awk '
       { t = t $0 "\n" }
       END {

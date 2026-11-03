@@ -39,20 +39,28 @@ bloqueado=$(segmentar "$cmd" |
         # `uniq ENTRADA SAIDA` grava SAIDA: nega com dois operandos.
         printf '%s' "$seg" | awk '{n=0; for(i=2;i<=NF;i++){if($i ~ /^-[fsw]$/){i++;continue} if($i !~ /^-/)n++} exit !(n>=2)}' && echo "$seg" ;;
       file) printf '%s' "$seg" | grep -Eq -- '[[:space:]](-[A-Za-z]*C|--compile)' && echo "$seg" ;;
-      rg) printf '%s' "$seg" | grep -Eq -- '--pre' && echo "$seg" ;;
+      # --hostname-bin roda o programa dado para descobrir o host.
+      rg) printf '%s' "$seg" | grep -Eq -- '--pre|--hostname-bin' && echo "$seg" ;;
+      # sed e awk são linguagens: filtro de texto não fecha (s|a|b|e executa com
+      # qualquer delimitador, o gawk chama system() por @f). Só passam com
+      # --sandbox logo após o nome — antes de um `--`, que o tornaria nome de
+      # arquivo —, que recusa e/r/w no sed e system, redirecionamento e extensão
+      # no gawk. O mawk não tem --sandbox: falha, e fica fechado.
       sed)
-        # -i grava no lugar; os comandos w/W e a flag w do s/// gravam arquivo;
-        # e (GNU) executa comando. Na dúvida, nega.
-        printf '%s' "$seg" | grep -Eq -- '[[:space:]](-[A-Za-z]*i|--in-place)|([0-9$/!;{}]|[[:space:]]|['"'"'"])[wWe]([[:space:]'"'"'"]|$)|/[gpiImM0-9]*[we]([[:space:]'"'"'";}]|$)' && echo "$seg" ;;
+        case "$seg" in 'sed --sandbox '*) ;; *) echo "$seg"; continue ;; esac
+        # o --sandbox não impede -i (grava no lugar)
+        printf '%s' "$seg" | grep -Eq -- '[[:space:]](-[A-Za-z]*i|--in-place)' && echo "$seg" ;;
       awk)
-        # `|` dentro do programa abre comando ("cmd" | getline, print | "sh");
-        # -f/-E/-i/-l carregam programa ou biblioteca de fora.
-        printf '%s' "$seg" | grep -Eq -- 'inplace|system|getline|[|]|[[:space:]](-[fEil]|--(file|exec|include|load))' && echo "$seg" ;;
+        case "$seg" in 'awk --sandbox '*) ;; *) echo "$seg"; continue ;; esac
+        # o --sandbox não impede -d/-p/-o (gravam variáveis, perfil e programa
+        # em arquivo) nem o depurador (-D)
+        printf '%s' "$seg" | grep -Eq -- '[[:space:]](-[A-Za-z]*[dDpo]|--(dump|debug|profile|pretty))' && echo "$seg" ;;
       find) printf '%s' "$seg" | grep -Eq -- '-(exec|execdir|ok|okdir|delete|fprint|fls)' && echo "$seg" ;;
       git)
         # -c/--config-env mudam config na hora (core.fsmonitor, diff.external
-        # executam programa); -O/--open-files-in-pager do grep também.
-        case "$seg" in *--output*|*--open-files-in-pager*|*--config-env*|*--exec-path*|*--ext-diff*) echo "$seg"; continue ;; esac
+        # executam programa); -O/--open-files-in-pager do grep também;
+        # --git-dir/--work-tree apontariam para um repositório com config de fora.
+        case "$seg" in *--output*|*--open-files-in-pager*|*--config-env*|*--exec-path*|*--ext-diff*|*--git-dir*|*--work-tree*) echo "$seg"; continue ;; esac
         printf '%s' "$seg" | grep -Eq -- '[[:space:]](-c|-O[^[:space:]]*)([[:space:]]|$)' && { echo "$seg"; continue; }
         sub=$(printf '%s' "$seg" | awk '{for(i=2;i<=NF;i++){if($i=="-C"){i++;continue} if($i ~ /^-/)continue; print $i; exit}}')
         case "$sub" in
@@ -64,5 +72,5 @@ bloqueado=$(segmentar "$cmd" |
   done | head -n 1)
 
 [ -n "$bloqueado" ] &&
-  negar "segmento fora da lista de leitura: $(printf '%s' "$bloqueado" | tr -d '"\\' | cut -c1-80)"
+  negar "segmento fora da lista de leitura (sed e awk so com --sandbox logo apos o nome): $(printf '%s' "$bloqueado" | tr -d '"\\' | cut -c1-80)"
 exit 0

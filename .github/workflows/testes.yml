@@ -1,0 +1,16 @@
+name: testes
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # jq e python3 já vêm no ubuntu-latest
+      - run: bash scripts/testar.sh

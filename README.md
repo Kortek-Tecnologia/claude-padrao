@@ -2,7 +2,8 @@
 
 Plugin de Claude Code (`padrao`) que padroniza projetos novos e existentes: **tudo no
 projeto, global limpo**, tudo na **família 5.5 com 1M de contexto** — principal Opus 5.5 1M,
-effort medium; subagents Sonnet 5.5 e Haiku 5.5, effort medium (aliases fixados por
+effort medium (toda sessão abre em medium; o `/effort` muda só a sessão em curso); subagents
+Sonnet 5.5 e Haiku 5.5, effort medium (aliases fixados por
 `ANTHROPIC_DEFAULT_*_MODEL`); sem fallback de modelo; auto memory desligado (contexto do
 projeto no `CLAUDE.md`) — e distribuição de subagents fixa: Opus decide, Sonnet executa,
 Haiku coleta. Funciona no Windows (Git Bash) e no Linux.
@@ -18,33 +19,36 @@ Haiku coleta. Funciona no Windows (Git Bash) e no Linux.
   e, nos que só leem, `disallowedTools: Write, Edit, NotebookEdit` além da lista `tools`.
 - Hook que deixa os agentes que só leem (`Explore`, `padrao:coletor`, `padrao:revisor`,
   `padrao:leitor`) só lerem: Bash fechado por padrão (sem gravar, redirecionar ou executar
-  programa), PowerShell fechado. Se o próprio hook falhar ou estourar o tempo, o comando é
-  bloqueado (`onFailure: "block"`) — para qualquer agente, já que o hook roda em todo Bash.
-- Hook de abertura que avisa quando algo voltou para o global (o `/model` e o `/effort`
-  gravam lá), o projeto saiu do padrão ou há `fallbackModel`.
+  programa; sed e awk só com `--sandbox`), PowerShell, MCP e as ferramentas que executam ou
+  gravam (Monitor, Workflow, CronCreate…) fechados. Se o próprio hook falhar ou estourar o
+  tempo, a chamada é bloqueada (`onFailure: "block"`) — para qualquer agente, já que o hook roda
+  em toda chamada dessas ferramentas. Fica de fora entrar (`cd`, `git -C`) num repositório bare
+  versionado com config hostil (`core.fsmonitor` executa no `git status`):
+  `git config --global safe.bareRepository explicit` fecha esse caso.
+- Hook de abertura que avisa quando algo voltou para o global (o `/model` grava lá), o projeto
+  saiu do padrão ou há `fallbackModel`. O effort que o `/effort` salva no global não conta: o
+  `modelSettings` do projeto vence, e a sessão seguinte abre em medium.
 - Hook de abertura que avisa quando o padrão está desatualizado (versão instalada atrás da
   do marketplace, ou `autoUpdate` desligado no projeto) — ver [Atualizar](#atualizar).
-- Skill `aplicar`: avalia tudo o que mora no global e leva cada item para o seu projeto.
-- Skill `medir`: placar de modelos por subagent a partir dos transcripts locais.
-- Skill `enxugar-docs` (só por `/padrao:enxugar-docs`): enxuga a documentação do projeto ao
-  essencial e mede a carga fixa do `CLAUDE.md` (com imports e rules sem `paths:`), movendo o que
-  não vale em toda sessão para arquivos apontados num índice — analisa e lista primeiro, edita
-  só após aprovação.
 - Subagent não abre subagent (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1` no `.claude/settings.json`).
-- Skill `auditar` (só por `/padrao:auditar`): diagnóstico de documentação e infraestrutura e
-  plano de correção em lotes com `/goal` prontos; roda até o fim sem perguntar, só lê o
-  repositório e grava em `_audit/`. A leitura de código vai ao agente `padrao:leitor`
-  (haiku, só lê, sem o `CLAUDE.md` no contexto, para não se contaminar pela documentação).
-- Skill `executar-lote` (só por `/padrao:executar-lote <n>`): executa um lote do
-  `_audit/PLANO.md` — executor (sonnet) aplica, revisor (sonnet) confere, a condição de saída
-  roda de verdade e só então os ids viram `resolvido`. Não commita.
-- Skill `atualizar-docs` (`/padrao:atualizar-docs [ref]`, ou o Claude chama antes de commitar):
-  corrige só a documentação que o diff atual deixou falsa — porta, comando, variável, caminho,
-  nome renomeado; regra contrariada pelo diff vira DIVERGENTE, sem edição.
+- Três comandos:
+  - `/padrao:aplicar`: avalia tudo o que mora no global e leva cada item para o seu projeto.
+  - `/padrao:arrumar [foco]`: levanta documentação, infraestrutura e o peso do `CLAUDE.md` sem
+    perguntar nada, volta com o plano completo — cada dúvida já com a resposta recomendada — e
+    pede UM OK. Aprovado, executa todos os lotes: o executor (sonnet) aplica, o revisor (sonnet)
+    confere, a verificação roda de verdade e cada lote vira um commit no branch
+    `padrao/arrumar-<data>`, sem push. A leitura de código vai ao `padrao:leitor` (haiku, sem o
+    `CLAUDE.md` no contexto, para não se contaminar pela documentação). Interrompido, rodar de
+    novo retoma de onde parou (`_audit/`).
+  - `/padrao:medir`: placar de modelos por subagent a partir dos transcripts locais.
+- Skill `atualizar-docs`, fora do menu: o Claude a chama antes de commitar e corrige só a
+  documentação que o diff deixou falsa — porta, comando, variável, caminho, nome renomeado;
+  regra contrariada pelo diff vira DIVERGENTE, sem edição.
 - Status line (`statusline/statusline.py`): modelo, pasta, branch, contexto, limites de 5h/7d e
   calor do prompt cache; com o padrão na própria linha — modelo em vermelho fora do Opus 5.5
-  1M, effort em vermelho fora de medium, "sem padrão" na pasta sem o plugin — e atualização a
-  cada 30 s (o contador do cache não congela com a sessão parada). Embutida de
+  1M, effort em amarelo fora de medium (ajuste da sessão), "sem padrão" na pasta sem o
+  plugin — e atualização a cada 30 s (o contador do cache não congela com a sessão parada).
+  Embutida de
   [Jhonatan-de-Souza/claude-code-statusline](https://github.com/Jhonatan-de-Souza/claude-code-statusline)
   (commit 44e9e48) com crédito e permissão do autor; fica fora da licença MIT deste repositório.
 - Status line dos subagents (`statusline/subagent-statusline.py`): uma linha por subagent no
@@ -58,6 +62,8 @@ Haiku coleta. Funciona no Windows (Git Bash) e no Linux.
 - **jq** — `winget install jqlang.jq` | `sudo apt install jq`. Sem ele, os agentes que só leem
   ficam sem Bash/PowerShell (fechado por padrão) e o hook de abertura se cala.
 - **Python 3.9+** para as skills (`scripts/py.sh` acha `python3`, `python` ou `py`).
+- **GNU sed 4.3+ e gawk** para os agentes que só leem usarem sed e awk (só com `--sandbox`; o Git
+  Bash já traz os dois). Com o mawk, padrão do Debian/Ubuntu, o awk deles fica negado.
 
 ## Instalar num projeto
 
@@ -77,11 +83,13 @@ o plugin é ignorado em silêncio: use os dois comandos acima.
 
 1. Inventaria o global (`inventariar.py`): `~/.claude/settings.json` e sobras, `CLAUDE.md`,
    agents, commands, skills, output-styles, status line, plugins no escopo user, MCP de
-   escopo user e local, memórias de cada projeto em `~/.claude/projects/*/memory`.
+   escopo user e local, memórias de cada projeto em `~/.claude/projects/*/memory`. Do `env` e
+   dos MCP saem só os nomes das variáveis, nunca os valores.
 2. Mostra o plano item → destino e pede OK uma vez.
 3. Faz backup em `.claude/backup-global-<data>/` (fora do git; sem tokens).
 4. Leva cada item ao projeto a que pertence: settings de time em `.claude/settings.json`,
-   pessoais em `.claude/settings.local.json`, MCP em `.mcp.json`, plugins com
+   pessoais e variáveis com nome de segredo em `.claude/settings.local.json` (fora do git),
+   `permissions.allow` regra a regra, com pergunta, MCP em `.mcp.json`, plugins com
    `--scope project`; memórias existentes (global ou `.claude/memoria/`) viram texto no
    `CLAUDE.md` do projeto, se forem fato durável e não pessoal (auto memory fica desligado).
 5. Insere no `CLAUDE.md` um bloco curto do padrão, sem sobrescrever o resto. O detalhe vai
@@ -94,11 +102,12 @@ o plugin é ignorado em silêncio: use os dois comandos acima.
      abordagem certa); subagent recebe as entradas que valem na passagem de tarefa.
 
    O mesmo vale para o contexto do próprio projeto: o que não serve a toda sessão vai para
-   `docs/agente/<tema>.md` (ou `.claude/rules/` com `paths:`), e o `/padrao:enxugar-docs`
-   aponta o que mover.
-6. Deixa o global só com `permissions.defaultMode`, `skipDangerousModePermissionPrompt`
-   (o Claude Code os recusa de projeto), `autoMemoryEnabled: false`, a `statusLine` e a
-   `subagentStatusLine` — interface do terminal, aparecem em qualquer pasta; scripts em `~/.claude/`.
+   `docs/agente/<tema>.md` (ou `.claude/rules/` com `paths:`), e o `/padrao:arrumar` faz essa
+   mudança.
+6. Deixa o global só com `autoMemoryEnabled: false`, a `statusLine` e a `subagentStatusLine` —
+   interface do terminal, aparecem em qualquer pasta; scripts em `~/.claude/` —, mais
+   `permissions.defaultMode` e `skipDangerousModePermissionPrompt` se você já os usava (o Claude
+   Code os recusa de projeto). O padrão não liga bypass nem desliga os checkpoints (`/rewind`).
 
 ## Por que as settings não vêm no plugin
 
@@ -113,6 +122,9 @@ O `model` do projeto vence o do usuário e é reaplicado a cada abertura, mesmo 
 bash scripts/testar.sh
 claude plugin validate .
 ```
+
+O `testar.sh` roda também no GitHub Actions (`.github/workflows/testes.yml`, Ubuntu) a cada push
+e pull request.
 
 ## Atualizar
 

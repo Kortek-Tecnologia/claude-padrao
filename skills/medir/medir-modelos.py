@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Mede se a política de modelos (regras do plugin padrao) pegou na prática.
 
-O hook só corrige Explore/Plan e recusa `model` fora da política; ele não vê o
-agente principal deixar de delegar, que é a falha cara (coleta e execução pagando
-preço de Opus). Isto lê os transcripts locais do Claude Code do projeto e conta:
+O hook só corrige os agentes de papel fixo e recusa `model` fora da política;
+ele não vê o agente principal deixar de delegar, que é a falha cara (coleta e
+execução pagando preço de Opus). Isto lê os transcripts locais do Claude Code do
+projeto e conta:
 
-- chamadas de subagent por tipo × modelo (haiku em zero = coleta não delegada);
-- recusas do hook de modelo;
-- turnos por modelo, do agente principal e dos subagents;
+- chamadas de subagent por tipo × modelo em que rodou (haiku em zero = coleta
+  não delegada);
+- correções (papel fixo) e recusas do hook de modelo;
+- tokens e turnos por modelo, do agente principal e dos subagents;
 - sessões sem nenhuma delegação (preocupa só a sessão longa).
 
     sh <plugin>/scripts/py.sh <dir da skill>/medir-modelos.py [--dias N] [--projeto P]
@@ -33,11 +35,40 @@ from pathlib import Path
 # Textos de recusa do hook de modelo: os atuais e os de versões anteriores.
 RECUSA = ("fora da politica", "roda em model=", "Subagent sem modelo", "e travado em model=")
 
+# Papel fixo, como o hook de modelo aplica: Plan e Explore sempre vão para este
+# modelo; os agentes do plugin, só quando a chamada traz outro `model` (sem ele
+# vale o frontmatter, que já é este).
+FIXO = {
+    "Plan": "opus",
+    "Explore": "haiku",
+    "padrao:coletor": "haiku",
+    "padrao:leitor": "haiku",
+    "padrao:revisor": "sonnet",
+    "padrao:executor": "sonnet",
+}
+
 
 def chave_projeto(caminho: str) -> str:
     """Nome da pasta em ~/.claude/projects: todo caractere não alfanumérico do
     caminho vira "-" (C:/Users/x → C--Users-x; /home/x/meu.proj → -home-x-meu-proj)."""
     return re.sub(r"[^A-Za-z0-9]", "-", caminho)
+
+
+def modelo_efetivo(tipo: str, pedido: str) -> tuple[str, bool]:
+    """(modelo em que o subagent rodou, se o hook corrigiu a chamada)."""
+    exigido = FIXO.get(tipo)
+    if exigido:
+        return exigido, pedido != exigido and (bool(pedido) or ":" not in tipo)
+    if tipo == "fork":
+        return "(sessão)", False
+    if pedido:
+        return pedido, False
+    # Sem `model`: o general-purpose cai no CLAUDE_CODE_SUBAGENT_MODEL do padrão;
+    # agente de plugin usa o frontmatter; outro agente (embutido ou do projeto),
+    # o modelo da própria definição, se ela fixar um.
+    if tipo == "general-purpose":
+        return "sonnet (env)", False
+    return ("(frontmatter)" if ":" in tipo else "(sem model)"), False
 
 
 def turno_novo(o: dict, vistos: set[str]) -> bool:
@@ -50,6 +81,30 @@ def turno_novo(o: dict, vistos: set[str]) -> bool:
         return False
     vistos.add(mid)
     return True
+
+
+def guardar_uso(usos: dict, msg: dict) -> None:
+    """Uso de tokens por resposta: as linhas de um mesmo message.id repetem o uso,
+    e a última traz o final — guarda por id, sobrescrevendo."""
+    uso = msg.get("usage")
+    if isinstance(uso, dict) and msg.get("model"):
+        usos[msg.get("id") or f"sem-id-{len(usos)}"] = (msg["model"], uso)
+
+
+def somar_uso(usos: dict) -> dict[str, Counter[str]]:
+    por_modelo: dict[str, Counter[str]] = defaultdict(Counter)
+    for modelo, uso in usos.values():
+        c = por_modelo[modelo]
+        c["entrada"] += (uso.get("input_tokens") or 0) + (uso.get("cache_creation_input_tokens") or 0)
+        c["cache lido"] += uso.get("cache_read_input_tokens") or 0
+        c["saída"] += uso.get("output_tokens") or 0
+    return por_modelo
+
+
+def fmt(n: int) -> str:
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    return f"{n / 1000:.0f}k" if n >= 1000 else str(n)
 
 
 def linhas(arquivo: Path, desde: str):
@@ -77,8 +132,11 @@ def main() -> None:
         raise SystemExit(f"sem transcripts em {pasta}")
 
     chamadas: dict[str, Counter[str]] = defaultdict(Counter)
+    corrigidas: Counter[str] = Counter()
     turnos_principal: Counter[str] = Counter()
     turnos_sub: Counter[str] = Counter()
+    uso_principal: dict = {}
+    uso_sub: dict = {}
     recusas = sessoes = sem_delegar = 0
     vistos: set[str] = set()
 
@@ -101,6 +159,7 @@ def main() -> None:
                         recusas += 1
             if o.get("type") != "assistant" or not isinstance(msg, dict):
                 continue
+            guardar_uso(uso_principal, msg)
             if msg.get("model") and turno_novo(o, vistos):
                 turnos_principal[msg["model"]] += 1
             for c in msg.get("content") or []:
@@ -110,10 +169,10 @@ def main() -> None:
                     and c.get("name") in ("Agent", "Task")
                 ):
                     i = c.get("input") or {}
-                    tipo = i.get("subagent_type", "general-purpose")
-                    # Agente de plugin (padrao:coletor…) traz `model:` no frontmatter.
-                    sem = "(frontmatter)" if ":" in tipo else "(sem model)"
-                    chamadas[tipo][i.get("model") or sem] += 1
+                    tipo = i.get("subagent_type") or "general-purpose"
+                    modelo, corrigida = modelo_efetivo(tipo, i.get("model") or "")
+                    chamadas[tipo][modelo] += 1
+                    corrigidas[tipo] += corrigida
                     ids_agent.add(c.get("id"))
                     delegou = True
         sessoes += ativa
@@ -122,17 +181,25 @@ def main() -> None:
     for arq in pasta.glob("*/subagents/*.jsonl"):
         for o, _ in linhas(arq, desde):
             msg = o.get("message")
-            if o.get("type") == "assistant" and isinstance(msg, dict) and msg.get("model") and turno_novo(o, vistos):
-                turnos_sub[msg["model"]] += 1
+            if o.get("type") == "assistant" and isinstance(msg, dict):
+                guardar_uso(uso_sub, msg)
+                if msg.get("model") and turno_novo(o, vistos):
+                    turnos_sub[msg["model"]] += 1
 
     print(f"últimos {dias} dias · {sessoes} sessão(ões) · {sem_delegar} sem nenhuma delegação")
-    print(f"recusas do hook de modelo: {recusas}")
+    correcoes = "  ".join(f"{t}={n}" for t, n in corrigidas.most_common() if n)
+    print(f"hook de modelo: {sum(corrigidas.values())} correção(ões) de papel fixo"
+          + (f" ({correcoes})" if correcoes else "") + f" · {recusas} recusa(s)")
     total: Counter[str] = Counter()
-    print("subagents (tipo: modelo × chamadas):")
+    print("subagents (tipo: modelo em que rodou × chamadas):")
     for tipo, por_modelo in sorted(chamadas.items()):
         total.update(por_modelo)
         print(f"  {tipo:<20} " + "  ".join(f"{m}={n}" for m, n in por_modelo.most_common()))
     print("  total                " + "  ".join(f"{m}={n}" for m, n in total.most_common()))
+    print("tokens por modelo (entrada · cache lido · saída):")
+    for rotulo, usos in (("principal", uso_principal), ("subagents", uso_sub)):
+        for modelo, c in sorted(somar_uso(usos).items(), key=lambda kv: -sum(kv[1].values())):
+            print(f"  {rotulo:<10} {modelo:<22} {fmt(c['entrada'])} · {fmt(c['cache lido'])} · {fmt(c['saída'])}")
     print(
         "turnos do agente principal: "
         + "  ".join(f"{m}={n}" for m, n in turnos_principal.most_common())

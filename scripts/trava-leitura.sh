@@ -1,17 +1,23 @@
 #!/bin/sh
 # Os agentes que só leem — o Explore embutido e os agentes `coletor`, `revisor` e
-# `leitor` do plugin — não têm Write/Edit, mas têm Bash (e o Explore, no Windows,
-# PowerShell) e podem gravar arquivo por eles mesmo instruídos a só ler.
-# Agente de plugin não declara hook no frontmatter; por isso este porteiro roda
-# para todo Bash e PowerShell e só aplica a trava quando a chamada vem de um
+# `leitor` do plugin — não têm Write/Edit, mas o Explore recebe quase todas as
+# ferramentas da sessão (Bash, PowerShell no Windows, MCP do projeto, Monitor,
+# Workflow, CronCreate...) e pode gravar ou executar por elas mesmo instruído a
+# só ler. Agente de plugin não declara hook no frontmatter; por isso este
+# porteiro roda para as ferramentas do matcher em hooks.json — as que executam,
+# gravam ou falam com fora — e só aplica a trava quando a chamada vem de um
 # deles (`agent_type` da entrada do hook). Fora deles: silêncio.
 #
 # - Bash: passa pela trava de segmentos (so-le.sh).
-# - PowerShell: negado inteiro — não há lista de leitura para ele; o agente
-#   tem Read/Grep/Glob e o Bash travado.
+# - Qualquer outra ferramenta do matcher (PowerShell, MCP...): negada inteira;
+#   o agente tem Read/Grep/Glob e o Bash travado. Ferramenta nova que executa
+#   ou grava entra no matcher do hooks.json.
 # - Sem jq: o agente que só lê é negado (fechado por padrão); os demais seguem.
 SO_LEEM='Explore|padrao:coletor|padrao:revisor|padrao:leitor'
 entrada=$(cat)
+# Sessão principal não traz agent_type: sai sem abrir jq (este hook roda em todo
+# Bash; no Windows cada processo a mais pesa).
+case "$entrada" in *'"agent_type"'*) ;; *) exit 0 ;; esac
 
 negar() {
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s so le: %s"}}\n' "${tipo:-subagent}" "$1"

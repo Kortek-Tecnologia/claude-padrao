@@ -8,7 +8,8 @@
 #    família 5.5, modelo de subagent sem `model`, memória desligada, subagent
 #    sem subagent) do .claude/settings.json iguais aos de modelos/settings.json
 #    (fonte única). `CLAUDE_CODE_DISABLE_AUTO_MEMORY` vence `autoMemoryEnabled`
-#    nos dois sentidos: por isso basta conferir o env.
+#    nos dois sentidos: por isso basta conferir o env. Checkpoints ligados:
+#    sem `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` (versões antigas o punham).
 # 2. Global limpo: ~/.claude/settings.json só com permissions.defaultMode,
 #    skipDangerousModePermissionPrompt, autoMemoryEnabled, statusLine e
 #    subagentStatusLine (interface do terminal: vale em qualquer pasta,
@@ -16,7 +17,9 @@
 #    de CLAUDE.md, agents, commands, skills, output-styles, rules ou workflows
 #    em ~/.claude; nenhum MCP de escopo user nem local deste projeto no
 #    ~/.claude.json; nenhuma memória deste projeto em ~/.claude/projects. O
-#    `/model` e o `/effort` gravam no global — por isso o 2.
+#    `/model` grava no global — por isso o 2. O effort que o `/effort` salva
+#    (`modelSettings` só com `effortLevel`, ou o `effortLevel` antigo) passa: o
+#    `modelSettings` do projeto vence o do usuário, e toda sessão abre em medium.
 # 3. Sem fallback: nenhum `fallbackModel` no settings.json nem no local.
 # 4. Nada do app: `disableClaudeAiConnectors: true` no .claude/settings.json
 #    (conectores MCP do claude.ai) e `syncClaudeAiPlugins: false` no
@@ -47,6 +50,9 @@ achados=$(jq -rn \
   --arg inst "$(le "$plugin/.claude-plugin/plugin.json")" \
   --arg pub "$(le "$g/plugins/marketplaces/claude-padrao/.claude-plugin/plugin.json")" '
   def obj: (try fromjson catch null) | if type == "object" then . else null end;
+  # modelSettings que só guarda effort por modelo (o que o /effort grava)
+  def so_effort: type == "object"
+    and ([.[] | if type == "object" then keys[] else "?" end] - ["effortLevel"] | length) == 0;
   ($proj | obj) as $P | ($local | obj) as $L | ($mod | obj) as $M | ($glob | obj) as $G
   | (($inst | obj) // {} | .version // "") as $vi
   | (($pub | obj) // {} | .version // "") as $vp
@@ -68,12 +74,15 @@ achados=$(jq -rn \
     | select($tem != $quer)
     | "\(.[0]) do projeto e '\''\($tem)'\'', o padrao e '\''\($quer)'\''"
   else empty end),
+  (if $P and ($P.env // {} | has("CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING")) then
+    "checkpoints (/rewind) desligados: tire env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING do .claude/settings.json" else empty end),
   (if $P and (($P.extraKnownMarketplaces["claude-padrao"].autoUpdate // false) != true) then
     "atualizacao automatica do padrao desligada (extraKnownMarketplaces.claude-padrao.autoUpdate no .claude/settings.json)" else empty end),
   (if $vi != "" and $vp != "" and $vi != $vp then
     "padrao \($vi) instalado, \($vp) disponivel: rode '\''claude plugin update padrao@claude-padrao --scope project'\'' e depois /reload-plugins" else empty end),
   (if $G then
-    ((($G | keys) - ["permissions", "autoMemoryEnabled", "skipDangerousModePermissionPrompt", "statusLine", "subagentStatusLine"])
+    ((($G | keys) - ["permissions", "autoMemoryEnabled", "skipDangerousModePermissionPrompt", "statusLine", "subagentStatusLine", "effortLevel"]
+        - (if ($G.modelSettings | so_effort) then ["modelSettings"] else [] end))
       + (($G.permissions // {}) | keys - ["defaultMode"] | map("permissions." + .))
     | select(length > 0) | "~/.claude/settings.json tem chaves fora do padrao: \(join(", "))")
   else empty end)

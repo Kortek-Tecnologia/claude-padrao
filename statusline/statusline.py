@@ -188,7 +188,8 @@ def truncate(text, n):
 
 # --- padrao: início do bloco do plugin padrao (o resto do arquivo é do autor) ---
 # Política na própria linha: modelo em vermelho fora do Opus 5.5 com 1M, effort
-# em vermelho fora de medium, "sem padrão" na pasta sem o plugin.
+# em amarelo fora de medium (ajuste da sessão: a próxima abre em medium), "sem
+# padrão" na pasta sem o plugin.
 PADRAO_MODELO, PADRAO_JANELA, PADRAO_EFFORT = "claude-opus-5-5", 1_000_000, "medium"
 
 
@@ -200,7 +201,7 @@ def padrao(data):
     marcas = []
     effort = (data.get("effort") or {}).get("level")
     if effort:
-        marcas.append(f"{GRAY if effort == PADRAO_EFFORT else RED}{effort}{RESET}")
+        marcas.append(f"{GRAY if effort == PADRAO_EFFORT else YELLOW}{effort}{RESET}")
     raiz = (data.get("workspace") or {}).get("project_dir") or ""
     try:
         with open(os.path.join(raiz, ".claude", "settings.json"), encoding="utf-8") as f:

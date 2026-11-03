@@ -22,12 +22,13 @@
             "shell": "bash",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/travar-modelo-subagent.sh\"",
             "timeout": 10,
-            "statusMessage": "Modelo do subagent"
+            "statusMessage": "Modelo do subagent",
+            "onFailure": "block"
           }
         ]
       },
       {
-        "matcher": "Bash|PowerShell",
+        "matcher": "^(Bash|PowerShell|Monitor|Workflow|Cron(Create|Delete)|RemoteTrigger|(Enter|Exit)Worktree|SendMessage|SendToProject.*|PushNotification|TaskStop)$|^mcp__",
         "hooks": [
           {
             "type": "command",
