@@ -19,7 +19,7 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 | `scripts/py.sh` | acha `python3`/`python`/`py` 3.9+ e roda com `-I` |
 | `agents/` | `coletor` (haiku), `leitor` (haiku, sem CLAUDE.md), `revisor` (sonnet), `executor` (sonnet) |
 | `skills/` | os três comandos — `aplicar` (+ `inventariar.py`, `modelos/`), `arrumar` (levanta, um OK, executa tudo) e `medir` (+ `medir-modelos.py`) — e `atualizar-docs`, fora do menu: o Claude a chama antes de commitar (o `cobrar-docs.sh` cobra) |
-| `statusline/` | `statusline.py` (principal) e `subagent-statusline.py`; instalados em `~/.claude/` pela skill `aplicar` |
+| `statusline/`, `settings.json` | `statusline.py` (principal; a skill `aplicar` a instala em `~/.claude/`) e `subagent-statusline.py` (linha dos subagents; roda direto do plugin, pelo `subagentStatusLine` do `settings.json` da raiz) |
 | `docs/como-funciona.md` | para quem mantém: peças, decisões dos hooks, skills, testes e publicação (o README é para quem usa) |
 | `AGENT_LEARNINGS.md` | erros do agente neste repositório e a abordagem certa; lido sob demanda (modelo e `docs/agente/padrao-*.md` em `skills/aplicar/modelos/`) |
 
@@ -36,7 +36,9 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 - Repositório público, licença MIT (`LICENSE`). `statusline/statusline.py` é código de
   terceiro (Jhonatan de Souza), usado com permissão e fora da MIT: mantenha o crédito.
 - Settings de plugin descartam `model` e `effortLevel`; por isso a skill `aplicar`
-  grava no `.claude/settings.json` do projeto.
+  grava no `.claude/settings.json` do projeto. Do `settings.json` da raiz só valem `agent` e
+  `subagentStatusLine`, e o global vence o plugin: `subagentStatusLine` no global é chave fora
+  do padrão.
 - Mudou `claude-md.md` ou `agente/padrao-*.md` em `skills/aplicar/modelos/`: suba o carimbo
   `modelo X` da 1ª linha para a versão nova e registre-o com a soma em `scripts/testar.sh` (o
   teste cobra). O hook de abertura compara só o carimbo: sem subir, projeto antigo não é avisado.

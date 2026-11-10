@@ -76,6 +76,11 @@ flowchart TD
 O bloco que entra no `CLAUDE.md` é curto: o detalhe fica em arquivos lidos **sob demanda**,
 listados num índice "arquivo → quando ler" (sem `@import`, que carregaria tudo em toda sessão).
 
+Projeto com servidor de linguagem instalado (Pyright, `typescript-language-server`…): o plano
+oferece o plugin oficial de LSP no escopo do projeto, em vez de deixá-lo ir para o global pelo
+diálogo do Claude Code. É oferta, não padrão: no teste, busca e renomeação saíram com o mesmo
+custo com e sem ele; o ganho é o erro de tipo apontado na hora da edição.
+
 Projeto com `AGENTS.md`: com um `CLAUDE.md` na pasta, o Claude Code deixa de ler o `AGENTS.md`
 sozinho. O plano inclui `@AGENTS.md` na primeira linha do `CLAUDE.md` (e, para `AGENTS.md` de
 subpasta, um `CLAUDE.md` ao lado só com o import), para as instruções do time não saírem do
@@ -161,7 +166,7 @@ hook não rodou naquela sessão (plugin antigo, `jq` ausente).
 | Trava de leitura | Bash, MCP e ferramentas que gravam, nos agentes que só leem | deixa `Explore`, coletor, leitor e revisor só lerem: grava, redireciona ou executa → recusa, dizendo o motivo |
 | `atualizar-docs` | antes de cada commit | corrige só a documentação que o diff deixou falsa (porta, comando, variável, caminho) |
 | Lembrete da documentação | todo `git commit` que o Claude roda | se a `atualizar-docs` não rodou desde o commit anterior, recusa uma vez e manda rodá-la; a repetição passa |
-| Status lines | sempre | modelo, effort, contexto, limites e cache na linha; uma linha por subagent |
+| Status lines | sempre; a dos subagents, onde o plugin está ligado | modelo, effort, contexto, limites e cache na linha; uma linha por subagent, que vem do próprio plugin |
 
 ```
 Opus 5.5 · loja · main · medium
@@ -219,7 +224,7 @@ flowchart LR
 flowchart LR
   subgraph G["~/.claude: global"]
     direction TB
-    g1["statusLine e subagentStatusLine"]
+    g1["statusLine"]
     g2["autoMemoryEnabled: false"]
     g3["defaultMode e skipDangerous…<br/>só se você já usava"]
     g1 ~~~ g2 ~~~ g3
@@ -236,7 +241,8 @@ flowchart LR
 ```
 
 O plugin não traz essas settings prontas porque o Claude Code descarta `model`, `effortLevel` e
-afins quando vêm de plugin (só `agent` e `subagentStatusLine` valem). Por isso o `aplicar` as
+afins quando vêm de plugin (só `agent` e `subagentStatusLine` valem — e a linha dos subagents
+vem assim, do `settings.json` do plugin, sem cópia no global). Por isso o `aplicar` as
 grava no `.claude/settings.json` do projeto, que vence o global a cada abertura — mesmo depois
 de um `/model`. O padrão não liga bypass de permissões nem desliga os checkpoints (`/rewind`);
 auto memory fica desligado e o contexto do projeto vive no `CLAUDE.md`.
@@ -245,8 +251,9 @@ auto memory fica desligado e o contexto do projeto vive no `CLAUDE.md`.
 
 Requisitos:
 
-- Claude Code **v2.1.317+** (antes dela, subagent herda o effort da sessão em vez do effort do
-  próprio modelo); o Fable 5.2 pede a v2.1.321.
+- Claude Code **v2.1.319+** (antes da 2.1.317, subagent herda o effort da sessão em vez do
+  effort do próprio modelo; antes da 2.1.319, a linha dos subagents que o plugin traz não
+  roda); o Fable 5.2 pede a v2.1.321.
 - Windows: **Git Bash** (os hooks rodam em `bash`).
 - **jq** — `winget install jqlang.jq` | `sudo apt install jq`. Sem ele, os agentes que só leem
   ficam sem Bash e o hook de abertura se cala: falha fechado. O lembrete da documentação
@@ -318,6 +325,7 @@ scripts/          os hooks em sh, py.sh e testar.sh
 agents/           coletor, leitor, revisor, executor
 skills/           aplicar (+ inventário e modelos), arrumar, medir, atualizar-docs
 statusline/       status line principal e dos subagents
+settings.json     a única setting que o plugin traz: a linha dos subagents
 docs/             como funciona por dentro
 .github/          CI: testes e validação dos diagramas
 ```

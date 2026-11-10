@@ -40,7 +40,7 @@ DESTINO = {
     "extraKnownMarketplaces": "time",
     "disableClaudeAiConnectors": "padrao",
     "statusLine": "global",
-    "subagentStatusLine": "global",
+    "subagentStatusLine": "padrao",  # vem do settings.json do plugin; no global venceria a dele
     "language": "local",
     "tui": "local",
     "theme": "local",
@@ -187,7 +187,7 @@ def main() -> None:
                     "output-styles": listar(G / "output-styles"),
                     "rules": listar(G / "rules"),
                     "workflows": listar(G / "workflows"),
-                    "statusline": sorted(p.name for p in G.glob("statusline*") if p.name not in ("statusline.py", "subagent-statusline.py")),
+                    "statusline": sorted(p.name for p in G.glob("*statusline*") if p.name != "statusline.py"),
                     "keybindings.json": (G / "keybindings.json").is_file(),
                 },
                 "plugins": plugins,

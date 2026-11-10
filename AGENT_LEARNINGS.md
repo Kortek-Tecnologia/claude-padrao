@@ -56,3 +56,8 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 - Erro: o `cobrar-docs.sh` achava o `git commit` com o `segmentar` do `segmentos.sh`, que parte na crase; um `cat <<'EOF'` cujo texto citava `git commit` entre crases foi recusado como commit, e só o teste de ponta a ponta mostrou.
 - Evitar: tratar o corte da trava como parser de shell em hook que precisa acertar (ele corta a mais de propósito: na trava, errar para o lado de negar é seguro).
 - Fazer: tirar o corpo dos heredocs antes do corte (`sem_heredoc` no script) e pôr no `testar.sh` um caso com o comando citado em texto; hook novo passa por sessão real no sandbox antes de fechar.
+
+### Saída de comando pago passada por filtro (2026-11-10)
+- Erro: rodei o `claude plugin eval` com a saída num `| sed …` de expressão errada; o `sed` morreu, a saída sumiu e a rodada (paga) teve de ser repetida.
+- Evitar: encadear filtro novo direto na saída de comando que custa dinheiro ou demora (sessão aninhada, eval, suíte).
+- Fazer: gravar a saída num arquivo do scratchpad (`> saida.log 2>&1`) e filtrar depois, do arquivo.

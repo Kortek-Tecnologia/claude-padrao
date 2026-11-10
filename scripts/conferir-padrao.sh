@@ -13,9 +13,11 @@
 #    nos dois sentidos: por isso basta conferir o env. Checkpoints ligados:
 #    sem `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` (versões antigas o punham).
 # 2. Global limpo: ~/.claude/settings.json só com permissions.defaultMode,
-#    skipDangerousModePermissionPrompt, autoMemoryEnabled, statusLine e
-#    subagentStatusLine (interface do terminal: vale em qualquer pasta,
-#    inclusive no home), com os scripts em ~/.claude iguais aos do plugin; nada
+#    skipDangerousModePermissionPrompt, autoMemoryEnabled e statusLine
+#    (interface do terminal: vale em qualquer pasta, inclusive no home), com o
+#    script em ~/.claude igual ao do plugin. A linha dos subagents vem do
+#    settings.json do plugin: `subagentStatusLine` no global venceria a dele
+#    (por isso é chave fora do padrão) e a cópia antiga do script é sobra. Nada
 #    de CLAUDE.md, agents, commands, skills, output-styles, rules ou workflows
 #    em ~/.claude; nenhum MCP de escopo user nem local deste projeto no
 #    ~/.claude.json; nenhuma memória deste projeto em ~/.claude/projects. O
@@ -90,7 +92,7 @@ achados=$(jq -rn \
   (if $vi != "" and $vp != "" and $vi != $vp then
     "padrao \($vi) instalado, \($vp) disponivel: rode '\''claude plugin update padrao@claude-padrao --scope project'\'' e depois /reload-plugins" else empty end),
   (if $G then
-    ((($G | keys) - ["permissions", "autoMemoryEnabled", "skipDangerousModePermissionPrompt", "statusLine", "subagentStatusLine", "effortLevel"]
+    ((($G | keys) - ["permissions", "autoMemoryEnabled", "skipDangerousModePermissionPrompt", "statusLine", "effortLevel"]
         - (if ($G.modelSettings | so_effort) then ["modelSettings"] else [] end))
       + (($G.permissions // {}) | keys - ["defaultMode"] | map("permissions." + .))
     | select(length > 0) | "~/.claude/settings.json tem chaves fora do padrao: \(join(", "))")
@@ -100,12 +102,12 @@ achados=$(jq -rn \
 anota() { achados="${achados:+$achados
 }- $1"; }
 
-for sl in statusline.py subagent-statusline.py; do
-  orig="$plugin/statusline/$sl"
-  if [ -r "$orig" ] && ! cmp -s "$orig" "$g/$sl"; then
-    anota "~/.claude/$sl ausente ou diferente da do plugin"
-  fi
-done
+orig="$plugin/statusline/statusline.py"
+if [ -r "$orig" ] && ! cmp -s "$orig" "$g/statusline.py"; then
+  anota "~/.claude/statusline.py ausente ou diferente da do plugin"
+fi
+[ -e "$g/subagent-statusline.py" ] &&
+  anota "~/.claude/subagent-statusline.py sobrou (a linha dos subagents agora vem do plugin)"
 # carimbo ARQUIVO MARCA: o X de `modelo X` na 1ª linha do arquivo que casa com a
 # marca. A marca vem ancorada no começo da linha: prosa do projeto que cite o
 # marcador ("o bloco fica entre <!-- padrao:inicio e ...") não pode valer por ele.

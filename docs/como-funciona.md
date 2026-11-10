@@ -19,8 +19,9 @@ flowchart LR
   GC --> CD["cobrar-docs.sh"] --> SG
   AP["skill aplicar"] -->|"grava a partir de"| MOD["skills/aplicar/modelos/"]
   CP -->|"compara com"| MOD
-  AP -->|"copia para ~/.claude/"| ST["statusline/*.py"]
+  AP -->|"copia para ~/.claude/"| ST["statusline/statusline.py"]
   CP -->|"confere a cópia"| ST
+  PS["settings.json do plugin:<br/>subagentStatusLine"] --> SU["py.sh →<br/>subagent-statusline.py"]
 ```
 
 | Caminho | Papel |
@@ -30,6 +31,7 @@ flowchart LR
 | `scripts/py.sh` | acha `python3`, `python` ou `py` 3.9+ (no Windows o `python3` costuma ser o atalho quebrado da Store) e roda com `-I` |
 | `agents/*.md` | os quatro agentes; os que só leem têm `tools` fechado e `disallowedTools` |
 | `statusline/` | `statusline.py` é de terceiro (Jhonatan de Souza); nossas linhas ficam entre `padrao: início` e `padrao: fim` ou marcadas `# padrao` |
+| `settings.json` | a única setting que o plugin traz: `subagentStatusLine`, que roda o `subagent-statusline.py` direto do plugin (de plugin só valem ela e `agent`) |
 
 ## Hook de abertura — `conferir-padrao.sh`
 
@@ -42,11 +44,27 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 | `model`, `effortLevel`, `modelSettings` (todos os campos que o modelo define em cada modelo, inclusive `autoCompactWindow`; campo ou modelo só do projeto não conta) e as chaves de `env` do projeto | `modelos/settings.json` |
 | `fallbackModel` em `settings.json` ou `settings.local.json`; `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` | têm de estar ausentes |
 | `disableClaudeAiConnectors` (projeto) e `syncClaudeAiPlugins: false` (local, único lugar em que vale) | `true` / `false` |
-| `~/.claude/settings.json` | só `permissions.defaultMode`, `skipDangerousModePermissionPrompt`, `autoMemoryEnabled`, as status lines e o effort que o `/effort` salva (o projeto vence) |
-| `~/.claude/` | sem `CLAUDE.md`, agents, commands, rules, workflows, skills pessoais (menos `synced/` e ocultas), status lines diferentes das do plugin |
+| `~/.claude/settings.json` | só `permissions.defaultMode`, `skipDangerousModePermissionPrompt`, `autoMemoryEnabled`, a status line principal e o effort que o `/effort` salva (o projeto vence); `subagentStatusLine` ali é chave fora do padrão, porque o global vence o plugin |
+| `~/.claude/` | sem `CLAUDE.md`, agents, commands, rules, workflows, skills pessoais (menos `synced/` e ocultas), `statusline.py` diferente da do plugin, `subagent-statusline.py` sobrando |
 | `~/.claude.json` e `~/.claude/projects/<chave>/memory` | sem MCP de escopo user nem local deste projeto; sem memória deste projeto |
 | versão instalada × `~/.claude/plugins/marketplaces/claude-padrao` | por **diferença**, não por ordem: a numeração recomeçou em 1.0.0 |
 | carimbo `modelo X` do bloco do `CLAUDE.md` e dos `docs/agente/padrao-*.md` do projeto | o da 1ª linha do arquivo em `modelos/`; só o carimbo, não o texto — quem grava no projeto é o Claude, e espaço ou CRLF dariam aviso falso. A marca vale só no começo da linha (prosa que cita o marcador não conta), e carimbo mais novo que o do plugin manda atualizar o plugin, não rodar o `aplicar` |
+
+## Linha dos subagents — `settings.json` do plugin
+
+O `subagentStatusLine` vem do `settings.json` da raiz, sem cópia em `~/.claude`: atualizou o
+plugin, atualizou a linha. Medido na v2.1.322, numa sessão interativa dentro de um
+pseudo-terminal (ver [Testes](#testes)):
+
+- o comando roda pelo Git Bash, com `${CLAUDE_PLUGIN_ROOT}` já trocado (a troca só existe da
+  v2.1.319 em diante) e com `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA` e `CLAUDE_PROJECT_DIR`
+  no ambiente;
+- o painel chama o comando a cada 5 s enquanto há subagent visível; nos primeiros segundos
+  aparece a linha padrão do Claude Code. Por isso o `py.sh` serve (~0,6 s no Windows, com o
+  teste de versão do Python) e não foi preciso um lançador próprio;
+- **o global vence o plugin**: `subagentStatusLine` em `~/.claude/settings.json` (o padrão a
+  punha lá até a 2.2.1) esconde a do plugin. O hook de abertura acusa a chave e a cópia antiga
+  do script, e o `aplicar` tira as duas.
 
 ## Hook de modelo — `travar-modelo-subagent.sh`
 
@@ -177,6 +195,22 @@ existe no `AGENTS.md`: sem import ela some, na raiz e em subpasta; com import, v
 que liga os dois (`pluginConfigs`) só vale no settings global, fora do padrão; o import mora no
 projeto. O `arrumar` acha o mesmo caso na carga fixa.
 
+LSP no `aplicar` é oferta, e só com o binário já no `PATH`. Medido na v2.1.322, no Windows, com
+o `pyright-lsp` e o Pyright do npm num projeto Python público de 13 mil linhas:
+
+- o servidor sobe (o atalho `.cmd` do npm serve) e o Claude recebe a ferramenta `LSP`
+  (`workspaceSymbol`, `findReferences`, `hover`) e os diagnósticos de tipo — estes na chamada de
+  ferramenta seguinte à edição, e só para `Edit`/`Write` (edição por `sed` no Bash não dispara);
+- a ferramenta `LSP` é adiada: o modelo a carrega pelo `ToolSearch` quando decide usá-la. Em
+  duas tarefas iguais com e sem o plugin (achar as chamadas de um método entre homônimos;
+  renomear um método no código e nos testes), o resultado, os turnos e o custo foram os mesmos,
+  e o Claude não chamou o `LSP` em nenhuma: resolveu por grep. Sem o plugin em uso, o contexto
+  não cresce;
+- `claude plugin install <plugin>@claude-plugins-official --scope project` grava só o
+  `enabledPlugins` do projeto (e reordena as chaves do arquivo). O marketplace oficial já vem
+  registrado numa instalação normal; num HOME novo de teste é preciso adicioná-lo, e no Windows
+  o clone dele estoura os 260 caracteres sem `core.longpaths`.
+
 **`arrumar`** — o estado mora em `_audit/` (no `.gitignore`), e é ele que permite retomar:
 
 ```mermaid
@@ -221,7 +255,8 @@ tabela não entra no custo nem nas faixas e é listado à parte.
 - que o `--sandbox` do sed e do gawk segura de verdade o que a trava deixa passar;
 - o hook de abertura com HOME e projeto falsos, limpo e sujo;
 - que nenhum modelo de `skills/aplicar/modelos/` mudou sem subir o carimbo (soma do texto);
-- as duas status lines, o inventário (não imprime valor do `env`) e as contas do `medir`
+- as duas status lines, o comando do `settings.json` do plugin (com o `${CLAUDE_PLUGIN_ROOT}`
+  trocado), o inventário (não imprime valor do `env`) e as contas do `medir`
   (inclusive custo, faixas de contexto, Haiku acima de 100K e período sem requisição).
 
 O CI tem ainda um job `diagramas`, que passa todo bloco Mermaid dos .md pelo parser oficial
@@ -245,6 +280,30 @@ Não cobre o texto das skills. Para elas, o **teste de ponta a ponta**:
    `git commit` e nenhuma recusa; com o bloco sem a linha "Antes de todo commit", recusa →
    `Skill` → commit. O que o hook recebe (campos, `if`, `CLAUDE_PLUGIN_DATA`) se sonda com um
    plugin de um hook só que grava a entrada, num `--plugin-dir` a mais.
+
+O que só a interface mostra (linha dos subagents, status line, diálogos) não aparece no
+`claude -p`. Para isso, uma sessão interativa num pseudo-terminal: um script Node com
+`@lydell/node-pty` (sobe o `claude` com o HOME falso e o token na env) e `@xterm/headless`
+(remonta a tela), gravando a tela em texto a cada mudança. No HOME falso, ponha
+`hasTrustDialogAccepted` para a pasta em `.claude.json` e `skipDangerousModePermissionPrompt`
+no settings, senão a sessão para nos diálogos de abertura.
+
+**`claude plugin eval`: ensaiado, não adotado** (v2.1.322, Windows, três casos de teste). Roda
+com a assinatura, guarda o relatório local e custa ~US$ 0,10 por rodada, mas não alcança o que
+este plugin precisa testar:
+
+- caso que pede Bash é recusado no Windows nativo, porque não há sandbox (`no sandbox backend on
+  this platform`). É onde mora quase tudo: o lembrete do commit, o `aplicar`, o `arrumar`, o
+  `medir`. Em Linux, macOS ou WSL2 roda; em CI pede API key, `bubblewrap` e `socat`;
+- nada de projeto carrega na rodada (`CLAUDE.md`, `.claude/`): as regras do bloco ficam de fora,
+  e o hook de abertura acusa "padrão fora do lugar" em toda rodada;
+- os arquivos de `context.add_dirs` não aparecem na pasta de trabalho: o Claude não os achou em
+  nenhuma rodada; fixture pede `scaffold_script`.
+
+O que rodou: a `atualizar-docs` foi chamada por frase natural só com o plugin carregado, e o
+`Explore` rodou em Haiku pelo hook de modelo (no `trace` isso aparece no `model` das mensagens
+do subagent; o texto do hook não entra). Vale rever quando o time tiver máquina com sandbox ou
+quando o sandbox do Windows sair de trás do `feature gate` que a recusa cita.
 
 No Windows, o caminho do HOME falso no scratchpad passa de 260 caracteres dentro de
 `.claude/projects/`: Python e o `jq` nativo não abrem — leia com `cat arquivo | jq` e, para o

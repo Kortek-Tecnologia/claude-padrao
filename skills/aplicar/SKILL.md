@@ -7,9 +7,10 @@ description: Aplica o padrão de Claude Code no projeto — leva o que mora no g
 
 Regra: **tudo no projeto, global limpo.** No `~/.claude/settings.json` ficam só
 `autoMemoryEnabled: false`, para pasta sem o padrão não criar memória no global (nos projetos o
-auto memory também fica desligado: contexto vai no `CLAUDE.md` da pasta), e `statusLine` e
-`subagentStatusLine`: são interface do terminal e têm de aparecer em qualquer pasta, inclusive
-no home — scripts em `~/.claude/statusline.py` e `~/.claude/subagent-statusline.py`. As chaves
+auto memory também fica desligado: contexto vai no `CLAUDE.md` da pasta), e `statusLine`: é
+interface do terminal e tem de aparecer em qualquer pasta, inclusive no home — script em
+`~/.claude/statusline.py`. A linha dos subagents (`subagentStatusLine`) vem do `settings.json`
+do próprio plugin, onde ele está ligado: no global ela venceria a do plugin, então sai. As chaves
 que o Claude Code recusa de projeto — `permissions.defaultMode` (bypass/auto só valem do escopo
 user) e `skipDangerousModePermissionPrompt` — ficam se o usuário já as tem; o padrão não as cria.
 
@@ -45,7 +46,8 @@ abertura acusar memória ou MCP que o inventário não traz, liste pelo Bash e i
 
 Leia também do projeto: `.claude/settings.json`, `.claude/settings.local.json`, `.mcp.json`,
 `CLAUDE.md`, `.gitignore`, `.claude/agents|skills|commands` e todo `AGENTS.md` versionado
-(`git ls-files AGENTS.md '*/AGENTS.md'`).
+(`git ls-files AGENTS.md '*/AGENTS.md'`). Veja também as linguagens do projeto, para a oferta de
+LSP do passo 2: `git ls-files | grep -o '\.[A-Za-z0-9]*$' | sort | uniq -c | sort -rn | head -5`.
 
 ## 2. Monte o plano e peça OK UMA vez
 
@@ -67,6 +69,7 @@ Mostre uma tabela item → destino → ação, cobrindo TODO o inventário. Mexe
 | `~/.claude/CLAUDE.md` | `CLAUDE.md` de cada projeto, só o que se aplica a ele |
 | `agents/`, `commands/`, `skills/` (menos `synced/`), `output-styles/`, `rules/`, `workflows/` | `.claude/<mesmo>` dos projetos que usam; de terceiro ou pessoal → também no `.gitignore` |
 | status line (`statusline*`) | substituída pela do padrão (passo 8); a antiga só no backup |
+| `subagentStatusLine` e `~/.claude/subagent-statusline.py` | saem: a linha dos subagents vem do plugin (passo 8) |
 | plugin no escopo user | `claude plugin install <p> --scope project` nos projetos que usam (rode DENTRO de cada um); depois `claude plugin uninstall <p> --scope user` |
 | MCP escopo user | `.mcp.json` na raiz dos projetos que usam — PERGUNTE quais; depois `claude mcp remove <nome> --scope user` |
 | MCP escopo local de um projeto | `.mcp.json` daquele projeto; depois, de dentro dele, `claude mcp remove <nome> --scope local` |
@@ -79,6 +82,30 @@ pasta não importa (`@AGENTS.md` fora de crase), uma linha no plano, com o taman
 raiz, `@AGENTS.md` na primeira linha do `CLAUDE.md`; em subpasta, um `<pasta>/CLAUDE.md` só com
 `@AGENTS.md` (ou a linha no que já existir), que carrega quando o Claude lê arquivo de lá. O
 import soma à carga fixa: o que o usuário não quiser importar fica de fora e vai para o resumo.
+
+**Code intelligence (LSP) é oferta, não padrão.** O plugin oficial da linguagem dá ao Claude o
+erro de tipo logo depois de cada `Edit`/`Write` e a navegação por símbolo (ferramenta `LSP`). Só
+funciona com o servidor de linguagem instalado na máquina. Medido num projeto de 13 mil linhas,
+busca e renomeação saíram com o mesmo custo e acerto com e sem ele (o Claude resolveu por grep):
+o ganho esperado é o erro de tipo pego na edição e a navegação em base grande. Para cada
+linguagem com peso no projeto:
+
+| Extensões | Plugin | Binário |
+|---|---|---|
+| `.py` | `pyright-lsp` | `pyright-langserver` — `npm install -g pyright` |
+| `.ts` `.tsx` `.js` `.jsx` | `typescript-lsp` | `typescript-language-server` — `npm install -g typescript-language-server typescript` |
+| `.go` · `.rs` · `.cs` · `.java` | `gopls-lsp` · `rust-analyzer-lsp` · `csharp-lsp` · `jdtls-lsp` | `gopls` · `rust-analyzer` · `csharp-ls` · `jdtls` |
+| `.c` `.cpp` `.h` · `.php` · `.rb` | `clangd-lsp` · `php-lsp` · `ruby-lsp` | `clangd` · `intelephense` · `ruby-lsp` |
+| `.kt` · `.lua` · `.swift` | `kotlin-lsp` · `lua-lsp` · `swift-lsp` | `kotlin-lsp` · `lua-language-server` · `sourcekit-lsp` |
+
+- Binário no `PATH` (`command -v <binário>`) e plugin fora do `enabledPlugins` do projeto → uma
+  linha no plano: instalar `<plugin>@claude-plugins-official` no escopo do projeto. Vale fazer por
+  aqui: com o binário presente, o próprio Claude Code oferece o plugin num diálogo que o instala
+  no escopo do usuário, fora do padrão. O time recebe pelo git; quem não tiver o binário fica sem
+  o servidor, e a sessão segue normal.
+- Binário ausente → não instale. No resumo final, uma linha com o comando que instala o binário
+  (os que a tabela não traz estão no README do plugin, em
+  `github.com/anthropics/claude-plugins-official/tree/main/plugins/<plugin>`).
 
 `keybindings.json` e `themes/` são só globais por natureza: ficam. Nunca toque em estado do app:
 `.credentials.json`, `projects/*.jsonl` e `projects/*/subagents` (transcripts, o `/resume`
@@ -130,6 +157,11 @@ globais que vão mudar e as pastas de memória. NÃO copie `~/.claude.json` (tem
 - `.gitignore`: `.claude/settings.local.json`, `.claude/backup-global-*/` e `_audit/` (rascunho
   do `/padrao:arrumar`; os commits dele não podem levá-lo). `.claude/memoria/` não é mais acrescentado (não remova de
   projeto que já o tenha).
+- Plugin de LSP aprovado no plano: de dentro do projeto,
+  `claude plugin install <plugin>@claude-plugins-official --scope project` (grava só o
+  `enabledPlugins` do `.claude/settings.json`). Se o marketplace oficial não estiver registrado
+  nesta máquina (`not found in marketplace "claude-plugins-official"`), não o adicione no
+  global: ponha o erro no resumo.
 
 ## 5. Memórias (auto memory desligado)
 
@@ -182,9 +214,10 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
    `skipDangerousModePermissionPrompt` SÓ se o usuário já os tinha (com o mesmo valor; não os
    crie), `<PYTHON>` = o interpretador que o `py.sh` acha nesta máquina (`python3`,
    `python` ou `py`) e `<HOME>` = o home com `/` (no Git Bash, `cygpath -m "$HOME"`; trocar as
-   barras do caminho do Windows à mão come as barras). Copie `<plugin>/statusline/statusline.py` e
-   `subagent-statusline.py` para `~/.claude/` (rodar a skill de novo os atualiza; o hook
-   de abertura avisa se ficarem velhos). Apague as sobras e o que foi migrado.
+   barras do caminho do Windows à mão come as barras). Copie `<plugin>/statusline/statusline.py`
+   para `~/.claude/` (rodar a skill de novo o atualiza; o hook de abertura avisa se ficar
+   velho). Apague `~/.claude/subagent-statusline.py`, se houver: a linha dos subagents roda
+   direto do plugin. Apague as sobras e o que foi migrado.
 2. Valide todo JSON tocado (`jq empty <arquivo>`).
 3. Confira: `printf '{}' | CLAUDE_PROJECT_DIR=<raiz> sh <plugin>/scripts/conferir-padrao.sh` não
    imprime nada, e rodar o inventário de novo mostra o global vazio.
