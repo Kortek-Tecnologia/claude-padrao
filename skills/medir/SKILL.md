@@ -1,6 +1,6 @@
 ---
 name: medir
-description: Mede se a política de modelos pegou — chamadas de subagent por tipo × modelo em que rodou, correções e recusas do hook, tokens, turnos e custo estimado por modelo, contexto por requisição, dos transcripts locais deste projeto.
+description: Mede se a política de modelos pegou — chamadas de subagent por tipo × modelo em que rodou, correções e recusas do hook, commits com a documentação conferida antes, tokens, turnos e custo estimado por modelo, contexto por requisição, dos transcripts locais deste projeto.
 disable-model-invocation: true
 ---
 
@@ -22,6 +22,10 @@ Leitura:
   dos subagents".
 - Correções = chamadas de papel fixo que o Opus fez com outro `model` (ou `Explore`/`Plan` sem
   `model`) e o hook trocou. Muitas = a delegação está pedindo o modelo errado.
+- Documentação antes do commit: commits da sessão principal (fora os lotes do `arrumar`) e
+  quantos tiveram a `padrao:atualizar-docs` desde o commit anterior. Lembrete = o hook recusou a
+  primeira tentativa. Commit sem a skill = o Claude repetiu depois do lembrete sem rodá-la (às
+  vezes com razão: dois commits do mesmo diff), ou o hook não rodou naquela sessão.
 - Tokens: o custo está em "entrada" e "saída"; "cache lido" sai bem mais barato. Opus com muita
   entrada e haiku perto de zero = leitura que devia ir ao coletor.
 - Custo: estimativa a preço de lista; em assinatura não é cobrança, é o peso relativo de cada

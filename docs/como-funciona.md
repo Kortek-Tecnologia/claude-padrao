@@ -11,10 +11,12 @@ flowchart LR
     SS["SessionStart"]
     AG["PreToolUse: Agent"]
     BT["PreToolUse: Bash, PowerShell,<br/>mcp__*, Monitor, Workflow…"]
+    GC["PreToolUse: Skill; Bash e<br/>PowerShell com git"]
   end
   SS --> CP["conferir-padrao.sh"]
   AG --> TM["travar-modelo-subagent.sh"]
   BT --> TL["trava-leitura.sh"] --> SL["so-le.sh"] --> SG["segmentos.sh"]
+  GC --> CD["cobrar-docs.sh"] --> SG
   AP["skill aplicar"] -->|"grava a partir de"| MOD["skills/aplicar/modelos/"]
   CP -->|"compara com"| MOD
   AP -->|"copia para ~/.claude/"| ST["statusline/*.py"]
@@ -23,7 +25,7 @@ flowchart LR
 
 | Caminho | Papel |
 |---|---|
-| `hooks/hooks.json` | liga os três hooks; todos com `shell: bash` e timeout de 10 s; os de PreToolUse com `onFailure: "block"` (falhou, bloqueia) |
+| `hooks/hooks.json` | liga os quatro hooks; todos com `shell: bash` e timeout de 10 s; as duas travas com `onFailure: "block"` (falhou, bloqueia), o lembrete da documentação sem ele (falhou, o commit segue) |
 | `skills/aplicar/modelos/` | **fonte única** do padrão: o `aplicar` grava a partir dela e o hook de abertura compara com ela |
 | `scripts/py.sh` | acha `python3`, `python` ou `py` 3.9+ (no Windows o `python3` costuma ser o atalho quebrado da Store) e roda com `-I` |
 | `agents/*.md` | os quatro agentes; os que só leem têm `tools` fechado e `disallowedTools` |
@@ -114,6 +116,54 @@ flowchart TD
 - **Risco que fica:** `cd` ou `git -C` para dentro de um repositório bare versionado com config
   hostil (`core.fsmonitor`). `safe.bareRepository=explicit` no git do usuário fecha.
 
+## Lembrete da documentação — `cobrar-docs.sh`
+
+A regra "antes de todo commit, a `padrao:atualizar-docs`" morava só no bloco do `CLAUDE.md`.
+Medida em 14 dias de histórico local, a skill rodava antes de cerca de 4% dos commits (todos da
+sessão principal, pelo Bash). Instrução depende de o modelo lembrar; o que tem hora certa vai em
+hook.
+
+```mermaid
+flowchart TD
+  K["Skill padrao:atualizar-docs"] --> AN["anota a sessão"]
+  G["Bash ou PowerShell com git"] --> C{"algum segmento é<br/>git … commit?"}
+  C -->|"não"| S0["segue, sem abrir jq"]
+  C -->|"sim, de lote do arrumar"| S1["segue"]
+  C -->|"sim"| N{"há anotação<br/>da sessão?"}
+  N -->|"sim: a skill rodou,<br/>ou já lembrei"| S2["segue e gasta<br/>a anotação"]
+  N -->|"não"| R["recusa uma vez: rode a skill<br/>e repita; anota que lembrou"]
+```
+
+- **Lembrete, não trava.** A segunda tentativa passa sempre. O hook não sabe se o diff tem algo
+  documentado, e commit preso é pior que doc velha. Por isso também **falha aberto**: sem `jq`,
+  sem `session_id` ou sem onde anotar, ele se cala.
+- **Um commit, uma passada.** O commit que passa apaga a anotação; o seguinte pede a skill de
+  novo. Commit que falha depois de passar pelo hook custa um lembrete a mais (menos de 1% dos
+  commits do histórico).
+- **Por sessão, não por repositório.** A anotação é `${CLAUDE_PLUGIN_DATA}/docs-<session_id>`.
+  Cerca de 12% dos commits do histórico rodam fora do cwd da sessão (`cd outro && git commit`,
+  `git -C`): amarrar ao HEAD de um repositório erraria nesses. A skill, ao anotar, varre as
+  anotações de mais de 7 dias.
+- **Filtro `if`** (`hooks.json`): `Bash(git *)` e `PowerShell(git *)`, um handler por ferramenta
+  (o `if` leva uma regra só). Medido na v2.1.322: dispara em commit encadeado (`cd x && git add
+  && git commit`), com atribuição na frente, com `git -C` e com heredoc; não dispara em `ls` nem
+  em `echo "git commit"`. `Bash(git commit*)` perderia o `git -C x commit`. O filtro é de melhor
+  esforço (dispara também em crase e `$()` que cita git): quem decide é o script.
+- **O que é commit** para o script: segmento (`segmentos.sh`) que começa por `git`, com ou sem
+  opções globais (`-C dir`, `-c k=v`, `--no-pager`), e subcomando `commit`. Antes do corte sai o
+  corpo dos heredocs: o segmentador parte na crase, e texto que cita `git commit` entre crases
+  (uma entrada de `AGENT_LEARNINGS.md` gravada por `cat <<EOF`) virava commit.
+- **Fora:** os lotes do `/padrao:arrumar` (mensagem que começa por `arrumar: lote `, em `-m "…"`
+  ou na 1ª linha do heredoc; o plano já cuidou da documentação) e o commit que o usuário roda no
+  terminal, que não é chamada de ferramenta. Citar `arrumar: lote` em outro ponto do comando não
+  isenta.
+- **Escapam, e o commit segue sem lembrete:** `bash -c "git commit"`, alias (`git ci`) e opção
+  global com o valor separado (`--git-dir x commit`). Nenhuma apareceu no histórico; o erro é
+  sempre para o lado de deixar passar.
+- **O texto da recusa** diz que é rotina e que não vai para o `AGENT_LEARNINGS.md`: o Claude
+  Code a mostra como `hook error`, e sem isso o modelo a registrava como erro. O `medir` conta os
+  lembretes por esse texto — mudou a frase, mude o `LEMBRETE` do `medir-modelos.py`.
+
 ## As skills
 
 **`aplicar`** — o `inventariar.py` só lê e imprime JSON com o destino de cada item (`DESTINO`,
@@ -142,13 +192,15 @@ stateDiagram-v2
 | `PLANO.md` | lotes com verificação checável, decisões assumidas, `<!-- APROVADO … -->` e a situação de cada lote |
 | `raw/` | saída bruta dos subagentes |
 
-**`atualizar-docs`** — `user-invocable: false`: fora do menu. Quem a dispara é o modelo, porque o
-bloco do `CLAUDE.md` manda chamá-la antes de todo commit (sem essa linha, no teste de ponta a
-ponta, ela não era chamada).
+**`atualizar-docs`** — `user-invocable: false`: fora do menu. Quem a dispara é o modelo: o bloco
+do `CLAUDE.md` manda chamá-la antes de todo commit, e o `cobrar-docs.sh` cobra na hora do
+`git commit` (só a linha do bloco, no uso real, cobria cerca de 4% dos commits).
 
 **`medir`** — lê `~/.claude/projects/<chave>/*.jsonl` e os `subagents/`. O modelo de cada chamada
 é o efetivo pela regra do hook; chamada recusada não conta como rodada; tokens por `message.id`
-(as linhas de uma resposta repetem o uso). Cada `message.id` é uma requisição: o custo estimado
+(as linhas de uma resposta repetem o uso). Commits da sessão principal: reconhecidos pela regra do
+`cobrar-docs.sh` (sem os do `arrumar`), refeita em regex — em forma rara os dois podem divergir, com a `atualizar-docs` chamada desde o commit anterior
+ou não; tentativa que o hook recusou conta como lembrete, não como commit. Cada `message.id` é uma requisição: o custo estimado
 sai da tabela `PRECO` (preço de lista por milhão, modelo casado por prefixo, escrita de cache de
 1 h à parte da de 5 min); contexto = entrada + cache lido + escrita, distribuído em faixas na
 sessão principal; Haiku acima de 100.000 paga a requisição inteira no preço alto. Modelo fora da
@@ -158,7 +210,9 @@ tabela não entra no custo nem nas faixas e é listado à parte.
 
 `bash scripts/testar.sh` (e o CI, no Ubuntu) confere:
 
-- as decisões dos três hooks, inclusive sem `jq` e as brechas já fechadas da trava;
+- as decisões dos quatro hooks, inclusive sem `jq` e as brechas já fechadas da trava;
+- o lembrete da documentação: as formas de commit do histórico, o que não é commit, a sequência
+  recusa → repetição → commit seguinte, a skill liberando só a própria sessão e a falha aberta;
 - que o `--sandbox` do sed e do gawk segura de verdade o que a trava deixa passar;
 - o hook de abertura com HOME e projeto falsos, limpo e sujo;
 - que nenhum modelo de `skills/aplicar/modelos/` mudou sem subir o carimbo (soma do texto);
@@ -181,6 +235,11 @@ Não cobre o texto das skills. Para elas, o **teste de ponta a ponta**:
 3. Etapa que pede OK: `--resume <session_id> "<resposta>"` (no `-p` não há `AskUserQuestion`).
 4. Confira o resultado com scripts (arquivos, commits, `conferir-padrao.sh` calado) e que o
    `~/.claude` real não mudou. Uma rodada completa (`aplicar`, hooks, `arrumar`) custa ~US$ 4.
+5. Lembrete da documentação: peça uma mudança com commit autorizado num projeto com o padrão
+   aplicado e confira no transcript a ordem das chamadas. Com o bloco inteiro, `Skill` antes do
+   `git commit` e nenhuma recusa; com o bloco sem a linha "Antes de todo commit", recusa →
+   `Skill` → commit. O que o hook recebe (campos, `if`, `CLAUDE_PLUGIN_DATA`) se sonda com um
+   plugin de um hook só que grava a entrada, num `--plugin-dir` a mais.
 
 No Windows, o caminho do HOME falso no scratchpad passa de 260 caracteres dentro de
 `.claude/projects/`: Python e o `jq` nativo não abrem — leia com `cat arquivo | jq` e, para o

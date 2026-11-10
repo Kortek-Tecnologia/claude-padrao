@@ -191,6 +191,95 @@ for caso in 'deny|trava-leitura.sh|{"agent_type":"Explore","tool_input":{"comman
   esperado=${caso%%|*}; resto=${caso#*|}; hook=${resto%%|*}; entrada=${resto#*|}
   confere "$esperado" "$hook $entrada" "$(semjq "$hook" "$entrada")"
 done
+# Documentação antes do commit (cobrar-docs.sh): commit sem a skill é recusado UMA
+# vez por sessão; a skill ou a recusa anterior liberam o commit seguinte, e só ele.
+DADOS=$(mktemp -d)
+docs() { printf '%s' "$1" | CLAUDE_PLUGIN_DATA="$DADOS" sh "$D/cobrar-docs.sh" | jq -r '.hookSpecificOutput.permissionDecision' 2>/dev/null; }
+cmd_de() { jq -cn --arg s "$1" --arg c "$2" --arg t "${3:-Bash}" '{session_id: $s, tool_name: $t, tool_input: {command: $c}}'; }
+skill_de() { jq -cn --arg s "$1" --arg k "$2" '{session_id: $s, tool_name: "Skill", tool_input: {skill: $k}}'; }
+espera() { [ "${3:-PASSA}" = "$2" ] || { echo "divergiu: cobrar-docs: $1: esperado $2, veio ${3:-PASSA}"; FALHAS=$((FALHAS + 1)); }; }
+n=0
+while IFS= read -r c; do  # é commit: recusa na 1ª vez (sessão nova a cada caso)
+  n=$((n + 1)); espera "commit: $c" deny "$(docs "$(cmd_de "c$n" "$c")")"
+done <<'CASOS'
+git commit -m x
+cd /c/proj && git add -A && git commit -m "feat(escopo): y; z"
+git -C sub commit -m x
+git -C "pasta com espaco" commit -m x
+git -c user.name="A B" -c user.email=a@b commit -m x
+git --no-pager commit --amend --no-edit
+X=1 Y=2 git commit -m x
+if git diff --cached --quiet; then echo nada; else git commit -m x; fi
+GIT_AUTHOR_NAME="a b" GIT_AUTHOR_EMAIL=a@b git commit -m x
+env X=1 git commit -m x
+../ferramentas/bin/git commit -m x
+git.exe commit -m x
+(cd sub && git commit)
+echo "arrumar: lote 1" ; git commit -m real
+git commit -m "fix: arrumar: lote 2 nao e o comeco da mensagem"
+git commit -m "arrumar: lote 1 — x" && git commit -m "outro, comum"
+CASOS
+# mensagem em heredoc (a forma mais comum no histórico); texto de heredoc que só cita o commit passa
+espera "commit com heredoc" deny "$(docs "$(cmd_de hd1 $'git add a.py && git commit -m "$(cat <<\'EOF\'\ntitulo\n\ncorpo com (parenteses) e git log\nEOF\n)"')")"
+espera "heredoc que cita o commit" PASSA "$(docs "$(cmd_de hd2 $'cat >>AGENT_LEARNINGS.md <<\'EOF\'\n- Erro: `git commit` recusado pelo hook.\ngit commit -m x\n\t- Fazer: rodar a skill antes do `git commit`.\nEOF\ntail -5 AGENT_LEARNINGS.md')")"
+[ ! -e "$DADOS/docs-hd2" ] || { echo "divergiu: cobrar-docs anotou por texto de heredoc"; FALHAS=$((FALHAS + 1)); }
+espera "commit depois do heredoc fechado" deny "$(docs "$(cmd_de hd3 $'cat >n.txt <<-FIM\n\ttexto\n\tFIM\ngit commit -m x')")"
+espera "here-string nao e heredoc" deny "$(docs "$(cmd_de hd4 $'grep -q x <<<EOF\ngit commit -m x')")"
+# `<<` que não é heredoc (entre aspas, aritmética) não tem linha de fim: o commit de depois vale
+espera "<< entre aspas" deny "$(docs "$(cmd_de hd5 $'echo "a <<EOF"\ngit commit -m y')")"
+espera "<< de aritmetica" deny "$(docs "$(cmd_de hd6 $'x=$((1 << SHIFT))\ngit commit -m y')")"
+espera "lote do arrumar com a mensagem em heredoc" PASSA "$(docs "$(cmd_de hd7 $'git add a && git commit -m "$(cat <<\'EOF\'\narrumar: lote 1 — x\n\ncorpo\nEOF\n)"')")"
+while IFS= read -r c; do  # não é commit: passa e não deixa anotação
+  n=$((n + 1)); espera "nao e commit: $c" PASSA "$(docs "$(cmd_de "c$n" "$c")")"
+  [ ! -e "$DADOS/docs-c$n" ] || { echo "divergiu: cobrar-docs anotou sem commit: $c"; FALHAS=$((FALHAS + 1)); }
+done <<'CASOS'
+git status --short
+git log --oneline --grep "git commit"
+echo "rode git commit -m x depois"
+git commit-tree abc -m x
+git config commit.gpgsign false
+git -C sub log --oneline -- commit.txt
+git show HEAD:docs/commit.md
+grep -rn 'git commit' docs
+git commit -m "arrumar: lote 2 — README"
+CASOS
+espera "PowerShell tambem cobra" deny "$(docs "$(cmd_de ps 'Write-Output oi; git commit -m x' PowerShell)")"
+espera "outra ferramenta passa" PASSA "$(docs "$(cmd_de mon 'git commit -m x' Monitor)")"
+# a sequência numa sessão: recusa, passa (já avisou), recusa de novo no commit seguinte
+espera "1o commit" deny "$(docs "$(cmd_de seq 'git commit -m a')")"
+espera "repeticao" PASSA "$(docs "$(cmd_de seq 'git commit -m a')")"
+espera "2o commit" deny "$(docs "$(cmd_de seq 'git commit -m b')")"
+# recusa → skill → commit: a anotação `avisado` vira `docs` e vale um commit só
+espera "recusa antes da skill" deny "$(docs "$(cmd_de rs 'git commit -m a')")"
+docs "$(skill_de rs padrao:atualizar-docs)" >/dev/null
+espera "commit depois de recusa e skill" PASSA "$(docs "$(cmd_de rs 'git commit -m a')")"
+espera "o seguinte volta a ser cobrado" deny "$(docs "$(cmd_de rs 'git commit -m b')")"
+# a skill libera o commit seguinte da MESMA sessão, sem recusa; outra skill não libera
+docs "$(skill_de sk padrao:atualizar-docs)" >/dev/null
+espera "skill em outra sessao nao vale" deny "$(docs "$(cmd_de outra 'git commit -m a')")"
+espera "git status nao gasta a anotacao" PASSA "$(docs "$(cmd_de sk 'git status')")"
+espera "commit do arrumar nao gasta a anotacao" PASSA "$(docs "$(cmd_de sk 'git commit -m "arrumar: lote 1 — x"')")"
+espera "commit depois da skill" PASSA "$(docs "$(cmd_de sk 'git add -A && git commit -m a')")"
+espera "commit seguinte pede nova passada" deny "$(docs "$(cmd_de sk 'git commit -m b')")"
+docs "$(skill_de med padrao:medir)" >/dev/null
+espera "outra skill nao libera" deny "$(docs "$(cmd_de med 'git commit -m a')")"
+# a recusa diz o que fazer (o medir a reconhece por este texto)
+printf '%s' "$(cmd_de msg 'git commit -m a')" | CLAUDE_PLUGIN_DATA="$DADOS" sh "$D/cobrar-docs.sh" |
+  jq -r '.hookSpecificOutput.permissionDecisionReason' | grep -q 'antes deste commit, rode a skill padrao:atualizar-docs' ||
+  { echo "divergiu: cobrar-docs: recusa sem o texto esperado"; FALHAS=$((FALHAS + 1)); }
+# a skill varre anotação velha (skill que rodou e o commit não veio)
+if touch -d '10 days ago' "$DADOS/docs-velha" 2>/dev/null; then
+  docs "$(skill_de faxina padrao:atualizar-docs)" >/dev/null
+  [ ! -e "$DADOS/docs-velha" ] && [ -e "$DADOS/docs-faxina" ] ||
+    { echo "divergiu: cobrar-docs nao varreu a anotacao velha (ou varreu a nova)"; FALHAS=$((FALHAS + 1)); }
+fi
+# falha ABERTA: sem session_id, sem pasta de dados, pasta que não dá para criar, sem jq
+espera "sem session_id" PASSA "$(docs '{"tool_name":"Bash","tool_input":{"command":"git commit -m a"}}')"
+espera "sem CLAUDE_PLUGIN_DATA" PASSA "$(cmd_de sd 'git commit -m a' | env -u CLAUDE_PLUGIN_DATA sh "$D/cobrar-docs.sh")"
+: >"$DADOS/arquivo"
+espera "pasta de dados invalida" PASSA "$(cmd_de sd 'git commit -m a' | CLAUDE_PLUGIN_DATA="$DADOS/arquivo/x" sh "$D/cobrar-docs.sh")"
+espera "sem jq" PASSA "$(CLAUDE_PLUGIN_DATA="$DADOS" semjq cobrar-docs.sh "$(cmd_de semjq 'git commit -m a')")"
+rm -rf "$DADOS"
 [ -z "$SEMJQ" ] || rm -rf "$SEMJQ"
 
 # Guarda do global: HOME e projeto falsos.
@@ -258,8 +347,8 @@ while read -r arq carimbo soma; do
   [ "$tem_c $tem_s" = "$carimbo $soma" ] ||
     { echo "divergiu: modelo $arq mudou (carimbo '$tem_c', soma $tem_s): suba o 'modelo X' da 1a linha e registre os dois em testar.sh"; FALHAS=$((FALHAS + 1)); }
 done <<'CARIMBOS'
-claude-md.md 2.1.0 921942160
-agente/padrao-modelos.md 2.1.0 4170627963
+claude-md.md 2.2.0 2856927040
+agente/padrao-modelos.md 2.2.0 3731529991
 agente/padrao-configuracao.md 2.1.0 1073251858
 CARIMBOS
 
@@ -326,6 +415,13 @@ agora=$(date -u +%Y-%m-%dT%H:%M:%S)
   # chamada que o hook recusou: não conta como se tivesse rodado
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m3","model":"claude-opus-5-5","content":[{"type":"tool_use","id":"t3","name":"Agent","input":{"subagent_type":"general-purpose","model":"fable","prompt":"z"}}]}}\n' "$agora"
   printf '{"type":"user","timestamp":"%s","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t3","content":"model=fable fora da politica"}]}}\n' "$agora"
+  # documentação antes do commit: skill e commit na mesma resposta (conta, com a skill); commit
+  # que o hook recusou (lembrete, não conta); a repetição e um `(… git commit)` (contam, sem a
+  # skill); lote do arrumar e comando que só cita o commit (fora). Sem model nem usage: não mexem nas outras contas.
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"d1","content":[{"type":"tool_use","id":"k1","name":"Skill","input":{"skill":"padrao:atualizar-docs"}},{"type":"tool_use","id":"k2","name":"Bash","input":{"command":"cd /x && git add -A && git commit -m \\"a (b)\\""}}]}}\n' "$agora"
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"d2","content":[{"type":"tool_use","id":"k3","name":"Bash","input":{"command":"git commit -m b"}}]}}\n' "$agora"
+  printf '{"type":"user","timestamp":"%s","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"k3","is_error":true,"content":"PreToolUse:Bash hook error: padrao: lembrete de rotina: antes deste commit, rode a skill padrao:atualizar-docs"}]}}\n' "$agora"
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"d3","content":[{"type":"tool_use","id":"k4","name":"Bash","input":{"command":"git commit -m b"}},{"type":"tool_use","id":"k5","name":"Bash","input":{"command":"git commit -m \\"arrumar: lote 1 — x\\""}},{"type":"tool_use","id":"k6","name":"Bash","input":{"command":"git log --grep \\"git commit\\""}},{"type":"tool_use","id":"k7","name":"Bash","input":{"command":"(cd y && git commit)"}}]}}\n' "$agora"
   # custo (US$/milhão): o sufixo [1m] casa por prefixo com claude-opus-5-5; m4 repete o id e
   # vale a última linha (10k·4 + 30k·5 + 20k de 1 h·8 + 140k lidos·0,2 + 1k·20 = 0,398, contexto
   # 200.000 exatos = faixa 100–200K); m5 = 300k·4 = 1,2; m6 = 500k·0,2 + 5k·20 = 0,2;
@@ -354,7 +450,7 @@ mkdir -p "$CASA/.claude/projects/$chave/s/subagents"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"a4","model":"claude-opus-4-8","usage":{"input_tokens":1000},"content":[]}}\n' "$agora"
 } >"$CASA/.claude/projects/$chave/s/subagents/a.jsonl"
 med=$(HOME="$CASA" USERPROFILE="$(nativo "$CASA")" sh "$D/py.sh" skills/medir/medir-modelos.py --projeto "$PROJ" | tr -d '\r')
-for re in '1 correção\(ões\) de papel fixo \(Explore=1\) · 1 recusa\(s\)' '^  general-purpose +fable \(recusada\)=1$' '^  Explore +haiku=1$' '^  padrao:coletor +haiku=1$' '^  principal +claude-opus-5-5 +3k · 5k · 300$' \
+for re in '1 correção\(ões\) de papel fixo \(Explore=1\) · 1 recusa\(s\)' '^documentação antes do commit: 3 commit\(s\) · 1 com a atualizar-docs antes · 1 lembrete\(s\) do hook$' '^  general-purpose +fable \(recusada\)=1$' '^  Explore +haiku=1$' '^  padrao:coletor +haiku=1$' '^  principal +claude-opus-5-5 +3k · 5k · 300$' \
   '^  principal  claude-opus-5-5\[1m\]    US\$ 1\.94$' '^  principal  claude-opus-5-5        US\$ 0\.02$' \
   '^  principal  claude-fable-5-2 +US\$ 0\.04$' \
   '^  subagents  claude-sonnet-5-5      US\$ 0\.08$' '^  subagents  claude-haiku-5-5       US\$ 0\.04$' \

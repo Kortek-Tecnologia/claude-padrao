@@ -39,6 +39,43 @@
             "onFailure": "block"
           }
         ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/cobrar-docs.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "Bash(git *)",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/cobrar-docs.sh\"",
+            "timeout": 10,
+            "statusMessage": "Doc do diff"
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "if": "PowerShell(git *)",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/cobrar-docs.sh\"",
+            "timeout": 10,
+            "statusMessage": "Doc do diff"
+          }
+        ]
       }
     ]
   }

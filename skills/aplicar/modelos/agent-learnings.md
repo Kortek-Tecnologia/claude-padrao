@@ -8,14 +8,15 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 
 - Uma entrada por padrão, no formato abaixo. "Faça assim" vale mais que "não faça".
 - Antes de acrescentar, procure entrada parecida: atualize-a em vez de duplicar.
-- Entrada que o código ou o `CLAUDE.md` já cobrem, ou que ficou falsa, sai.
+- Entrada que o código ou o `CLAUDE.md` já cobrem, que ficou falsa ou cujo motivo deixou de
+  valer, sai: cautela velha continua sendo seguida e trava trabalho que hoje é rotina.
 - Teto de ~40 entradas: passou disso, junte as parecidas e corte as velhas sem recorrência.
 - Nada pessoal nem sigiloso (token, senha, dado de pessoa).
 
 <!-- Formato:
 ### <assunto curto> (AAAA-MM-DD)
 - Erro: o que aconteceu, em uma linha.
-- Evitar: o padrão que levou a ele.
+- Evitar: o padrão que levou a ele, com o escopo (em que situação vale); sem escopo, vira proibição geral.
 - Fazer: a abordagem certa, concreta (comando, arquivo, passo).
 -->
 

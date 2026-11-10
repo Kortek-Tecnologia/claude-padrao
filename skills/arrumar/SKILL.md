@@ -237,7 +237,8 @@ usuário viaja junto e não entra em commit nenhum.
    depois; nunca `-A` nem `.`) e `git commit -m "arrumar: lote <n> — <título>"`, com
    `(parcial)` no fim se algum id ficou aberto. Hook de commit recusou → volte ao executor uma
    vez; persistindo, é bloqueio (o lote seguinte misturaria as mudanças). Estes commits não
-   passam pelo `atualizar-docs`: o plano já cuidou da documentação.
+   passam pelo `atualizar-docs`: o plano já cuidou da documentação. O lembrete do commit
+   (`cobrar-docs.sh`) os deixa passar porque a mensagem começa por `arrumar: lote `: mantenha.
 6. **Situação** no `PLANO.md`: `feito (<hash>)`, `parcial (<hash>; ids abertos)` ou
    `pulado (motivo)`.
 

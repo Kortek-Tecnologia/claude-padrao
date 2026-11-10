@@ -1,4 +1,4 @@
-<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.1.0; edite no plugin, não aqui -->
+<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.2.0; edite no plugin, não aqui -->
 # Modelos e delegação
 
 Tudo na família **5.5, com 1M de contexto** (nativo nela), fixado no `.claude/settings.json`:
@@ -28,11 +28,13 @@ própria sessão; a próxima volta ao padrão:
    conserta abordagem errada: aí replaneje.
 3. **Passou de high, troque de modelo** em vez de ir a xhigh ou max: abra `/model`, escolha o
    Fable e tecle `s` (só a sessão; Enter ou `/model fable` gravam no global, e o hook de abertura
-   acusa), em medium. Serve a refactor ou migração grande e a arquitetura. Custa o dobro do Opus
-   em entrada e saída (o cache lido custa o mesmo) e, conforme o plano, consome créditos de uso
-   (o seletor avisa). Troque numa pausa,
-   depois de `/compact` ou em sessão nova com o plano: o cache é por modelo, e a primeira
-   resposta no Fable relê a conversa inteira sem cache. Em subagent o Fable segue recusado.
+   acusa). No Fable, medium para o trabalho interativo e high para a parte difícil ou longa sem
+   supervisão: quase todo o ganho dele já está em high, e xhigh rende pouco por muito mais
+   tokens — só com ganho medido. Serve a refactor ou migração grande e a arquitetura. Custa o
+   dobro do Opus em entrada e saída (o cache lido custa o mesmo) e, conforme o plano, consome
+   créditos de uso (o seletor avisa). Troque numa pausa, depois de `/compact` ou em sessão nova
+   com o plano: o cache é por modelo, e a primeira resposta no Fable relê a conversa inteira sem
+   cache. Em subagent o Fable segue recusado.
 
 ## Quem faz o quê
 

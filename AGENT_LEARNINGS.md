@@ -8,14 +8,15 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 
 - Uma entrada por padrão, no formato abaixo. "Faça assim" vale mais que "não faça".
 - Antes de acrescentar, procure entrada parecida: atualize-a em vez de duplicar.
-- Entrada que o código ou o `CLAUDE.md` já cobrem, ou que ficou falsa, sai.
+- Entrada que o código ou o `CLAUDE.md` já cobrem, que ficou falsa ou cujo motivo deixou de
+  valer, sai: cautela velha continua sendo seguida e trava trabalho que hoje é rotina.
 - Teto de ~40 entradas: passou disso, junte as parecidas e corte as velhas sem recorrência.
 - Nada pessoal nem sigiloso (token, senha, dado de pessoa).
 
 <!-- Formato:
 ### <assunto curto> (AAAA-MM-DD)
 - Erro: o que aconteceu, em uma linha.
-- Evitar: o padrão que levou a ele.
+- Evitar: o padrão que levou a ele, com o escopo (em que situação vale); sem escopo, vira proibição geral.
 - Fazer: a abordagem certa, concreta (comando, arquivo, passo).
 -->
 
@@ -50,3 +51,8 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 - Erro: o hook de abertura achava o carimbo pela primeira linha que continha `padrao:inicio`; prosa do projeto citando o marcador dava aviso falso em toda sessão, e o teste não pegava.
 - Evitar: casar por substring um marcador em arquivo que o usuário edita (`CLAUDE.md`, docs).
 - Fazer: ancorar no começo da linha (`^<!-- padrao:inicio`) e pôr no teste um caso com o marcador citado em prosa antes do bloco.
+
+### Segmentador da trava reusado para reconhecer comando (2026-11-10)
+- Erro: o `cobrar-docs.sh` achava o `git commit` com o `segmentar` do `segmentos.sh`, que parte na crase; um `cat <<'EOF'` cujo texto citava `git commit` entre crases foi recusado como commit, e só o teste de ponta a ponta mostrou.
+- Evitar: tratar o corte da trava como parser de shell em hook que precisa acertar (ele corta a mais de propósito: na trava, errar para o lado de negar é seguro).
+- Fazer: tirar o corpo dos heredocs antes do corte (`sem_heredoc` no script) e pôr no `testar.sh` um caso com o comando citado em texto; hook novo passa por sessão real no sandbox antes de fechar.

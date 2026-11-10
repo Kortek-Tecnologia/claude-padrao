@@ -33,7 +33,7 @@ flowchart LR
   S --- H1["Hook de abertura<br/>avisa o que saiu do padrão"]
   S --- H2["Hook de modelo<br/>cada subagent no seu modelo"]
   S --- H3["Trava de leitura<br/>quem só lê, só lê"]
-  S --- D["atualizar-docs<br/>antes de cada commit"]
+  S --- D["Lembrete da doc<br/>atualizar-docs antes do commit"]
   S -.->|"a doc envelheceu"| R["/padrao:arrumar<br/>levanta, um OK, executa"]
   S -.->|"de tempos em tempos"| M["/padrao:medir<br/>a delegação pegou?"]
   H1 -.->|"global sujo"| A
@@ -119,6 +119,7 @@ Lê os transcripts locais do projeto (últimos 14 dias) e mostra quem fez o quê
 
 ```
 hook de modelo: 1 correção(ões) de papel fixo (Explore=1) · 1 recusa(s)
+documentação antes do commit: 3 commit(s) · 3 com a atualizar-docs antes · 1 lembrete(s) do hook
 subagents (tipo: modelo em que rodou × chamadas):
   Explore              haiku=1
   padrao:executor      sonnet=3
@@ -142,7 +143,9 @@ Haiku acima de 100K: 0 de 4 requisições · sobrepreço US$ 0.00
 ```
 
 Haiku perto de zero com muita entrada no Opus = leitura que devia ter ido ao coletor. O custo é
-estimativa a preço de lista; o que mais pesa é o contexto grande na sessão principal.
+estimativa a preço de lista; o que mais pesa é o contexto grande na sessão principal. Commit sem
+a `atualizar-docs` antes = o Claude repetiu o commit depois do lembrete sem rodar a skill, ou o
+hook não rodou naquela sessão (plugin antigo, `jq` ausente).
 
 ## O que roda sozinho
 
@@ -152,6 +155,7 @@ estimativa a preço de lista; o que mais pesa é o contexto grande na sessão pr
 | Hook de modelo | toda chamada de subagent | corrige o modelo dos papéis fixos e recusa modelo fora da política |
 | Trava de leitura | Bash, MCP e ferramentas que gravam, nos agentes que só leem | deixa `Explore`, coletor, leitor e revisor só lerem: grava, redireciona ou executa → recusa, dizendo o motivo |
 | `atualizar-docs` | antes de cada commit | corrige só a documentação que o diff deixou falsa (porta, comando, variável, caminho) |
+| Lembrete da documentação | todo `git commit` que o Claude roda | se a `atualizar-docs` não rodou desde o commit anterior, recusa uma vez e manda rodá-la; a repetição passa |
 | Status lines | sempre | modelo, effort, contexto, limites e cache na linha; uma linha por subagent |
 
 ```
@@ -190,9 +194,10 @@ flowchart LR
   antes do commit.
 - **Tarefa que pede mais**, um degrau por vez: um teste que rode; um nível de effort
   (`/effort high`, ou `ultrathink` no prompt para um turno); passou de high, o Fable 5.2 só na
-  sessão (`/model`, tecla `s`) em medium, em vez de xhigh ou max — custa o dobro do Opus em
-  entrada e saída (o cache lido custa o mesmo) e, conforme o plano, consome créditos de uso. Troque depois de `/compact`: o cache é por
-  modelo. Em subagent o Fable é recusado.
+  sessão (`/model`, tecla `s`), em vez de xhigh ou max no Opus. No Fable, medium para o trabalho
+  interativo e high para a parte difícil; xhigh rende pouco por muito mais tokens. Custa o dobro
+  do Opus em entrada e saída (o cache lido custa o mesmo) e, conforme o plano, consome créditos
+  de uso. Troque depois de `/compact`: o cache é por modelo. Em subagent o Fable é recusado.
 - Os aliases `opus`, `sonnet`, `haiku` e `fable` apontam fixo para a 5.5 e o Fable 5.2
   (`ANTHROPIC_DEFAULT_*_MODEL`): não mudam sozinhos quando sai versão nova. Sem `fallbackModel`,
   indisponibilidade não troca de modelo; a única troca automática é a de segurança (mensagem
@@ -239,7 +244,8 @@ Requisitos:
   próprio modelo); o Fable 5.2 pede a v2.1.321.
 - Windows: **Git Bash** (os hooks rodam em `bash`).
 - **jq** — `winget install jqlang.jq` | `sudo apt install jq`. Sem ele, os agentes que só leem
-  ficam sem Bash e o hook de abertura se cala: falha fechado.
+  ficam sem Bash e o hook de abertura se cala: falha fechado. O lembrete da documentação
+  também se cala, e o commit segue.
 - **Python 3.9+** para as skills (`scripts/py.sh` acha `python3`, `python` ou `py`).
 - **GNU sed 4.3+ e gawk** para os agentes que só leem usarem sed e awk (só com `--sandbox`; o Git
   Bash traz os dois). Com o mawk, padrão do Debian/Ubuntu, o awk deles fica negado.
@@ -287,6 +293,11 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
   leitor conhecido e não gravar; sed e awk só com `--sandbox`. Se o próprio hook falhar, a
   chamada é bloqueada. Fica um caso: entrar (`cd`, `git -C`) num repositório bare versionado com
   config hostil — `git config --global safe.bareRepository explicit` fecha.
+- **Lembrete da documentação, aberto por padrão.** É lembrete na hora certa, não trava: recusa o
+  `git commit` uma vez e a segunda tentativa sempre passa — o hook não sabe se o diff tem algo
+  documentado, e commit preso é pior que doc velha. Vê só o commit que o Claude roda pelo Bash ou
+  pelo PowerShell (o seu, no terminal, não passa por ele) e não cobra os lotes do
+  `/padrao:arrumar`. Se o hook falhar, o commit segue.
 - **Segredos:** o inventário e o `arrumar` nunca imprimem valor de variável; o backup não leva o
   `~/.claude.json`.
 - **Windows, caminho com mais de 260 caracteres:** o Python não enxerga (projeto em pasta muito
@@ -297,7 +308,7 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 
 ```
 .claude-plugin/   manifesto do plugin e do marketplace (version: semver)
-hooks/            hooks.json: abertura, modelo do subagent, trava de leitura
+hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc
 scripts/          os hooks em sh, py.sh e testar.sh
 agents/           coletor, leitor, revisor, executor
 skills/           aplicar (+ inventário e modelos), arrumar, medir, atualizar-docs

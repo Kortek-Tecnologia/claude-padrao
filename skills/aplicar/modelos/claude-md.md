@@ -1,4 +1,4 @@
-<!-- padrao:inicio — gerado pelo plugin padrao (/padrao:aplicar), modelo 2.1.0; edite no plugin, não aqui -->
+<!-- padrao:inicio — gerado pelo plugin padrao (/padrao:aplicar), modelo 2.2.0; edite no plugin, não aqui -->
 ## Claude Code: padrão do projeto
 
 Configuração só no projeto (`.claude/settings.json` time, `.claude/settings.local.json`
@@ -17,10 +17,12 @@ grava no global), rode `/padrao:aplicar`.
 ### Decida e siga; pare só no irreversível
 
 - **Reversível → siga com a recomendada.** Editar código e arquivos do projeto, criar branch,
-  rodar teste, build e comando local, instalar dependência no projeto: escolha a opção que você
-  recomendaria, faça e conte depois.
+  rodar teste, build e comando local, instalar dependência no projeto, repetir o comando seguro
+  que falhou por erro passageiro: escolha a opção que você recomendaria, faça e conte depois.
 - **Irreversível → pare e pergunte:** commit, push, merge, deploy, publicar, apagar o que você
-  não criou, dado de produção, mexer no global (`~/.claude`), mensagem a outra pessoa, gasto.
+  não criou, dado de produção, mexer no global (`~/.claude`), mensagem para uma pessoa fora da
+  sessão (e-mail, chat, comentário em PR ou issue), compra, serviço pago ou recurso de nuvem que
+  gera cobrança.
   Antes de todo commit, a skill `padrao:atualizar-docs` acerta a doc que o diff deixou falsa.
   Autorizado uma vez, vale até o fim daquele trabalho (subagent incluso: cite a autorização);
   volte só se o risco for maior do que o usuário aprovou.

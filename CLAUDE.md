@@ -11,13 +11,14 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 
 | Caminho | Conteúdo |
 |---|---|
-| `hooks/hooks.json` | SessionStart → `conferir-padrao.sh`; PreToolUse `Agent` → `travar-modelo-subagent.sh`; PreToolUse Bash, PowerShell, `mcp__*` e as ferramentas que executam ou gravam (regex no matcher) → `trava-leitura.sh` |
+| `hooks/hooks.json` | SessionStart → `conferir-padrao.sh`; PreToolUse `Agent` → `travar-modelo-subagent.sh`; PreToolUse Bash, PowerShell, `mcp__*` e as ferramentas que executam ou gravam (regex no matcher) → `trava-leitura.sh`; PreToolUse `Skill` e Bash/PowerShell com `git` (`if`) → `cobrar-docs.sh` |
 | `scripts/conferir-padrao.sh` | só avisa (nunca corrige): global sujo (o effort salvo pelo `/effort` passa: o projeto vence), modelos fora da 5.5, conectores/plugins do app claude.ai ligados, auto memory ligado, checkpoints desligados ou `fallbackModel` no projeto, bloco do `CLAUDE.md` ou `docs/agente/padrao-*.md` de outro modelo (carimbo), versão nova no marketplace |
 | `scripts/travar-modelo-subagent.sh` | corrige `Plan`=opus, `Explore`/`coletor`/`leitor`=haiku e `revisor`/`executor`=sonnet (`updatedInput`); recusa `model` fora de haiku/sonnet/opus (o Fable 5.2 é degrau só da sessão); sem `model` vale o `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`; `fork` passa |
 | `scripts/trava-leitura.sh`, `so-le.sh`, `segmentos.sh` | trava de leitura dos agentes que só leem (coletor, revisor, leitor, `Explore`): Bash por segmento contra uma lista de comandos de leitura (sed e awk só com `--sandbox`), qualquer outra ferramenta do matcher fechada |
+| `scripts/cobrar-docs.sh` | lembrete da documentação: `git commit` sem a `padrao:atualizar-docs` desde o commit anterior é recusado uma vez (a repetição passa); anotação por sessão em `${CLAUDE_PLUGIN_DATA}`; falha aberta; não cobra os lotes do `arrumar` |
 | `scripts/py.sh` | acha `python3`/`python`/`py` 3.9+ e roda com `-I` |
 | `agents/` | `coletor` (haiku), `leitor` (haiku, sem CLAUDE.md), `revisor` (sonnet), `executor` (sonnet) |
-| `skills/` | os três comandos — `aplicar` (+ `inventariar.py`, `modelos/`), `arrumar` (levanta, um OK, executa tudo) e `medir` (+ `medir-modelos.py`) — e `atualizar-docs`, fora do menu: o Claude a chama antes de commitar |
+| `skills/` | os três comandos — `aplicar` (+ `inventariar.py`, `modelos/`), `arrumar` (levanta, um OK, executa tudo) e `medir` (+ `medir-modelos.py`) — e `atualizar-docs`, fora do menu: o Claude a chama antes de commitar (o `cobrar-docs.sh` cobra) |
 | `statusline/` | `statusline.py` (principal) e `subagent-statusline.py`; instalados em `~/.claude/` pela skill `aplicar` |
 | `docs/como-funciona.md` | para quem mantém: peças, decisões dos hooks, skills, testes e publicação (o README é para quem usa) |
 | `AGENT_LEARNINGS.md` | erros do agente neste repositório e a abordagem certa; lido sob demanda (modelo e `docs/agente/padrao-*.md` em `skills/aplicar/modelos/`) |
@@ -26,7 +27,8 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 
 - Scripts em sh/bash POSIX com awk e sed; no Windows rodam no **Git Bash**. `jq` é
   obrigatório: sem ele a trava fecha os agentes que só leem e a conferência do padrão se cala —
-  mantenha esse comportamento (falhar fechado).
+  mantenha esse comportamento (falhar fechado). O lembrete da documentação é o contrário de
+  propósito: falha aberto, porque commit preso é pior que doc velha.
 - Python só biblioteca padrão, 3.9+, sempre via `scripts/py.sh`.
 - `version` no `.claude-plugin/plugin.json`: o aviso de versão nova compara com ela.
   Toda mudança publicada sobe a `version` (semver). O `marketplace.json` da raiz
@@ -45,7 +47,7 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 ## Testes
 
 `bash scripts/testar.sh`: confere as decisões dos
-três hooks (inclusive sem `jq`; o `conferir-padrao.sh` com HOME falso), as duas status
+quatro hooks (inclusive sem `jq`; o `conferir-padrao.sh` com HOME falso), as duas status
 lines, que nenhum modelo mudou sem subir o carimbo, que o inventário não imprime valor do `env`
 e as contas do `medir-modelos.py` (tokens, custo a preço de lista, faixas de contexto). Não cobre
 o texto das skills. Depois: `claude plugin validate .`. O CI (`.github/workflows/testes.yml`)

@@ -11,6 +11,8 @@ projeto e conta:
 - correções (papel fixo) e recusas do hook de modelo;
 - tokens e turnos por modelo, do agente principal e dos subagents;
 - sessões sem nenhuma delegação (preocupa só a sessão longa);
+- commits da sessão principal: quantos tiveram a `padrao:atualizar-docs` antes e
+  quantas vezes o hook da documentação precisou lembrar;
 - custo estimado a preço de lista por modelo, o contexto por requisição da
   sessão principal (o que mais pesa) e as requisições do Haiku acima de 100K.
 
@@ -36,6 +38,31 @@ from pathlib import Path
 
 # Textos de recusa do hook de modelo: os atuais e os de versões anteriores.
 RECUSA = ("fora da politica", "roda em model=", "Subagent sem modelo", "e travado em model=")
+
+# Recusa do hook da documentação (cobrar-docs.sh): o commit tentado sem a skill.
+LEMBRETE = "antes deste commit, rode a skill"
+
+# Comando que faz commit, pela regra do cobrar-docs.sh (lá em sh, por segmento; aqui
+# aproximada): somem os heredocs fechados e o conteúdo das aspas (mensagem que cita o
+# comando) e casa um segmento que começa por `git`, opções globais (`-C dir`, `-c k=v`,
+# `--no-pager`) e `commit`.
+HEREDOC = re.compile(r"<<-?\s*['\"]?(\w+)['\"]?.*?\n\t*\1\b", re.S)
+ASPAS = re.compile(r"'[^']*'|\"(?:[^\"\\]|\\.)*\"", re.S)
+ARG = r"(?:[^\s\"']|\"[^\"]*\"|'[^']*')+"
+COMMIT = re.compile(
+    r"(?:^|[;&|(){}\n`]|\$\()\s*(?:(?:then|do|else|time|command|exec|env|sudo)\s+|[A-Za-z_]\w*=\S*\s+)*"
+    r"(?:[^\s\"']*[/\\])?git(?:\.exe)?"
+    r"(?:\s+(?:-[Cc]\s+" + ARG + r"|--?[A-Za-z][A-Za-z-]*(?:=" + ARG + r")?))*\s+commit(?=[\s;&|)]|$)"
+)
+# Mensagem de lote do /padrao:arrumar: `-m "arrumar: lote …"` ou a 1ª linha do heredoc.
+LOTE = re.compile(r"-m\s*[\"']arrumar: lote |-m\s*\"\$\(cat\s*<<[^\n]*\n\s*arrumar: lote ")
+
+
+def faz_commit(comando: str) -> bool:
+    """Commit que o hook cobra: os lotes do /padrao:arrumar ficam fora, como lá."""
+    commits = len(COMMIT.findall(ASPAS.sub("''", HEREDOC.sub(" ", comando))))
+    return commits > len(LOTE.findall(comando))
+
 
 # Papel fixo, como o hook de modelo aplica: Plan e Explore sempre vão para este
 # modelo; os agentes do plugin, só quando a chamada traz outro `model` (sem ele
@@ -229,12 +256,16 @@ def main() -> None:
     uso_principal: dict = {}
     uso_sub: dict = {}
     recusas = sessoes = sem_delegar = 0
+    commits = com_docs = lembretes = 0
     vistos: set[str] = set()
 
     for arq in pasta.glob("*.jsonl"):
         delegou = ativa = False
         # id da chamada Agent → (tipo, modelo), para tirar da conta a que foi recusada
         ids_agent: dict[str, tuple[str, str]] = {}
+        # id do commit → se a atualizar-docs rodou desde o commit anterior
+        ids_commit: dict[str, bool] = {}
+        docs_antes = False
         for o, _ in linhas(arq, desde):
             ativa = True
             msg = o.get("message")
@@ -242,6 +273,16 @@ def main() -> None:
                 # Recusa = resultado de uma chamada Agent com o texto do hook. Só o
                 # resultado do Agent: o texto também aparece em leitura do script.
                 for c in msg.get("content") or []:
+                    if (
+                        isinstance(c, dict)
+                        and c.get("type") == "tool_result"
+                        and c.get("tool_use_id") in ids_commit
+                        and LEMBRETE in json.dumps(c.get("content"), ensure_ascii=False)
+                    ):
+                        # o hook recusou: a tentativa não é commit
+                        lembretes += 1
+                        commits -= 1
+                        com_docs -= ids_commit.pop(c["tool_use_id"])
                     if (
                         isinstance(c, dict)
                         and c.get("type") == "tool_result"
@@ -258,12 +299,21 @@ def main() -> None:
             if msg.get("model") and turno_novo(o, vistos):
                 turnos_principal[msg["model"]] += 1
             for c in msg.get("content") or []:
-                if (
-                    isinstance(c, dict)
-                    and c.get("type") == "tool_use"
-                    and c.get("name") in ("Agent", "Task")
+                if not isinstance(c, dict) or c.get("type") != "tool_use":
+                    continue
+                i = c.get("input") or {}
+                if c.get("name") == "Skill" and "atualizar-docs" in str(i.get("skill") or ""):
+                    docs_antes = True
+                elif (
+                    c.get("name") in ("Bash", "PowerShell")
+                    and c.get("id") not in ids_commit
+                    and faz_commit(str(i.get("command") or ""))
                 ):
-                    i = c.get("input") or {}
+                    commits += 1
+                    com_docs += docs_antes
+                    ids_commit[c.get("id")] = docs_antes
+                    docs_antes = False
+                if c.get("name") in ("Agent", "Task"):
                     tipo = i.get("subagent_type") or "general-purpose"
                     modelo, corrigida = modelo_efetivo(tipo, i.get("model") or "")
                     chamadas[tipo][modelo] += 1
@@ -285,6 +335,8 @@ def main() -> None:
     correcoes = "  ".join(f"{t}={n}" for t, n in corrigidas.most_common() if n)
     print(f"hook de modelo: {sum(corrigidas.values())} correção(ões) de papel fixo"
           + (f" ({correcoes})" if correcoes else "") + f" · {recusas} recusa(s)")
+    print(f"documentação antes do commit: {commits} commit(s) · {com_docs} com a atualizar-docs antes"
+          f" · {lembretes} lembrete(s) do hook")
     total: Counter[str] = Counter()
     print("subagents (tipo: modelo em que rodou × chamadas):")
     for tipo, por_modelo in sorted(chamadas.items()):
