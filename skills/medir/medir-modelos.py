@@ -10,7 +10,9 @@ projeto e conta:
   não delegada);
 - correções (papel fixo) e recusas do hook de modelo;
 - tokens e turnos por modelo, do agente principal e dos subagents;
-- sessões sem nenhuma delegação (preocupa só a sessão longa).
+- sessões sem nenhuma delegação (preocupa só a sessão longa);
+- custo estimado a preço de lista por modelo, o contexto por requisição da
+  sessão principal (o que mais pesa) e as requisições do Haiku acima de 100K.
 
     sh <plugin>/scripts/py.sh <dir da skill>/medir-modelos.py [--dias N] [--projeto P]
 
@@ -46,6 +48,46 @@ FIXO = {
     "padrao:revisor": "sonnet",
     "padrao:executor": "sonnet",
 }
+
+
+# Preço de lista em US$ por milhão de tokens: (entrada, escrita de cache 5 min,
+# escrita de cache 1 h, cache lido, saída). O modelo casa por prefixo do nome.
+PRECO = {
+    "claude-opus-5-5": (4, 5, 8, 0.20, 20),
+    "claude-sonnet-5-5": (2, 2.5, 4, 0.10, 10),
+    "claude-fable-5-2": (8, 10, 16, 0.20, 40),
+    "claude-haiku-5-5": (0.10, 0.125, 0.20, 0.01, 0.50),
+}
+# Haiku: requisição com contexto acima disto paga toda ela o preço alto.
+HAIKU = "claude-haiku-5-5"
+HAIKU_LIMITE = 100_000
+HAIKU_ALTO = (0.50, 0.625, 1.00, 0.05, 2.50)
+# Faixas de contexto da sessão principal: (nome, limite superior inclusivo).
+FAIXAS = (
+    ("até 100K", 100_000),
+    ("100–200K", 200_000),
+    ("200–400K", 400_000),
+    ("400–600K", 600_000),
+    ("acima de 600K", float("inf")),
+)
+
+
+def prefixo_preco(modelo: str) -> str | None:
+    return next((p for p in PRECO if modelo.startswith(p)), None)
+
+
+def requisicao(uso: dict) -> tuple[int, tuple[int, int, int, int, int]]:
+    """(contexto, tokens na ordem do PRECO) de uma resposta."""
+    entrada = uso.get("input_tokens") or 0
+    lido = uso.get("cache_read_input_tokens") or 0
+    escrita = uso.get("cache_creation_input_tokens") or 0
+    uma_hora = min(escrita, (uso.get("cache_creation") or {}).get("ephemeral_1h_input_tokens") or 0)
+    saida = uso.get("output_tokens") or 0
+    return entrada + lido + escrita, (entrada, escrita - uma_hora, uma_hora, lido, saida)
+
+
+def valor(tokens: tuple, preco: tuple) -> float:
+    return sum(t * p for t, p in zip(tokens, preco)) / 1_000_000
 
 
 def chave_projeto(caminho: str) -> str:
@@ -99,6 +141,55 @@ def somar_uso(usos: dict) -> dict[str, Counter[str]]:
         c["cache lido"] += uso.get("cache_read_input_tokens") or 0
         c["saída"] += uso.get("output_tokens") or 0
     return por_modelo
+
+
+def imprimir_custo(uso_principal: dict, uso_sub: dict) -> None:
+    """Custo a preço de lista, contexto da sessão principal e Haiku acima de 100K.
+    Uma requisição = um message.id (o uso guardado já é o final de cada um)."""
+    custo = {"principal": Counter(), "subagents": Counter()}
+    faixa_n: Counter[str] = Counter()
+    faixa_custo: Counter[str] = Counter()
+    sem_preco: Counter[str] = Counter()
+    haiku = haiku_alto = 0
+    sobrepreco = 0.0
+    for rotulo, usos in (("principal", uso_principal), ("subagents", uso_sub)):
+        for modelo, uso in usos.values():
+            if modelo == "<synthetic>":  # aviso do próprio Claude Code, não é requisição a modelo
+                continue
+            prefixo = prefixo_preco(modelo)
+            if prefixo is None:
+                sem_preco[modelo] += 1
+                continue
+            contexto, tokens = requisicao(uso)
+            preco = PRECO[prefixo]
+            if prefixo == HAIKU:
+                haiku += 1
+                if contexto > HAIKU_LIMITE:
+                    haiku_alto += 1
+                    sobrepreco += valor(tokens, HAIKU_ALTO) - valor(tokens, preco)
+                    preco = HAIKU_ALTO
+            v = valor(tokens, preco)
+            custo[rotulo][modelo] += v
+            if rotulo == "principal":
+                faixa = next(nome for nome, teto in FAIXAS if contexto <= teto)
+                faixa_n[faixa] += 1
+                faixa_custo[faixa] += v
+    print("custo estimado a preço de lista (em assinatura é peso relativo, não cobrança):")
+    for rotulo, por_modelo in custo.items():
+        for modelo, v in sorted(por_modelo.items(), key=lambda kv: -kv[1]):
+            print(f"  {rotulo:<10} {modelo:<22} US$ {v:.2f}")
+    principal = sum(custo["principal"].values())
+    sub = sum(custo["subagents"].values())
+    total = principal + sub
+    print(f"  total      US$ {total:.2f} · subagents {(sub / total if total else 0):.0%}")
+    print("contexto por requisição da sessão principal (requisições · % do custo dela):")
+    for nome, _ in FAIXAS:
+        parte = faixa_custo[nome] / principal if principal else 0
+        print(f"  {nome:<17}{faixa_n[nome]} · {parte:.0%}")
+    print(f"Haiku acima de 100K: {haiku_alto} de {haiku} requisições · sobrepreço US$ {sobrepreco:.2f}")
+    if sem_preco:
+        print("sem preço na tabela (fora da conta): "
+              + ", ".join(f"{m}={n}" for m, n in sem_preco.most_common()))
 
 
 def fmt(n: int) -> str:
@@ -212,6 +303,7 @@ def main() -> None:
     print(
         "turnos dos subagents:       " + "  ".join(f"{m}={n}" for m, n in turnos_sub.most_common())
     )
+    imprimir_custo(uso_principal, uso_sub)
 
 
 if __name__ == "__main__":

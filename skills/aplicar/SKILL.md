@@ -1,6 +1,6 @@
 ---
 name: aplicar
-description: Aplica o padrão de Claude Code no projeto — leva o que mora no global (~/.claude, ~/.claude.json) para o projeto, deixa o global limpo e fixa modelos e subagents (Opus decide, Sonnet executa, Haiku coleta). Use ao começar ou adotar o padrão num projeto, quando o hook do padrão avisar algo fora do lugar, ou quando pedirem para aplicar o padrão ou limpar o global.
+description: Aplica o padrão de Claude Code no projeto — leva o que mora no global (~/.claude, ~/.claude.json) para o projeto, deixa o global limpo e fixa modelos e subagents (Opus decide, Sonnet executa lote com ficha, Haiku coleta). Use ao começar ou adotar o padrão num projeto, quando o hook do padrão avisar algo fora do lugar, ou quando pedirem para aplicar o padrão ou limpar o global.
 ---
 
 # Aplicar o padrão
@@ -53,7 +53,7 @@ Mostre uma tabela item → destino → ação, cobrindo TODO o inventário. Mexe
 
 | Item global | Vai para |
 |---|---|
-| `model`, `effortLevel`, `modelSettings`, `fallbackModel`, `cleanupPeriodDays`, `disableClaudeAiConnectors` (destino `padrao`) | descartados: o `modelos/settings.json` fixa Opus 5.5 1M, effort medium, subagents Sonnet/Haiku 5.5 effort medium, transcripts por 14 dias, conectores do claude.ai desligados, e sem `fallbackModel` (sem a chave não há fallback) |
+| `model`, `effortLevel`, `modelSettings`, `fallbackModel`, `cleanupPeriodDays`, `disableClaudeAiConnectors` (destino `padrao`) | descartados: o `modelos/settings.json` fixa Opus 5.5 1M, effort medium, subagents Sonnet/Haiku 5.5 effort medium, transcripts por 14 dias, conectores do claude.ai desligados, e sem `fallbackModel` (sem a chave, indisponibilidade não troca de modelo) |
 | `autoMemoryDirectory`, `autoDreamEnabled` (destino `descartar`) | descartados: auto memory desligado |
 | `env.*` que o modelo já define (destino `padrao`) | descartados: o `modelos/settings.json` fixa |
 | chaves `time` (`env.*` comuns, `hooks`, `permissions.deny/ask`, `enabledPlugins`, `extraKnownMarketplaces`) | `.claude/settings.json` dos projetos que usam |
@@ -92,15 +92,18 @@ globais que vão mudar e as pastas de memória. NÃO copie `~/.claude.json` (tem
 
 - `.claude/settings.json` (time, git): mescle `modelos/settings.json`. As chaves do modelo
   VENCEM — `model` é sempre `claude-opus-5-5[1m]`, `effortLevel` `medium`, `modelSettings` com
-  effort `medium` para Opus, Sonnet e Haiku 5.5, os aliases dos subagents
-  (`env.ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL`) na família 5.5, sem "atualizar", e a memória
+  effort `medium` para Opus, Sonnet e Haiku 5.5 e o teto de compactação automática do Opus em
+  400K (`modelSettings["claude-opus-5-5"].autoCompactWindow: 400000`), os aliases
+  (`env.ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL` na família 5.5 e
+  `env.ANTHROPIC_DEFAULT_FABLE_MODEL` no Fable 5.2), sem "atualizar", e a memória
   desligada (`env.CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1"`, que vence `autoMemoryEnabled` nos dois
   sentidos — tire `autoMemoryEnabled` e `autoDreamEnabled` do projeto, se houver), subagent sem
   `model` em sonnet (`env.CLAUDE_CODE_SUBAGENT_MODEL`) e subagent sem abrir subagent
   (`env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "1"`) —, SEM
   `env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` (versões antigas do padrão o punham: tire, para o
   `/rewind` voltar), SEM
-  `fallbackModel` (tire se houver: sem a chave não há fallback; o `[]` não é documentado),
+  `fallbackModel` (tire se houver: sem a chave, indisponibilidade não troca de modelo; o `[]`
+  não é documentado),
   e `extraKnownMarketplaces.claude-padrao` com `autoUpdate: true` (marketplace de terceiro vem sem
   atualização automática),
   exceto `permissions`, `hooks`, `env` (una) e chaves que o projeto tenha e o modelo não cite
@@ -147,7 +150,9 @@ usuário rodar `/padrao:aplicar` lá quando abrir.
 
 Insira `modelos/claude-md.md` no `CLAUDE.md` da raiz. Se já houver o bloco entre
 `<!-- padrao:inicio` e `<!-- padrao:fim -->`, SUBSTITUA só ele. Se o projeto já tiver seção
-própria de modelos/subagents, mostre a sobreposição e pergunte qual fica.
+própria de modelos/subagents, mostre a sobreposição e pergunte qual fica. A primeira linha do
+bloco e a dos `padrao-*.md` trazem o carimbo `modelo X`: copie-a como está — o hook de abertura
+compara só o carimbo e avisa quando o projeto ficou com um modelo anterior.
 
 O bloco é curto de propósito: o que não vale em toda sessão fica em arquivos lidos sob demanda,
 listados no índice dele (sem `@`: import carrega sempre e não economiza contexto).
@@ -174,4 +179,8 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
    primeira sessão o Claude Code pede confiança na pasta para instalar o plugin, que o `/model`
    grava no global — o projeto reaplica o Opus 5.5 1M ao abrir, e o hook do padrão avisa — e que
    toda sessão abre em effort medium: o `/effort` muda a sessão (com `s` no seletor, sem gravar no
-   global) e a próxima volta a medium.
+   global) e a próxima volta a medium. A compactação automática do Opus fica em 400K (cada
+   requisição relê o contexto inteiro); a sessão que precisar de mais abre com
+   `claude --autocompact 1M`. Subir ao Fable 5.2 é o último degrau e vale só na sessão:
+   `/model`, escolher o Fable e teclar `s`, de preferência depois de `/compact` (o cache é por
+   modelo).

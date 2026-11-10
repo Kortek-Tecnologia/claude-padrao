@@ -4,9 +4,9 @@
     tipo · Modelo 5.5 · effort · ctx 12% (120k) · 1m32s · descrição
 
 Recebe {"columns": N, "tasks": [...]} no stdin e devolve uma linha JSON
-{"id", "content"} por task. Modelo fora da família 5.5 sai em vermelho — é a
-política do padrao (aliases fixados em claude-*-5-5). Task sem modelo resolvido
-ainda: mostra "…".
+{"id", "content"} por task. Modelo fora dos que o padrao fixa sai em vermelho:
+a família 5.5 e o Fable 5.2 (só o `fork` de uma sessão escalada chega nele).
+Task sem modelo resolvido ainda: mostra "…".
 """
 import json
 import re
@@ -20,14 +20,15 @@ GREEN, YELLOW, RED, CYAN, MAGENTA, BOLD, RESET = (
     "\033[32m", "\033[33m", "\033[31m", "\033[36m", "\033[35m", "\033[1m", "\033[0m",
 )
 GRAY = "\033[38;5;244m"
-FAMILIA = {"opus": MAGENTA, "sonnet": CYAN, "haiku": GREEN}
+FAMILIA = {"opus": MAGENTA, "sonnet": CYAN, "haiku": GREEN, "fable": YELLOW}
+FIXADO = {"opus": ("5", "5"), "sonnet": ("5", "5"), "haiku": ("5", "5"), "fable": ("5", "2")}
 STATUS = {"completed": f"{GREEN}✓{RESET}", "failed": f"{RED}✗{RESET}", "killed": f"{GRAY}■{RESET}"}
 ANSI = re.compile(r"\033\[[0-9;]*m")
 SEP = f" {GRAY}·{RESET} "
 
 
 def modelo(m):
-    """claude-haiku-5-5[1m] → ('Haiku 5.5', cor); fora da 5.5 em vermelho."""
+    """claude-haiku-5-5[1m] → ('Haiku 5.5', cor); fora dos fixados em vermelho."""
     if not m:
         return f"{GRAY}…{RESET}"
     r = re.match(r"claude-([a-z]+)-(\d+)-(\d+)", m)
@@ -35,7 +36,7 @@ def modelo(m):
         return f"{RED}{m}{RESET}"
     fam, maj, men = r.groups()
     nome = f"{fam.capitalize()} {maj}.{men}"
-    cor = FAMILIA.get(fam, YELLOW) if (maj, men) == ("5", "5") else RED
+    cor = FAMILIA[fam] if FIXADO.get(fam) == (maj, men) else RED
     return f"{BOLD}{cor}{nome}{RESET}"
 
 

@@ -4,8 +4,8 @@
 
 Plugin de [Claude Code](https://code.claude.com) que deixa todo projeto no mesmo padrão:
 configuração **no projeto** e global limpo, modelos da **família 5.5** com papéis fixos — **Opus
-decide, Sonnet executa, Haiku coleta** — e documentação curta e verdadeira. Funciona no Windows
-(Git Bash) e no Linux.
+decide, Sonnet executa lote com ficha, Haiku coleta** — e documentação curta e
+verdadeira. Funciona no Windows (Git Bash) e no Linux.
 
 - [O que ele resolve](#o-que-ele-resolve)
 - [Visão geral](#visão-geral)
@@ -127,15 +127,28 @@ tokens por modelo (entrada · cache lido · saída):
   principal  claude-opus-5-5        125k · 2.8M · 50k
   subagents  claude-sonnet-5-5      74k · 203k · 9k
   subagents  claude-haiku-5-5       32k · 78k · 9k
+custo estimado a preço de lista (em assinatura é peso relativo, não cobrança):
+  principal  claude-opus-5-5        US$ 2.11
+  subagents  claude-sonnet-5-5      US$ 0.29
+  subagents  claude-haiku-5-5       US$ 0.01
+  total      US$ 2.41 · subagents 12%
+contexto por requisição da sessão principal (requisições · % do custo dela):
+  até 100K         15 · 46%
+  100–200K         9 · 54%
+  200–400K         0 · 0%
+  400–600K         0 · 0%
+  acima de 600K    0 · 0%
+Haiku acima de 100K: 0 de 4 requisições · sobrepreço US$ 0.00
 ```
 
-Haiku perto de zero com muita entrada no Opus = leitura que devia ter ido ao coletor.
+Haiku perto de zero com muita entrada no Opus = leitura que devia ter ido ao coletor. O custo é
+estimativa a preço de lista; o que mais pesa é o contexto grande na sessão principal.
 
 ## O que roda sozinho
 
 | Peça | Quando | O que faz |
 |---|---|---|
-| Hook de abertura | toda sessão | avisa (nunca corrige) se algo voltou para o global, se o projeto saiu do padrão ou se há versão nova do plugin |
+| Hook de abertura | toda sessão | avisa (nunca corrige) se algo voltou para o global, se o projeto saiu do padrão, se o bloco do `CLAUDE.md` ou os `docs/agente/padrao-*.md` são de outro modelo, ou se há versão nova do plugin |
 | Hook de modelo | toda chamada de subagent | corrige o modelo dos papéis fixos e recusa modelo fora da política |
 | Trava de leitura | Bash, MCP e ferramentas que gravam, nos agentes que só leem | deixa `Explore`, coletor, leitor e revisor só lerem: grava, redireciona ou executa → recusa, dizendo o motivo |
 | `atualizar-docs` | antes de cada commit | corrige só a documentação que o diff deixou falsa (porta, comando, variável, caminho) |
@@ -147,17 +160,17 @@ ctx █░░░░░░░░░ 12% 120k/1M  │  5h ███░░░░░
 padrao:coletor · Haiku 5.5 · medium · ctx 4% (42k) · 1m15s · lendo app.py
 ```
 
-Modelo em vermelho fora do Opus 5.5 1M, effort em amarelo fora de medium (ajuste da sessão),
-"sem padrão" na pasta sem o plugin; nos subagents, vermelho fora da 5.5. Como cada hook decide:
-[docs/como-funciona.md](docs/como-funciona.md).
+Modelo em vermelho fora do Opus 5.5 1M; em amarelo o que é ajuste só da sessão (effort fora de
+medium, Fable 5.2); "sem padrão" na pasta sem o plugin; nos subagents, vermelho fora dos modelos
+fixados. Como cada hook decide: [docs/como-funciona.md](docs/como-funciona.md).
 
 ## Modelos e delegação
 
 ```mermaid
 flowchart LR
   O["Opus 5.5 1M · a sessão<br/>decide, planeja, o difícil"]
-  O -->|"plano pronto"| E["Sonnet · padrao:executor<br/>executa"]
-  O -->|"diff"| R["Sonnet · padrao:revisor<br/>revisa, só lê"]
+  O -->|"lote com ficha"| E["Sonnet · padrao:executor<br/>executa"]
+  O -->|"diff grande ou arriscado"| R["Sonnet · padrao:revisor<br/>revisa, só lê"]
   O -->|"busca, leitura, log"| C["Haiku · padrao:coletor, Explore<br/>coleta, só lê"]
   E -->|"saída real"| O
   R -->|"achados"| O
@@ -166,8 +179,23 @@ flowchart LR
 
 - Tudo na **família 5.5 com 1M de contexto**, effort **medium**. Toda sessão abre em medium; o
   `/effort` muda só a sessão em curso (o projeto vence o global na próxima).
-- Os aliases `opus`, `sonnet` e `haiku` apontam fixo para a 5.5 (`ANTHROPIC_DEFAULT_*_MODEL`): não
-  mudam sozinhos quando sai versão nova. Sem `fallbackModel`: nada troca de modelo sozinho.
+- **Teto de 400K no Opus:** a compactação automática da sessão dispara aos 400K tokens
+  (`modelSettings["claude-opus-5-5"].autoCompactWindow`), não perto de 1M — cada requisição relê
+  o contexto inteiro. O bloco do `CLAUDE.md` diz o que preservar ao compactar. Sessão que precisar
+  de mais: `claude --autocompact 1M`.
+- **Lote com ficha vai para o executor.** A sessão decide e faz a mudança pequena; lote com ficha
+  fechada (arquivos, mudança, critério de aceite, verificação que roda) vai para o
+  `padrao:executor`, porque cada requisição da sessão relê o contexto inteiro dela. Diff grande
+  ou arriscado passa pelo `padrao:revisor` antes do commit.
+- **Tarefa que pede mais**, um degrau por vez: um teste que rode; um nível de effort
+  (`/effort high`, ou `ultrathink` no prompt para um turno); passou de high, o Fable 5.2 só na
+  sessão (`/model`, tecla `s`) em medium, em vez de xhigh ou max — custa o dobro do Opus em
+  entrada e saída (o cache lido custa o mesmo) e, conforme o plano, consome créditos de uso. Troque depois de `/compact`: o cache é por
+  modelo. Em subagent o Fable é recusado.
+- Os aliases `opus`, `sonnet`, `haiku` e `fable` apontam fixo para a 5.5 e o Fable 5.2
+  (`ANTHROPIC_DEFAULT_*_MODEL`): não mudam sozinhos quando sai versão nova. Sem `fallbackModel`,
+  indisponibilidade não troca de modelo; a única troca automática é a de segurança (mensagem
+  sinalizada é refeita num modelo anterior, com aviso no transcript).
 - Subagent sem `model` roda em Sonnet (`CLAUDE_CODE_SUBAGENT_MODEL`), não no Opus da sessão;
   subagent não abre subagent (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`).
 - Agentes do plugin: `padrao:coletor` e `padrao:leitor` (haiku, só leem; o leitor roda sem o
@@ -206,7 +234,8 @@ auto memory fica desligado e o contexto do projeto vive no `CLAUDE.md`.
 
 Requisitos:
 
-- Claude Code **v2.1.295+**.
+- Claude Code **v2.1.317+** (antes dela, subagent herda o effort da sessão em vez do effort do
+  próprio modelo); o Fable 5.2 pede a v2.1.321.
 - Windows: **Git Bash** (os hooks rodam em `bash`).
 - **jq** — `winget install jqlang.jq` | `sudo apt install jq`. Sem ele, os agentes que só leem
   ficam sem Bash e o hook de abertura se cala: falha fechado.
@@ -237,7 +266,8 @@ claude plugin update padrao@claude-padrao --scope project
 
 Projeto sem `autoUpdate` (instalado antes de o padrão gravá-lo) não recebe sozinho — o hook
 avisa: rode o comando acima uma vez e depois `/padrao:aplicar`. Mudou o bloco do `CLAUDE.md` ou
-os `docs/agente/padrao-*.md` numa versão nova: rode `/padrao:aplicar` de novo no projeto, que os
+os `docs/agente/padrao-*.md` numa versão nova: o hook de abertura avisa (compara o carimbo
+`modelo X` da primeira linha de cada um) — rode `/padrao:aplicar` de novo no projeto, que os
 regrava.
 
 **Projeto de um marketplace antigo** (`padrao@kortek-tools` ou `padrao@padrao`), de dentro dele:
@@ -281,7 +311,8 @@ claude plugin validate .
 ```
 
 O CI (Ubuntu) roda o `testar.sh` e valida os diagramas Mermaid a cada push. Publicar: suba a `version` em
-`.claude-plugin/plugin.json` — o aviso de versão nova compara com ela — e dê push. Detalhes,
+`.claude-plugin/plugin.json` — o aviso de versão nova compara com ela — e dê push. Mudou um
+modelo que vai para o projeto (`skills/aplicar/modelos/`): suba também o carimbo dele. Detalhes,
 árvore de decisão de cada hook e o teste de ponta a ponta das skills:
 [docs/como-funciona.md](docs/como-funciona.md).
 

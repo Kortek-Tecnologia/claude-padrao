@@ -3,8 +3,10 @@
 # Roda em toda sessão e a 1ª resposta espera por ele: um jq para as settings e
 # versões, outro para o ~/.claude.json (pode ser grande; não vai como argumento).
 #
-# 1. Modelos e env: `model`, `effortLevel`, o effort de cada modelo
-#    (modelSettings) e as chaves de `env` do padrão (aliases dos subagents na
+# 1. Modelos e env: `model`, `effortLevel`, todo campo que o modelo de
+#    settings define em cada chave de `modelSettings` (effort; no Opus, o teto
+#    de compactação `autoCompactWindow`) — campo ou modelo que só o projeto
+#    tenha não conta — e as chaves de `env` do padrão (aliases dos subagents na
 #    família 5.5, modelo de subagent sem `model`, memória desligada, subagent
 #    sem subagent) do .claude/settings.json iguais aos de modelos/settings.json
 #    (fonte única). `CLAUDE_CODE_DISABLE_AUTO_MEMORY` vence `autoMemoryEnabled`
@@ -32,6 +34,10 @@
 #    projeto em 3.x tem de ser avisado da 1.0.0. O
 #    auto-update roda até 10 min depois da 1ª mensagem e não troca a versão da
 #    sessão aberta: daí o aviso com o comando e o /reload-plugins.
+# 6. Modelos em dia: o bloco do padrão no CLAUDE.md e os docs/agente/padrao-*.md
+#    do projeto trazem o carimbo `modelo X` da 1ª linha do arquivo de
+#    skills/aplicar/modelos de onde saíram. Compara só o carimbo, não o texto:
+#    quem grava no projeto é o Claude, e espaço ou CRLF dariam aviso falso.
 #
 # Achou algo: avisa o usuário (systemMessage) e o Claude (additionalContext),
 # apontando o /padrao:aplicar. Sem jq: silêncio.
@@ -66,11 +72,14 @@ achados=$(jq -rn \
   (if $M then
     ([["model", ["model"]], ["effortLevel", ["effortLevel"]]]
       + ($M.env // {} | keys | map(["env.\(.)", ["env", .]]))
-      + ($M.modelSettings // {} | keys | map(["modelSettings[\"\(.)\"].effortLevel", ["modelSettings", ., "effortLevel"]]))
+      + ($M.modelSettings // {} | to_entries | map(.key as $m | .value
+          | if type == "object" then keys else [] end
+          | map(["modelSettings[\"\($m)\"].\(.)", ["modelSettings", $m, .]])) | add // [])
     )[]
     | .[1] as $c
-    | (($M | getpath($c)) // "" | tostring) as $quer
-    | ((($P // {}) | getpath($c)) // "" | tostring) as $tem
+    | ($M | getpath($c) | if . == null then "" else tostring end) as $quer
+    # o `try`: `modelSettings` do projeto que não é objeto não pode derrubar o jq e calar o resto
+    | (($P // {}) | (try getpath($c) catch null) | if . == null then "" else tostring end) as $tem
     | select($tem != $quer)
     | "\(.[0]) do projeto e '\''\($tem)'\'', o padrao e '\''\($quer)'\''"
   else empty end),
@@ -97,6 +106,38 @@ for sl in statusline.py subagent-statusline.py; do
     anota "~/.claude/$sl ausente ou diferente da do plugin"
   fi
 done
+# carimbo ARQUIVO MARCA: o X de `modelo X` na 1ª linha do arquivo que casa com a
+# marca. A marca vem ancorada no começo da linha: prosa do projeto que cite o
+# marcador ("o bloco fica entre <!-- padrao:inicio e ...") não pode valer por ele.
+carimbo() { sed -n "/$2/{s/.*modelo \([0-9][0-9.]*\).*/\1/p;q;}" "$1" 2>/dev/null; }
+# maior A B: a versão A é maior que a B (campo a campo, numérico)
+maior() {
+  awk -v a="$1" -v b="$2" 'BEGIN {
+    n = split(a, x, "."); m = split(b, y, ".")
+    for (i = 1; i <= (n > m ? n : m); i++) {
+      if (x[i] + 0 > y[i] + 0) exit 0
+      if (x[i] + 0 < y[i] + 0) exit 1
+    }
+    exit 1 }'
+}
+em_dia() { # em_dia MODELO ARQUIVO_DO_PROJETO MARCA NOME_NO_AVISO
+  quer=$(carimbo "$plugin/skills/aplicar/modelos/$1" "$3")
+  [ -n "$quer" ] || return 0
+  tem=$(carimbo "$raiz/$2" "$3")
+  [ "$tem" = "$quer" ] && return 0
+  # Carimbo do projeto mais novo: um colega aplicou com o plugin já atualizado e
+  # esta sessão ainda roda o antigo — rodar o aplicar aqui rebaixaria o texto.
+  if [ -n "$tem" ] && maior "$tem" "$quer"; then
+    anota "$4 e de um modelo mais novo ('$tem') que o do plugin desta sessao ('$quer'): atualize o plugin em vez de rodar o /padrao:aplicar"
+  else
+    anota "$4 ausente ou de outro modelo do padrao (tem '${tem:-nenhum}', o plugin traz '$quer')"
+  fi
+}
+em_dia claude-md.md CLAUDE.md '^<!-- padrao:inicio' "bloco do padrao no CLAUDE.md"
+for doc in padrao-modelos.md padrao-configuracao.md; do
+  em_dia "agente/$doc" "docs/agente/$doc" '^<!-- gerado pelo plugin padrao' "docs/agente/$doc"
+done
+
 for item in CLAUDE.md agents commands output-styles rules workflows; do
   [ -e "$g/$item" ] && [ -n "$(ls -A "$g/$item" 2>/dev/null)" ] && anota "~/.claude/$item existe"
 done

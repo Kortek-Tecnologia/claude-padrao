@@ -28,7 +28,7 @@ G = Path.home() / ".claude"
 DESTINO = {
     "model": "padrao",
     "effortLevel": "padrao",
-    "fallbackModel": "padrao",  # fora do padrão: sem a chave não há fallback
+    "fallbackModel": "padrao",  # fora do padrão: sem a chave, indisponibilidade não troca de modelo
     "modelSettings": "padrao",
     "autoMemoryEnabled": "global",  # false no global: pasta sem o padrão não cria memória
     "autoMemoryDirectory": "descartar",  # auto memory desligado

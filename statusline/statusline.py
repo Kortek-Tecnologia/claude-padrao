@@ -187,17 +187,21 @@ def truncate(text, n):
 
 
 # --- padrao: início do bloco do plugin padrao (o resto do arquivo é do autor) ---
-# Política na própria linha: modelo em vermelho fora do Opus 5.5 com 1M, effort
-# em amarelo fora de medium (ajuste da sessão: a próxima abre em medium), "sem
-# padrão" na pasta sem o plugin.
+# Política na própria linha: modelo em vermelho fora do Opus 5.5 com 1M — menos
+# o Fable 5.2, degrau de escalada, em amarelo como o effort fora de medium
+# (ajuste da sessão: a próxima abre no Opus em medium) —, "sem padrão" na pasta
+# sem o plugin.
 PADRAO_MODELO, PADRAO_JANELA, PADRAO_EFFORT = "claude-opus-5-5", 1_000_000, "medium"
+PADRAO_ESCALADA = "claude-fable-5-2"
 
 
 def padrao(data):
     """(cor do modelo, marcas extras da linha 1)."""
-    modelo = data.get("model") or {}
+    ident = (data.get("model") or {}).get("id") or ""
     janela = (data.get("context_window") or {}).get("context_window_size")
-    no_padrao = (modelo.get("id") or "").startswith(PADRAO_MODELO) and (not janela or janela >= PADRAO_JANELA)
+    cor = RED
+    if not janela or janela >= PADRAO_JANELA:
+        cor = CYAN if ident.startswith(PADRAO_MODELO) else YELLOW if ident.startswith(PADRAO_ESCALADA) else RED
     marcas = []
     effort = (data.get("effort") or {}).get("level")
     if effort:
@@ -211,7 +215,7 @@ def padrao(data):
         tem = False
     if not tem:
         marcas.append(f"{YELLOW}sem padrão{RESET}")
-    return (CYAN if no_padrao else RED), marcas
+    return cor, marcas
 # --- padrao: fim do bloco ---
 
 

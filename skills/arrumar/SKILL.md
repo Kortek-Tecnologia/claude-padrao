@@ -155,6 +155,9 @@ Colunas: id, tipo, severidade, arquivos, evidência, status.
 - severidade: **alta** — leva agente ou pessoa a executar algo errado (build, deploy, comando,
   contrato de API); **média** — retrabalho ou decisão com base incompleta; **baixa** —
   incompleto ou cosmético;
+- antes de marcar **alta**, abra você o `arquivo:linha` do código e confirme o que ele faz: a
+  leitura do `padrao:leitor` é insumo, e documentação corrigida em cima de leitura errada sai
+  mais cara que a conferência;
 - `Duplicado` lista dois ou mais arquivos, com uma evidência por local; `Obsoleto` tem como
   evidência a ausência; os demais, `arquivo:linha`;
 - status `aberto`; só a fase 3 muda para `resolvido`.
@@ -220,7 +223,8 @@ usuário viaja junto e não entra em commit nenhum.
    real; decisão que a ficha não cobre → pare e devolva a pergunta. Pergunta do executor:
    responda com o plano, `SISTEMA.md` ou `INFRA.md`; sem resposta lá, a opção que muda menos o
    repositório — e registre para o relatório.
-3. **Revisor** (`padrao:revisor`): o `git diff` do lote, a ficha e a verificação; peça achados
+3. **Revisor** (`padrao:revisor`), em todo lote, grande ou pequeno — aqui a execução corre sem
+   o usuário olhando: o `git diff` do lote, a ficha e a verificação; peça achados
    com `arquivo:linha` — o que fugiu da ficha, quebrou ou faltou. Achado real → devolva ao MESMO
    executor com `SendMessage`, só aquele ponto (parou no teto de turnos: retome-o igual). No
    máximo duas voltas; o que sobrar fica aberto.

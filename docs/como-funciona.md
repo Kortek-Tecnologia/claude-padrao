@@ -37,13 +37,14 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 
 | Confere | Contra |
 |---|---|
-| `model`, `effortLevel`, `modelSettings` e as chaves de `env` do projeto | `modelos/settings.json` |
+| `model`, `effortLevel`, `modelSettings` (todos os campos que o modelo define em cada modelo, inclusive `autoCompactWindow`; campo ou modelo só do projeto não conta) e as chaves de `env` do projeto | `modelos/settings.json` |
 | `fallbackModel` em `settings.json` ou `settings.local.json`; `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` | têm de estar ausentes |
 | `disableClaudeAiConnectors` (projeto) e `syncClaudeAiPlugins: false` (local, único lugar em que vale) | `true` / `false` |
 | `~/.claude/settings.json` | só `permissions.defaultMode`, `skipDangerousModePermissionPrompt`, `autoMemoryEnabled`, as status lines e o effort que o `/effort` salva (o projeto vence) |
 | `~/.claude/` | sem `CLAUDE.md`, agents, commands, rules, workflows, skills pessoais (menos `synced/` e ocultas), status lines diferentes das do plugin |
 | `~/.claude.json` e `~/.claude/projects/<chave>/memory` | sem MCP de escopo user nem local deste projeto; sem memória deste projeto |
 | versão instalada × `~/.claude/plugins/marketplaces/claude-padrao` | por **diferença**, não por ordem: a numeração recomeçou em 1.0.0 |
+| carimbo `modelo X` do bloco do `CLAUDE.md` e dos `docs/agente/padrao-*.md` do projeto | o da 1ª linha do arquivo em `modelos/`; só o carimbo, não o texto — quem grava no projeto é o Claude, e espaço ou CRLF dariam aviso falso. A marca vale só no começo da linha (prosa que cita o marcador não conta), e carimbo mais novo que o do plugin manda atualizar o plugin, não rodar o `aplicar` |
 
 ## Hook de modelo — `travar-modelo-subagent.sh`
 
@@ -70,6 +71,8 @@ flowchart TD
   `CLAUDE_CODE_SUBAGENT_MODEL` > modelo da sessão. Por isso os agentes do plugin sem `model` passam
   (o frontmatter já tem o certo) e o hook só age quando a chamada traz outro.
 - O `Explore` embutido roda no `opus` por padrão: daí a correção sempre.
+- `fable` segue recusado em subagent: é o último degrau de escalada da **sessão** (`/model` com
+  `s`; amarelo na status line), e o alias está fixado no Fable 5.2 só para não mudar sozinho.
 - A correção devolve a entrada inteira com o `model` trocado (`updatedInput` substitui a entrada).
 - **Sem jq** não dá para reescrever: os campos saem por regex e o papel fixo fora do modelo é
   recusado com o modelo certo na mensagem.
@@ -145,7 +148,11 @@ ponta, ela não era chamada).
 
 **`medir`** — lê `~/.claude/projects/<chave>/*.jsonl` e os `subagents/`. O modelo de cada chamada
 é o efetivo pela regra do hook; chamada recusada não conta como rodada; tokens por `message.id`
-(as linhas de uma resposta repetem o uso).
+(as linhas de uma resposta repetem o uso). Cada `message.id` é uma requisição: o custo estimado
+sai da tabela `PRECO` (preço de lista por milhão, modelo casado por prefixo, escrita de cache de
+1 h à parte da de 5 min); contexto = entrada + cache lido + escrita, distribuído em faixas na
+sessão principal; Haiku acima de 100.000 paga a requisição inteira no preço alto. Modelo fora da
+tabela não entra no custo nem nas faixas e é listado à parte.
 
 ## Testes
 
@@ -154,7 +161,9 @@ ponta, ela não era chamada).
 - as decisões dos três hooks, inclusive sem `jq` e as brechas já fechadas da trava;
 - que o `--sandbox` do sed e do gawk segura de verdade o que a trava deixa passar;
 - o hook de abertura com HOME e projeto falsos, limpo e sujo;
-- as duas status lines, o inventário (não imprime valor do `env`) e as contas do `medir`.
+- que nenhum modelo de `skills/aplicar/modelos/` mudou sem subir o carimbo (soma do texto);
+- as duas status lines, o inventário (não imprime valor do `env`) e as contas do `medir`
+  (inclusive custo, faixas de contexto, Haiku acima de 100K e período sem requisição).
 
 O CI tem ainda um job `diagramas`, que passa todo bloco Mermaid dos .md pelo parser oficial
 (`.github/scripts/validar-mermaid.mjs`, com `mermaid` e `jsdom` instalados só ali). O parser não
@@ -181,4 +190,7 @@ No Windows, o caminho do HOME falso no scratchpad passa de 260 caracteres dentro
 
 Suba a `version` em `.claude-plugin/plugin.json` (semver) a cada mudança publicada — o
 marketplace pina por ela, e o aviso de versão nova compara com ela —, rode os testes e dê push.
+Mudou `claude-md.md` ou `agente/padrao-*.md`: suba o `modelo X` da 1ª linha para a versão nova e
+registre-o com a soma em `scripts/testar.sh` — é o carimbo que faz o hook de abertura avisar o
+projeto que ficou com o texto antigo.
 O `marketplace.json` publica este mesmo diretório (`source: "./"`).

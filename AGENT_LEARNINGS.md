@@ -40,3 +40,13 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 - Erro: no sandbox (HOME falso no scratchpad), `inventariar.py`, `medir-modelos.py` e o `jq` não acharam `~/.claude/projects/<chave>/...`; o Bash achava.
 - Evitar: concluir "não existe" pela saída de Python ou jq nativos em caminho fundo.
 - Fazer: para testar `medir`/`inventariar`, copie os transcripts para um HOME curto e use `--projeto` curto; ler arquivo fundo, `cat arquivo | jq`.
+
+### Política de modelos mudada só por artigo (2026-11-10)
+- Erro: troquei a regra de delegação e o lema com base num post ("o Opus edita por padrão") e tive de voltar atrás em ~10 arquivos quando o histórico das sessões mostrou o contrário.
+- Evitar: mudar regra de modelo, delegação ou custo apoiado só em documentação ou artigo.
+- Fazer: antes de mexer, medir no histórico local (`/padrao:medir` mostra custo e contexto por requisição) e, se a dúvida for de qualidade, rodar o mesmo lote nos dois modelos com o teste de aceite escrito antes.
+
+### Marcador de bloco casado sem âncora (2026-11-10)
+- Erro: o hook de abertura achava o carimbo pela primeira linha que continha `padrao:inicio`; prosa do projeto citando o marcador dava aviso falso em toda sessão, e o teste não pegava.
+- Evitar: casar por substring um marcador em arquivo que o usuário edita (`CLAUDE.md`, docs).
+- Fazer: ancorar no começo da linha (`^<!-- padrao:inicio`) e pôr no teste um caso com o marcador citado em prosa antes do bloco.
