@@ -131,17 +131,23 @@ severidade classifica, o plano filtra.
 | Obsoleto | documentado, não existe mais |
 | Duplicado | mesma informação em mais de um lugar |
 | Excesso | documenta o que o código já responde, histórico/CHANGELOG, instrução que o modelo já segue sozinho ("seja claro") ou enchimento |
-| Fora do lugar | está na carga fixa e não vale em toda sessão |
+| Fora do lugar | está na carga fixa e não vale em toda sessão; ou é instrução dada como ativa que não carrega (`AGENTS.md` sem import) |
 
 O que o código responde sozinho (assinaturas, tipos, estrutura de pastas, lista de endpoints,
 comportamento óbvio) **não é Gap**: documentá-lo cria texto que desatualiza. Cada Gap diz a sua
 categoria (porquê · rodar/configurar · armadilha); sem categoria, não é Gap. Feche com a
 contagem por tipo.
 
-**Carga fixa.** Meça arquivo a arquivo (`wc -l`): `CLAUDE.md`, `.claude/CLAUDE.md`,
-`AGENTS.md` e `CLAUDE.local.md` da raiz; cada `@caminho` importado fora de crase; e
+**Carga fixa.** Meça arquivo a arquivo (`wc -l`): `CLAUDE.md`, `.claude/CLAUDE.md` e
+`CLAUDE.local.md` da raiz; cada `@caminho` importado fora de crase; e
 `.claude/rules/**/*.md` sem `paths:` (`grep -rL '^paths:' .claude/rules`). A soma é a carga
-fixa; `CLAUDE.md` de subdiretório e rule com `paths:` não somam. Julgue cada seção fora do
+fixa; `CLAUDE.md` de subdiretório e rule com `paths:` não somam. O `AGENTS.md` só soma quando
+importado: havendo `CLAUDE.md` na pasta ou acima, o Claude Code não o lê sozinho. `AGENTS.md`
+versionado (`git ls-files AGENTS.md '*/AGENTS.md'`) sem `CLAUDE.md` ao lado que o importe é
+achado Fora do lugar — o time conta com instrução que não carrega; a correção é `@AGENTS.md` na
+primeira linha do `CLAUDE.md` da pasta (em subpasta, um `CLAUDE.md` só com o import).
+
+Julgue cada seção fora do
 bloco do padrão: **uma tarefa qualquer neste projeto sairia errada sem isto no contexto?** Não →
 Fora do lugar (ou Excesso). Mesmo com a carga abaixo de 200 linhas, é candidato: seção com mais
 de ~15 linhas, tabela ou lista de consulta, passo a passo, exemplo longo, detalhe de um módulo

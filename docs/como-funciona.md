@@ -171,6 +171,11 @@ flowchart TD
 `global`, `avaliar` (pergunte) ou `descartar`. Do `env` e dos MCP saem só os nomes. Os arquivos
 que vão para o projeto saem de `modelos/`; o bloco do `CLAUDE.md` fica entre
 `<!-- padrao:inicio` e `<!-- padrao:fim -->` e é substituído inteiro a cada `aplicar`.
+Projeto com `AGENTS.md`: o plano propõe `@AGENTS.md` na primeira linha do `CLAUDE.md` da mesma
+pasta. O Claude Code lê um ou outro — conferido na v2.1.322, com uma palavra-código que só
+existe no `AGENTS.md`: sem import ela some, na raiz e em subpasta; com import, volta. A opção
+que liga os dois (`pluginConfigs`) só vale no settings global, fora do padrão; o import mora no
+projeto. O `arrumar` acha o mesmo caso na carga fixa.
 
 **`arrumar`** — o estado mora em `_audit/` (no `.gitignore`), e é ele que permite retomar:
 

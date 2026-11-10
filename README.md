@@ -76,6 +76,11 @@ flowchart TD
 O bloco que entra no `CLAUDE.md` é curto: o detalhe fica em arquivos lidos **sob demanda**,
 listados num índice "arquivo → quando ler" (sem `@import`, que carregaria tudo em toda sessão).
 
+Projeto com `AGENTS.md`: com um `CLAUDE.md` na pasta, o Claude Code deixa de ler o `AGENTS.md`
+sozinho. O plano inclui `@AGENTS.md` na primeira linha do `CLAUDE.md` (e, para `AGENTS.md` de
+subpasta, um `CLAUDE.md` ao lado só com o import), para as instruções do time não saírem do
+contexto sem aviso.
+
 ### `/padrao:arrumar` — levantar, um OK, executar tudo
 
 ```mermaid

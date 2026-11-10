@@ -44,7 +44,8 @@ Python não enxerga caminho com mais de 260 caracteres (projeto em pasta funda):
 abertura acusar memória ou MCP que o inventário não traz, liste pelo Bash e inclua no plano.
 
 Leia também do projeto: `.claude/settings.json`, `.claude/settings.local.json`, `.mcp.json`,
-`CLAUDE.md`, `.gitignore`, `.claude/agents|skills|commands`.
+`CLAUDE.md`, `.gitignore`, `.claude/agents|skills|commands` e todo `AGENTS.md` versionado
+(`git ls-files AGENTS.md '*/AGENTS.md'`).
 
 ## 2. Monte o plano e peça OK UMA vez
 
@@ -70,6 +71,14 @@ Mostre uma tabela item → destino → ação, cobrindo TODO o inventário. Mexe
 | MCP escopo user | `.mcp.json` na raiz dos projetos que usam — PERGUNTE quais; depois `claude mcp remove <nome> --scope user` |
 | MCP escopo local de um projeto | `.mcp.json` daquele projeto; depois, de dentro dele, `claude mcp remove <nome> --scope local` |
 | memória `~/.claude/projects/<x>/memory` ou `<projeto>/.claude/memoria/` | texto no `CLAUDE.md` do projeto, se for fato durável dele; o resto só no backup (ver 5) |
+
+**`AGENTS.md` do projeto entra no plano.** O Claude Code só lê `AGENTS.md` enquanto não há
+`CLAUDE.md` na pasta nem acima dela — e o passo 7 cria o `CLAUDE.md`. Sem import, as instruções
+do time saem do contexto sem aviso. Para cada `AGENTS.md` versionado que o `CLAUDE.md` da mesma
+pasta não importa (`@AGENTS.md` fora de crase), uma linha no plano, com o tamanho (`wc -l`): na
+raiz, `@AGENTS.md` na primeira linha do `CLAUDE.md`; em subpasta, um `<pasta>/CLAUDE.md` só com
+`@AGENTS.md` (ou a linha no que já existir), que carrega quando o Claude lê arquivo de lá. O
+import soma à carga fixa: o que o usuário não quiser importar fica de fora e vai para o resumo.
 
 `keybindings.json` e `themes/` são só globais por natureza: ficam. Nunca toque em estado do app:
 `.credentials.json`, `projects/*.jsonl` e `projects/*/subagents` (transcripts, o `/resume`
@@ -148,8 +157,9 @@ usuário rodar `/padrao:aplicar` lá quando abrir.
 
 ## 7. Regras no `CLAUDE.md`
 
-Insira `modelos/claude-md.md` no `CLAUDE.md` da raiz. Se já houver o bloco entre
-`<!-- padrao:inicio` e `<!-- padrao:fim -->`, SUBSTITUA só ele. Se o projeto já tiver seção
+Insira `modelos/claude-md.md` no fim do `CLAUDE.md` da raiz (o texto do projeto vem antes). Se
+já houver o bloco entre `<!-- padrao:inicio` e `<!-- padrao:fim -->`, SUBSTITUA só ele, onde
+estiver. Se o projeto já tiver seção
 própria de modelos/subagents, mostre a sobreposição e pergunte qual fica. A primeira linha do
 bloco e a dos `padrao-*.md` trazem o carimbo `modelo X`: copie-a como está — o hook de abertura
 compara só o carimbo e avisa quando o projeto ficou com um modelo anterior.
@@ -160,6 +170,9 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
   plugin, como o bloco).
 - `AGENT_LEARNINGS.md` na raiz (erros do agente e a abordagem certa, no git, para o time): sem
   ele, crie de `modelos/agent-learnings.md`; existindo, não toque.
+- `AGENTS.md` aprovado no plano: `@AGENTS.md` sozinho na primeira linha do `CLAUDE.md` da mesma
+  pasta, antes de tudo e fora de crase (entre crases é só texto — é assim que este arquivo o
+  cita). Já importado, não repita.
 - Projeto com `CLAUDE.md` longo (perto de 200 linhas ou mais): sugira no resumo final rodar
   `/padrao:arrumar`, que move o que não vale em toda sessão para `docs/agente/`.
 
