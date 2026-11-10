@@ -38,8 +38,8 @@ própria sessão; a próxima volta ao padrão:
 
 | Papel | Modelo | Agente |
 |---|---|---|
-| decidir e o difícil — plano, arquitetura, revisão de invariante, bug sem pista; a mudança pequena ou acoplada ao que acabou de ler | `opus` | a sessão; `Plan` |
-| executar lote com ficha fechada (arquivos, mudança, critério de aceite, verificação que roda) | `sonnet` | `padrao:executor` |
+| decidir e o difícil — plano, arquitetura, revisão de invariante, bug sem pista; a mudança de poucas chamadas de ferramenta, em sessão ainda curta | `opus` | a sessão; `Plan` |
+| executar lote com ficha fechada (arquivos, mudança, critério de aceite, verificação que roda): o de muitos passos, e todo lote quando a sessão já está longa | `sonnet` | `padrao:executor` |
 | revisar diff grande ou arriscado contra plano e critério de aceite | `sonnet` | `padrao:revisor` (só lê) |
 | coletar — busca, leitura, resumo de log, saída de CI | `haiku` | `padrao:coletor` (só lê); `Explore` |
 
@@ -51,17 +51,19 @@ fechados. Coleta que exige julgamento ou escrita vai num `general-purpose` com s
 
 Decisão fica na sessão; execução com ficha fechada vai para o executor. Cada requisição da
 sessão relê o contexto inteiro dela, e o que um lote lê e escreve fica nesse contexto dali em
-diante: o mesmo lote sai mais barato num subagent de contexto pequeno. Modelo menor vai para o
-que tem erro barato de notar (achar arquivo, rodar teste, ler log) ou para ficha fechada com
-verificação. Não delegue o que você termina em poucas chamadas de ferramenta, mudança acoplada ao
-que acabou de ler, nem o que pede decisão no meio. Um subagent basta? Use um; lotes em paralelo,
-só com arquivos disjuntos. Subagent não abre subagent (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`).
-Gatilhos de delegar:
+diante: o mesmo lote sai mais barato num subagent de contexto pequeno, e a diferença cresce com
+o tamanho da sessão. Em sessão ainda curta, o lote de poucas chamadas você mesmo faz: abrir o
+subagent custaria mais que ele. Modelo menor vai para o que tem erro barato de notar (achar
+arquivo, rodar teste, ler log) ou para ficha fechada com verificação. Não delegue mudança
+acoplada ao que acabou de ler nem o que pede decisão no meio. Um subagent basta? Use um; lotes em
+paralelo, só com arquivos disjuntos. Subagent não abre subagent
+(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`). Gatilhos de delegar:
 
 1. CI reprovou, saída de teste/medição, log longo → `padrao:coletor` devolve a falha com `arquivo:linha`.
-2. Plano aprovado → `padrao:executor` implementa cada lote com ficha fechada (arquivos, mudança,
-   critério de aceite, verificação que roda). Mudança pequena, acoplada ao que você acabou de ler
-   ou com decisão no meio: faça você.
+2. Plano aprovado → `padrao:executor` implementa o lote com ficha fechada (arquivos, mudança,
+   critério de aceite, verificação que roda) quando ele tem muitos passos ou a sessão já está
+   longa (muita leitura, muitos turnos). Lote de poucas chamadas em sessão curta, mudança
+   acoplada ao que você acabou de ler ou com decisão no meio: faça você.
 3. Diff grande (passa de ~200 linhas ou de 5 arquivos) ou arriscado (segurança, permissão, dado
    persistente, contrato público, concorrência) → `padrao:revisor` antes do commit, quem quer
    que tenha escrito. Diff pequeno segue sem ele.

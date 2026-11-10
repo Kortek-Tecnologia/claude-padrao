@@ -44,7 +44,7 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 ### Política de modelos mudada só por artigo (2026-11-10)
 - Erro: troquei a regra de delegação e o lema com base num post ("o Opus edita por padrão") e tive de voltar atrás em ~10 arquivos quando o histórico das sessões mostrou o contrário.
 - Evitar: mudar regra de modelo, delegação ou custo apoiado só em documentação ou artigo.
-- Fazer: antes de mexer, medir no histórico local (`/padrao:medir` mostra custo e contexto por requisição) e, se a dúvida for de qualidade, rodar o mesmo lote nos dois modelos com o teste de aceite escrito antes.
+- Fazer: antes de mexer, medir no histórico local (`/padrao:medir` mostra custo e contexto por requisição) e, se a dúvida for de qualidade, rodar o mesmo lote nos dois modelos com o teste de aceite escrito antes. Texto novo de regra no bloco do `CLAUDE.md`: sondar em sessão real (`claude -p` no sandbox) com um caso de cada lado da regra — "pequena" sem critério foi lida de um jeito que só a sondagem mostrou.
 
 ### Marcador de bloco casado sem âncora (2026-11-10)
 - Erro: o hook de abertura achava o carimbo pela primeira linha que continha `padrao:inicio`; prosa do projeto citando o marcador dava aviso falso em toda sessão, e o teste não pegava.

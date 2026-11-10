@@ -258,8 +258,8 @@ while read -r arq carimbo soma; do
   [ "$tem_c $tem_s" = "$carimbo $soma" ] ||
     { echo "divergiu: modelo $arq mudou (carimbo '$tem_c', soma $tem_s): suba o 'modelo X' da 1a linha e registre os dois em testar.sh"; FALHAS=$((FALHAS + 1)); }
 done <<'CARIMBOS'
-claude-md.md 2.1.0 2511660356
-agente/padrao-modelos.md 2.1.0 3490513551
+claude-md.md 2.1.0 921942160
+agente/padrao-modelos.md 2.1.0 4170627963
 agente/padrao-configuracao.md 2.1.0 1073251858
 CARIMBOS
 

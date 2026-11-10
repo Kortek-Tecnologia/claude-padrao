@@ -9,8 +9,8 @@ grava no global), rode `/padrao:aplicar`.
 
 | Papel | Agente |
 |---|---|
-| decidir e o difícil — plano, arquitetura, bug sem pista; a mudança pequena ou acoplada ao que acabou de ler | a sessão (opus); `Plan` |
-| executar lote com ficha fechada (arquivos, mudança, aceite, verificação que roda) | `padrao:executor` (sonnet) |
+| decidir e o difícil — plano, arquitetura, bug sem pista; a mudança de poucas chamadas de ferramenta, em sessão ainda curta | a sessão (opus); `Plan` |
+| executar lote com ficha fechada (arquivos, mudança, aceite, verificação que roda): o de muitos passos, e todo lote quando a sessão já está longa | `padrao:executor` (sonnet) |
 | revisar diff grande ou arriscado, antes do commit | `padrao:revisor` (sonnet, só lê) |
 | coletar — busca, leitura, log, saída de CI | `padrao:coletor` (haiku, só lê); `Explore` |
 

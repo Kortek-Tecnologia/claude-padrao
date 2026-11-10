@@ -183,10 +183,11 @@ flowchart LR
   (`modelSettings["claude-opus-5-5"].autoCompactWindow`), não perto de 1M — cada requisição relê
   o contexto inteiro. O bloco do `CLAUDE.md` diz o que preservar ao compactar. Sessão que precisar
   de mais: `claude --autocompact 1M`.
-- **Lote com ficha vai para o executor.** A sessão decide e faz a mudança pequena; lote com ficha
-  fechada (arquivos, mudança, critério de aceite, verificação que roda) vai para o
-  `padrao:executor`, porque cada requisição da sessão relê o contexto inteiro dela. Diff grande
-  ou arriscado passa pelo `padrao:revisor` antes do commit.
+- **Lote com ficha vai para o executor.** Lote com ficha fechada (arquivos, mudança, critério de
+  aceite, verificação que roda) vai para o `padrao:executor` quando tem muitos passos ou a sessão
+  já está longa: cada requisição da sessão relê o contexto inteiro dela. Em sessão curta, o lote
+  de poucas chamadas a própria sessão faz. Diff grande ou arriscado passa pelo `padrao:revisor`
+  antes do commit.
 - **Tarefa que pede mais**, um degrau por vez: um teste que rode; um nível de effort
   (`/effort high`, ou `ultrathink` no prompt para um turno); passou de high, o Fable 5.2 só na
   sessão (`/model`, tecla `s`) em medium, em vez de xhigh ou max — custa o dobro do Opus em

@@ -168,7 +168,8 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
 1. Grave `~/.claude/settings.json` como `modelos/global.json`, mais `permissions.defaultMode` e
    `skipDangerousModePermissionPrompt` SÓ se o usuário já os tinha (com o mesmo valor; não os
    crie), `<PYTHON>` = o interpretador que o `py.sh` acha nesta máquina (`python3`,
-   `python` ou `py`) e `<HOME>` = o home com `/`. Copie `<plugin>/statusline/statusline.py` e
+   `python` ou `py`) e `<HOME>` = o home com `/` (no Git Bash, `cygpath -m "$HOME"`; trocar as
+   barras do caminho do Windows à mão come as barras). Copie `<plugin>/statusline/statusline.py` e
    `subagent-statusline.py` para `~/.claude/` (rodar a skill de novo os atualiza; o hook
    de abertura avisa se ficarem velhos). Apague as sobras e o que foi migrado.
 2. Valide todo JSON tocado (`jq empty <arquivo>`).
