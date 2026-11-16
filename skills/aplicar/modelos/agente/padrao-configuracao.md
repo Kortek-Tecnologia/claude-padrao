@@ -1,4 +1,4 @@
-<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.3.0; edite no plugin, não aqui -->
+<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.4.0; edite no plugin, não aqui -->
 # Configuração: no projeto, nada no global
 
 `.claude/settings.json` (time, no git) e `.claude/settings.local.json` (pessoal: idioma, tela —
@@ -15,3 +15,10 @@ voltou para o global (o `/model` grava lá), se o projeto saiu do padrão ou se 
 rode `/padrao:aplicar`. O effort que o
 `/effort` salva no global não conta: o projeto vence e a sessão abre em medium. Transcripts
 ficam 14 dias, só para o `/resume`; checkpoints (`/rewind`) ligados.
+
+Dois opcionais, desligados por padrão e fora da política de modelos. O Code Mode
+(`/padrao:code-mode`) é a única variável de `env` que fica no global
+(`CLAUDE_CODE_EXPERIMENTAL_CODE_MODE`): o Claude Code a descarta dos settings de projeto, e ela
+vale para a máquina inteira. O Fable como advisor (`/padrao:advisor`) grava `advisorModel` no
+`.claude/settings.local.json` deste projeto; o `/advisor` do Claude Code grava no global, e o
+hook acusa.

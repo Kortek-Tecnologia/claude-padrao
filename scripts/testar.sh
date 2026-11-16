@@ -281,6 +281,12 @@ espera "pasta de dados invalida" PASSA "$(cmd_de sd 'git commit -m a' | CLAUDE_P
 espera "sem jq" PASSA "$(CLAUDE_PLUGIN_DATA="$DADOS" semjq cobrar-docs.sh "$(cmd_de semjq 'git commit -m a')")"
 rm -rf "$DADOS"
 [ -z "$SEMJQ" ] || rm -rf "$SEMJQ"
+# onFailure no hooks.json: as travas bloqueiam se o hook falhar; o lembrete da documentação
+# deixa seguir, e por extenso — no Code Mode, hook que falha sem a chave recusa a chamada.
+falha_de() { jq -c --arg s "$1" '[.hooks.PreToolUse[].hooks[] | select(.command | contains($s)) | .onFailure] | unique' hooks/hooks.json | tr -d '\r'; }
+[ "$(falha_de cobrar-docs.sh)" = '["continue"]' ] && [ "$(falha_de trava-leitura.sh)" = '["block"]' ] &&
+  [ "$(falha_de travar-modelo-subagent.sh)" = '["block"]' ] ||
+  { echo "divergiu: onFailure do hooks.json (travas = block, cobrar-docs = continue)"; FALHAS=$((FALHAS + 1)); }
 
 # Guarda do global: HOME e projeto falsos.
 CASA=$(mktemp -d); PROJ=$(mktemp -d)
@@ -297,15 +303,17 @@ cp skills/aplicar/modelos/agente/padrao-*.md "$PROJ/docs/agente/"
 { printf '# Projeto\n\nO bloco do plugin fica entre `<!-- padrao:inicio` e `<!-- padrao:fim -->`.\n\n'
   cat skills/aplicar/modelos/claude-md.md; } | sed 's/$/\r/' >"$PROJ/CLAUDE.md"
 mkdir -p "$CASA/.claude/skills/synced/x" "$CASA/.claude/skills/.trash/1-x/morning"
-# o effort que o /effort salva no global não conta: o projeto vence ao abrir
-jq '. + {effortLevel: "high", modelSettings: {"claude-opus-5-5": {effortLevel: "xhigh"}}}' "$CASA/.claude/settings.json" >"$CASA/s" && mv "$CASA/s" "$CASA/.claude/settings.json"
+# o effort que o /effort salva no global não conta: o projeto vence ao abrir; a variável do
+# Code Mode também não (o Claude Code a descarta dos settings de projeto: só liga do global)
+jq '. + {effortLevel: "high", modelSettings: {"claude-opus-5-5": {effortLevel: "xhigh"}}, env: {CLAUDE_CODE_EXPERIMENTAL_CODE_MODE: "1"}}' "$CASA/.claude/settings.json" >"$CASA/s" && mv "$CASA/s" "$CASA/.claude/settings.json"
 conferir() { printf '{}' | HOME="$CASA" CLAUDE_PROJECT_DIR="$PROJ" sh "$D/conferir-padrao.sh"; }
 # modelo ou campo de modelSettings que só o projeto tem não conta
 jq '.modelSettings["claude-opus-5-5"].extra = 1 | .modelSettings["outro-modelo"] = {effortLevel: "high"}' "$PROJ/.claude/settings.json" >"$PROJ/s" && mv "$PROJ/s" "$PROJ/.claude/settings.json"
 [ -z "$(conferir)" ] || { echo "divergiu: conferir-padrao acusou um ambiente limpo: $(conferir)"; FALHAS=$((FALHAS + 1)); }
 jq '.fallbackModel = [] | .modelSettings["claude-sonnet-5-5"].effortLevel = "high" | .modelSettings["claude-opus-5-5"].autoCompactWindow = 200000 | del(.env.ANTHROPIC_DEFAULT_HAIKU_MODEL) | del(.extraKnownMarketplaces["claude-padrao"].autoUpdate) | del(.disableClaudeAiConnectors) | del(.env.CLAUDE_CODE_SUBAGENT_MODEL) | .env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING = "1"' "$PROJ/.claude/settings.json" >"$PROJ/s" && mv "$PROJ/s" "$PROJ/.claude/settings.json"
-# modelSettings com mais que effort já é configuração no global
-jq '. + {model: "opus", fallbackModel: [], subagentStatusLine: {type: "command", command: "x"}} | .modelSettings["claude-opus-5-5"].autoCompactWindow = 100000' "$CASA/.claude/settings.json" >"$CASA/s" && mv "$CASA/s" "$CASA/.claude/settings.json"
+# modelSettings com mais que effort já é configuração no global; outra variável de env e o
+# advisorModel (o /advisor grava lá) também
+jq '. + {model: "opus", fallbackModel: [], subagentStatusLine: {type: "command", command: "x"}, advisorModel: "fable"} | .modelSettings["claude-opus-5-5"].autoCompactWindow = 100000 | .env.OUTRA = "x"' "$CASA/.claude/settings.json" >"$CASA/s" && mv "$CASA/s" "$CASA/.claude/settings.json"
 mkdir -p "$CASA/.claude/projects/$(printf '%s' "$PROJ" | sed 's/[^A-Za-z0-9]/-/g')/memory" && touch "$CASA/.claude/projects/$(printf '%s' "$PROJ" | sed 's/[^A-Za-z0-9]/-/g')/memory/MEMORY.md"
 printf '# velha\n' >"$CASA/.claude/statusline.py"
 # a linha dos subagents vem do plugin: a chave no global (venceria a dele) e a cópia antiga são sobra
@@ -321,9 +329,10 @@ sed 's/modelo [0-9][0-9.]*/modelo 0.9.0/' skills/aplicar/modelos/claude-md.md >"
 printf '<!-- gerado pelo plugin padrao (/padrao:aplicar); edite no plugin, não aqui -->\n' >"$PROJ/docs/agente/padrao-modelos.md"
 rm "$PROJ/docs/agente/padrao-configuracao.md"
 saida=$(conferir | jq -r .systemMessage)
-for esperado in "bloco do padrao no CLAUDE.md ausente ou de outro modelo do padrao (tem '0.9.0'" "docs/agente/padrao-modelos.md ausente ou de outro modelo do padrao (tem 'nenhum'" "docs/agente/padrao-configuracao.md ausente ou de outro modelo" "chaves fora do padrao: fallbackModel, model, modelSettings, subagentStatusLine" "subagent-statusline.py sobrou" "checkpoints (/rewind) desligados" "statusline.py ausente ou diferente" "fallbackModel em .claude/settings.local.json" "fallbackModel em .claude/settings.json" "modelSettings[\"claude-sonnet-5-5\"].effortLevel do projeto e 'high', o padrao e 'medium'" "modelSettings[\"claude-opus-5-5\"].autoCompactWindow do projeto e '200000', o padrao e '400000'" "memoria deste projeto" "env.ANTHROPIC_DEFAULT_HAIKU_MODEL do projeto e ''" "env.CLAUDE_CODE_SUBAGENT_MODEL do projeto e ''" "atualizacao automatica do padrao desligada" "0.9.0 disponivel" "conectores MCP do claude.ai ligados" "plugins do app (claude.ai) sincronizados" "skills tem skills pessoais"; do
+for esperado in "bloco do padrao no CLAUDE.md ausente ou de outro modelo do padrao (tem '0.9.0'" "docs/agente/padrao-modelos.md ausente ou de outro modelo do padrao (tem 'nenhum'" "docs/agente/padrao-configuracao.md ausente ou de outro modelo" "chaves fora do padrao: advisorModel, fallbackModel, model, modelSettings, subagentStatusLine, env.OUTRA" "subagent-statusline.py sobrou" "checkpoints (/rewind) desligados" "statusline.py ausente ou diferente" "fallbackModel em .claude/settings.local.json" "fallbackModel em .claude/settings.json" "modelSettings[\"claude-sonnet-5-5\"].effortLevel do projeto e 'high', o padrao e 'medium'" "modelSettings[\"claude-opus-5-5\"].autoCompactWindow do projeto e '200000', o padrao e '400000'" "memoria deste projeto" "env.ANTHROPIC_DEFAULT_HAIKU_MODEL do projeto e ''" "env.CLAUDE_CODE_SUBAGENT_MODEL do projeto e ''" "atualizacao automatica do padrao desligada" "0.9.0 disponivel" "conectores MCP do claude.ai ligados" "plugins do app (claude.ai) sincronizados" "skills tem skills pessoais"; do
   case "$saida" in *"$esperado"*) ;; *) echo "divergiu: conferir-padrao nao acusou '$esperado'"; FALHAS=$((FALHAS + 1)) ;; esac
 done
+case "$saida" in *CLAUDE_CODE_EXPERIMENTAL_CODE_MODE*) echo "divergiu: conferir-padrao acusou a variavel do Code Mode no global"; FALHAS=$((FALHAS + 1)) ;; esac
 # bloco de modelo MAIS NOVO que o do plugin da sessão: manda atualizar o plugin, não o aplicar
 sed 's/modelo [0-9][0-9.]*/modelo 99.0.0/' skills/aplicar/modelos/claude-md.md >"$PROJ/CLAUDE.md"
 saida=$(conferir | jq -r .systemMessage)
@@ -351,7 +360,7 @@ while read -r arq carimbo soma; do
 done <<'CARIMBOS'
 claude-md.md 2.2.0 2856927040
 agente/padrao-modelos.md 2.2.0 3731529991
-agente/padrao-configuracao.md 2.3.0 2346395112
+agente/padrao-configuracao.md 2.4.0 3993088577
 CARIMBOS
 
 # Status line principal: o padrão na linha 1 (vermelho = \033[31m).
@@ -405,16 +414,70 @@ printf '%s' '{"columns":80,"tasks":[{"id":"a","agentType":"padrao:coletor","stat
 
 # Inventário: do env global saem só os nomes (o JSON vai para o transcript); nome
 # de segredo vai para o local, o que o modelo define é descartado, allow pergunta.
+# Os opcionais: a variável do Code Mode fica no global (só vale lá) e o advisorModel
+# vai para o settings.local.json do projeto.
 # Path.home() lê HOME no Linux e USERPROFILE no Windows.
 CASA=$(mktemp -d); mkdir -p "$CASA/.claude"
-printf '%s' '{"env":{"GITHUB_TOKEN":"ghp_SEGREDO_DE_TESTE","MEU_MODO":"x9z_VALOR","ANTHROPIC_DEFAULT_HAIKU_MODEL":"claude-haiku-4-5"},"permissions":{"allow":["Bash(rm:*)"],"defaultMode":"default"}}' >"$CASA/.claude/settings.json"
+printf '%s' '{"env":{"GITHUB_TOKEN":"ghp_SEGREDO_DE_TESTE","MEU_MODO":"x9z_VALOR","ANTHROPIC_DEFAULT_HAIKU_MODEL":"claude-haiku-4-5","CLAUDE_CODE_EXPERIMENTAL_CODE_MODE":"1"},"advisorModel":"fable","permissions":{"allow":["Bash(rm:*)"],"defaultMode":"default"}}' >"$CASA/.claude/settings.json"
 inv=$(HOME="$CASA" USERPROFILE="$(nativo "$CASA")" sh "$D/py.sh" skills/aplicar/inventariar.py --projeto "$(nativo "$CASA")")
 case "$inv" in *SEGREDO_DE_TESTE* | *x9z_VALOR*) echo "divergiu: inventariar imprimiu valor do env"; FALHAS=$((FALHAS + 1)) ;; esac
 ok=$(printf '%s' "$inv" | jq -r '[.settings_global[] | {(.chave): .destino}] | add
   | [."env.GITHUB_TOKEN" == "local", ."env.MEU_MODO" == "time", ."env.ANTHROPIC_DEFAULT_HAIKU_MODEL" == "padrao",
-     ."permissions.allow" == "avaliar", ."permissions.defaultMode" == "global"] | all')
+     ."permissions.allow" == "avaliar", ."permissions.defaultMode" == "global",
+     ."env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE" == "global", .advisorModel == "local"] | all')
 [ "$ok" = true ] || { echo "divergiu: inventariar: $(printf '%s' "$inv" | jq -c .settings_global)"; FALHAS=$((FALHAS + 1)); }
 rm -rf "$CASA"
+
+# Opcionais (scripts/opcional.py). Code Mode: a variável mora no settings global, o único em
+# que vale; o resto do arquivo, a indentação e o fim de linha ficam como estavam. Advisor: o
+# ID do Fable que o padrão fixa, no settings.local.json do projeto.
+CASA=$(mktemp -d); PROJ=$(nativo "$(mktemp -d)"); mkdir -p "$CASA/.claude" "$PROJ/.claude"
+GLOB="$CASA/.claude/settings.json"; LOC="$PROJ/.claude/settings.local.json"
+opc() { HOME="$CASA" USERPROFILE="$(nativo "$CASA")" sh "$D/py.sh" scripts/opcional.py "$@" 2>&1 | tr -d '\r'; }
+tem() { case "$2" in *"$3"*) ;; *) echo "divergiu: opcional: $1: $2"; FALHAS=$((FALHAS + 1)) ;; esac; }
+vale() { jq -e "$2" "$3" >/dev/null 2>&1 || { echo "divergiu: opcional: $1: $(cat "$3" 2>/dev/null)"; FALHAS=$((FALHAS + 1)); }; }
+tem "estado sem settings" "$(opc code-mode)" "Code Mode: desligado"
+[ ! -e "$GLOB" ] || { echo "divergiu: opcional: consultar o estado criou o settings global"; FALHAS=$((FALHAS + 1)); }
+printf '{\r\n    "autoMemoryEnabled": false,\r\n    "env": {\r\n        "OUTRA": "x"\r\n    }\r\n}\r\n' >"$GLOB"
+tem "ligar" "$(opc code-mode ligar)" "Code Mode: ligado"
+vale "ligar preserva o resto" '.env == {OUTRA: "x", CLAUDE_CODE_EXPERIMENTAL_CODE_MODE: "1"} and .autoMemoryEnabled == false' "$GLOB"
+# 7 linhas, 7 CRs (conta os bytes: no Windows o grep tira o CR antes de casar)
+grep -q '^    "autoMemoryEnabled": false,' "$GLOB" && [ "$(tr -cd '\r' <"$GLOB" | wc -c)" -eq 7 ] ||
+  { echo "divergiu: opcional: ligar mudou a indentacao ou o fim de linha do settings"; FALHAS=$((FALHAS + 1)); }
+cp "$GLOB" "$CASA/antes"
+tem "ligar de novo" "$(opc code-mode on)" "nada a gravar"
+cmp -s "$GLOB" "$CASA/antes" || { echo "divergiu: opcional: ligar de novo regravou o settings"; FALHAS=$((FALHAS + 1)); }
+tem "desligar" "$(opc code-mode desligar)" "Code Mode: desligado"
+vale "desligar tira so a variavel" '.env == {OUTRA: "x"}' "$GLOB"
+printf '{"env":{"CLAUDE_CODE_EXPERIMENTAL_CODE_MODE":"0"},"statusLine":{"type":"command"}}' >"$GLOB"
+tem "0 no global" "$(opc code-mode)" "desligado à força"
+opc code-mode off >/dev/null
+vale "env vazio sai junto" '(has("env") | not) and .statusLine.type == "command"' "$GLOB"
+# JSON inválido: para com erro e não toca no arquivo
+printf '{ quebrado' >"$GLOB"
+tem "JSON invalido" "$(opc code-mode ligar)" "erro: ~/.claude/settings.json não é JSON válido"
+[ "$(cat "$GLOB")" = '{ quebrado' ] || { echo "divergiu: opcional: mexeu em settings invalido"; FALHAS=$((FALHAS + 1)); }
+HOME="$CASA" USERPROFILE="$(nativo "$CASA")" sh "$D/py.sh" scripts/opcional.py code-mode ligar >/dev/null 2>&1 &&
+  { echo "divergiu: opcional: JSON invalido saiu com 0"; FALHAS=$((FALHAS + 1)); }
+tem "acao desconhecida" "$(opc code-mode talvez)" "erro: ação 'talvez' desconhecida"
+rm -f "$GLOB"
+fable=$(jq -r '.env.ANTHROPIC_DEFAULT_FABLE_MODEL' skills/aplicar/modelos/settings.json | tr -d '\r')
+tem "advisor desligado" "$(opc advisor --projeto "$PROJ")" "Advisor neste projeto: desligado"
+[ ! -e "$LOC" ] || { echo "divergiu: opcional: consultar o advisor criou o settings.local.json"; FALHAS=$((FALHAS + 1)); }
+printf '{\n  "syncClaudeAiPlugins": false\n}\n' >"$LOC"
+tem "advisor ligar" "$(opc advisor ligar --projeto "$PROJ")" "Advisor neste projeto: $fable · advisorModel em .claude/settings.local.json"
+vale "advisor no local, com o resto" ".advisorModel == \"$fable\" and .syncClaudeAiPlugins == false" "$LOC"
+tem "advisor desligar" "$(opc advisor desligar --projeto "$PROJ")" "Advisor neste projeto: desligado"
+vale "advisor sai do local" '. == {syncClaudeAiPlugins: false}' "$LOC"
+# advisorModel no global (o /advisor grava lá): o estado diz de onde vem e avisa
+printf '{"advisorModel":"opus"}' >"$GLOB"
+saida=$(opc advisor --projeto "$PROJ")
+tem "advisor pelo global" "$saida" "Advisor neste projeto: opus · advisorModel em ~/.claude/settings.json"
+tem "aviso do global" "$saida" "aviso: ~/.claude/settings.json tem advisorModel"
+# do home o script recusa: lá o settings.local.json seria global
+tem "advisor no home" "$(opc advisor ligar --projeto "$(nativo "$CASA")")" "erro: o home não é projeto"
+[ ! -e "$CASA/.claude/settings.local.json" ] || { echo "divergiu: opcional: gravou o advisor no home"; FALHAS=$((FALHAS + 1)); }
+rm -rf "$CASA" "$PROJ"
 
 # medir: modelo em que o subagent rodou, correção do hook e tokens por modelo.
 CASA=$(mktemp -d); PROJ=$(nativo "$(mktemp -d)")
@@ -431,10 +494,12 @@ agora=$(date -u +%Y-%m-%dT%H:%M:%S)
   # documentação antes do commit: skill e commit na mesma resposta (conta, com a skill); commit
   # que o hook recusou (lembrete, não conta); a repetição e um `(… git commit)` (contam, sem a
   # skill); lote do arrumar e comando que só cita o commit (fora). Sem model nem usage: não mexem nas outras contas.
+  # A última (d3) vem como o Code Mode grava a chamada feita de dentro do código: model
+  # `<synthetic>` e uso zerado — os commits dela contam; tokens e turnos, não.
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"d1","content":[{"type":"tool_use","id":"k1","name":"Skill","input":{"skill":"padrao:atualizar-docs"}},{"type":"tool_use","id":"k2","name":"Bash","input":{"command":"cd /x && git add -A && git commit -m \\"a (b)\\""}}]}}\n' "$agora"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"d2","content":[{"type":"tool_use","id":"k3","name":"Bash","input":{"command":"git commit -m b"}}]}}\n' "$agora"
   printf '{"type":"user","timestamp":"%s","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"k3","is_error":true,"content":"PreToolUse:Bash hook error: padrao: lembrete de rotina: antes deste commit, rode a skill padrao:atualizar-docs"}]}}\n' "$agora"
-  printf '{"type":"assistant","timestamp":"%s","message":{"id":"d3","content":[{"type":"tool_use","id":"k4","name":"Bash","input":{"command":"git commit -m b"}},{"type":"tool_use","id":"k5","name":"Bash","input":{"command":"git commit -m \\"arrumar: lote 1 — x\\""}},{"type":"tool_use","id":"k6","name":"Bash","input":{"command":"git log --grep \\"git commit\\""}},{"type":"tool_use","id":"k7","name":"Bash","input":{"command":"(cd y && git commit)"}}]}}\n' "$agora"
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"d3","model":"<synthetic>","usage":{"input_tokens":0,"output_tokens":0},"content":[{"type":"tool_use","id":"k4","name":"Bash","input":{"command":"git commit -m b"}},{"type":"tool_use","id":"k5","name":"Bash","input":{"command":"git commit -m \\"arrumar: lote 1 — x\\""}},{"type":"tool_use","id":"k6","name":"Bash","input":{"command":"git log --grep \\"git commit\\""}},{"type":"tool_use","id":"k7","name":"Bash","input":{"command":"(cd y && git commit)"}}]}}\n' "$agora"
   # custo (US$/milhão): o sufixo [1m] casa por prefixo com claude-opus-5-5; m4 repete o id e
   # vale a última linha (10k·4 + 30k·5 + 20k de 1 h·8 + 140k lidos·0,2 + 1k·20 = 0,398, contexto
   # 200.000 exatos = faixa 100–200K); m5 = 300k·4 = 1,2; m6 = 500k·0,2 + 5k·20 = 0,2;
@@ -472,6 +537,7 @@ for re in '1 correção\(ões\) de papel fixo \(Explore=1\) · 1 recusa\(s\)' '^
   '^Haiku acima de 100K: 1 de 2 requisições · sobrepreço US\$ 0\.02$' '^sem preço na tabela \(fora da conta\): claude-opus-4-8=2$'; do
   printf '%s\n' "$med" | grep -Eq "$re" || { echo "divergiu: medir-modelos sem /$re/: $med"; FALHAS=$((FALHAS + 1)); }
 done
+case "$med" in *"<synthetic>"*) echo "divergiu: medir-modelos listou <synthetic> como modelo"; FALHAS=$((FALHAS + 1)) ;; esac
 # período sem requisição: as seções saem com zeros, sem quebrar
 for f in "$CASA/.claude/projects/$chave/s.jsonl" "$CASA/.claude/projects/$chave/s/subagents/a.jsonl"; do
   sed 's/"timestamp":"[^"]*"/"timestamp":"2000-01-01T00:00:00"/' "$f" >"$f.velho" && mv "$f.velho" "$f"

@@ -24,6 +24,10 @@
 #    `/model` grava no global — por isso o 2. O effort que o `/effort` salva
 #    (`modelSettings` só com `effortLevel`, ou o `effortLevel` antigo) passa: o
 #    `modelSettings` do projeto vence o do usuário, e toda sessão abre em medium.
+#    De `env`, passa só `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` (o /padrao:code-mode
+#    a grava): o Claude Code a descarta dos settings de projeto, então o Code
+#    Mode só liga daqui. `advisorModel` no global (o `/advisor` grava lá) é chave
+#    fora do padrão: o /padrao:advisor a põe no settings.local.json do projeto.
 # 3. Sem fallback: nenhum `fallbackModel` no settings.json nem no local.
 # 4. Nada do app: `disableClaudeAiConnectors: true` no .claude/settings.json
 #    (conectores MCP do claude.ai) e `syncClaudeAiPlugins: false` no
@@ -61,6 +65,9 @@ achados=$(jq -rn \
   # modelSettings que só guarda effort por modelo (o que o /effort grava)
   def so_effort: type == "object"
     and ([.[] | if type == "object" then keys[] else "?" end] - ["effortLevel"] | length) == 0;
+  # `env` do global: fora a variável do Code Mode, cada nome é chave fora do padrão
+  def env_fora: if type == "object"
+    then keys - ["CLAUDE_CODE_EXPERIMENTAL_CODE_MODE"] | map("env." + .) else ["env"] end;
   ($proj | obj) as $P | ($local | obj) as $L | ($mod | obj) as $M | ($glob | obj) as $G
   | (($inst | obj) // {} | .version // "") as $vi
   | (($pub | obj) // {} | .version // "") as $vp
@@ -92,8 +99,9 @@ achados=$(jq -rn \
   (if $vi != "" and $vp != "" and $vi != $vp then
     "padrao \($vi) instalado, \($vp) disponivel: rode '\''claude plugin update padrao@claude-padrao --scope project'\'' e depois /reload-plugins" else empty end),
   (if $G then
-    ((($G | keys) - ["permissions", "autoMemoryEnabled", "skipDangerousModePermissionPrompt", "statusLine", "effortLevel"]
+    ((($G | keys) - ["permissions", "autoMemoryEnabled", "skipDangerousModePermissionPrompt", "statusLine", "effortLevel", "env"]
         - (if ($G.modelSettings | so_effort) then ["modelSettings"] else [] end))
+      + (if ($G | has("env")) then ($G.env | env_fora) else [] end)
       + (($G.permissions // {}) | keys - ["defaultMode"] | map("permissions." + .))
     | select(length > 0) | "~/.claude/settings.json tem chaves fora do padrao: \(join(", "))")
   else empty end)

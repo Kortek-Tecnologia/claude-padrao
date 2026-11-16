@@ -47,7 +47,8 @@
             "type": "command",
             "shell": "bash",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/cobrar-docs.sh\"",
-            "timeout": 10
+            "timeout": 10,
+            "onFailure": "continue"
           }
         ]
       },
@@ -60,7 +61,8 @@
             "if": "Bash(git *)",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/cobrar-docs.sh\"",
             "timeout": 10,
-            "statusMessage": "Doc do diff"
+            "statusMessage": "Doc do diff",
+            "onFailure": "continue"
           }
         ]
       },
@@ -73,7 +75,8 @@
             "if": "PowerShell(git *)",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/cobrar-docs.sh\"",
             "timeout": 10,
-            "statusMessage": "Doc do diff"
+            "statusMessage": "Doc do diff",
+            "onFailure": "continue"
           }
         ]
       }

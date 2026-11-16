@@ -26,11 +26,12 @@ flowchart LR
 
 | Caminho | Papel |
 |---|---|
-| `hooks/hooks.json` | liga os quatro hooks; todos com `shell: bash` e timeout de 10 s; as duas travas com `onFailure: "block"` (falhou, bloqueia), o lembrete da documentação sem ele (falhou, o commit segue) |
+| `hooks/hooks.json` | liga os quatro hooks; todos com `shell: bash` e timeout de 10 s; as duas travas com `onFailure: "block"` (falhou, bloqueia), o lembrete da documentação com `onFailure: "continue"` (falhou, o commit segue — por extenso, porque no Code Mode o hook que falha sem a chave recusa a chamada) |
 | `skills/aplicar/modelos/` | **fonte única** do padrão: o `aplicar` grava a partir dela e o hook de abertura compara com ela |
 | `scripts/py.sh` | acha `python3`, `python` ou `py` 3.9+ (no Windows o `python3` costuma ser o atalho quebrado da Store) e roda com `-I` |
 | `agents/*.md` | os quatro agentes; os que só leem têm `tools` fechado e `disallowedTools` |
 | `statusline/` | `statusline.py` é de terceiro (Jhonatan de Souza); nossas linhas ficam entre `padrao: início` e `padrao: fim` ou marcadas `# padrao` |
+| `scripts/opcional.py` | liga, desliga e mostra os dois opcionais (Code Mode e Fable como advisor); as skills `code-mode` e `advisor` só o chamam — ver [Os opcionais](#os-opcionais--opcionalpy) |
 | `settings.json` | a única setting que o plugin traz: `subagentStatusLine`, que roda o `subagent-statusline.py` direto do plugin (de plugin só valem ela e `agent`) |
 
 ## Hook de abertura — `conferir-padrao.sh`
@@ -44,7 +45,7 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 | `model`, `effortLevel`, `modelSettings` (todos os campos que o modelo define em cada modelo, inclusive `autoCompactWindow`; campo ou modelo só do projeto não conta) e as chaves de `env` do projeto | `modelos/settings.json` |
 | `fallbackModel` em `settings.json` ou `settings.local.json`; `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` | têm de estar ausentes |
 | `disableClaudeAiConnectors` (projeto) e `syncClaudeAiPlugins: false` (local, único lugar em que vale) | `true` / `false` |
-| `~/.claude/settings.json` | só `permissions.defaultMode`, `skipDangerousModePermissionPrompt`, `autoMemoryEnabled`, a status line principal e o effort que o `/effort` salva (o projeto vence); `subagentStatusLine` ali é chave fora do padrão, porque o global vence o plugin |
+| `~/.claude/settings.json` | só `permissions.defaultMode`, `skipDangerousModePermissionPrompt`, `autoMemoryEnabled`, a status line principal, o effort que o `/effort` salva (o projeto vence) e, de `env`, só `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` (o Code Mode só liga do escopo user); outra variável sai no aviso como `env.NOME`. `subagentStatusLine` ali é chave fora do padrão, porque o global vence o plugin, e `advisorModel` também (o `/advisor` grava lá; o lugar dele é o `settings.local.json` do projeto) |
 | `~/.claude/` | sem `CLAUDE.md`, agents, commands, rules, workflows, skills pessoais (menos `synced/` e ocultas), `statusline.py` diferente da do plugin, `subagent-statusline.py` sobrando |
 | `~/.claude.json` e `~/.claude/projects/<chave>/memory` | sem MCP de escopo user nem local deste projeto; sem memória deste projeto |
 | versão instalada × `~/.claude/plugins/marketplaces/claude-padrao` | por **diferença**, não por ordem: a numeração recomeçou em 1.0.0 |
@@ -243,7 +244,95 @@ ou não; tentativa que o hook recusou conta como lembrete, não como commit. Cad
 sai da tabela `PRECO` (preço de lista por milhão, modelo casado por prefixo, escrita de cache de
 1 h à parte da de 5 min); contexto = entrada + cache lido + escrita, distribuído em faixas na
 sessão principal; Haiku acima de 100.000 paga a requisição inteira no preço alto. Modelo fora da
-tabela não entra no custo nem nas faixas e é listado à parte.
+tabela não entra no custo nem nas faixas e é listado à parte. Mensagem `<synthetic>` (aviso do
+Claude Code; no Code Mode, cada chamada feita de dentro do código) não é requisição: o
+`tool_use` dela conta para commits e subagents, e ela fica fora de tokens, turnos e custo.
+
+## Os opcionais — `opcional.py`
+
+Code Mode e advisor são recursos experimentais do Claude Code. O padrão não liga nenhum dos dois
+nem muda a política de modelos por causa deles: as skills `code-mode` e `advisor`
+(`disable-model-invocation`: só o usuário chama) rodam o `scripts/opcional.py`, que grava ou tira
+uma chave e mostra o estado.
+
+| | Code Mode | Fable como advisor |
+|---|---|---|
+| Chave | `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE: "1"` | `advisorModel` |
+| Arquivo | `~/.claude/settings.json` | `.claude/settings.local.json` do projeto |
+| Por que ali | o Claude Code só aceita a variável do shell, do settings do usuário ou de um `--settings`; do projeto e do local ele a descarta | a chave vale em qualquer settings, então não precisa do global; pessoal porque o Fable custa mais e pode consumir créditos de uso de quem ligou |
+| Valor | `"1"`; desligar tira a chave (um `"0"` venceria até o `1` do shell) | o ID de `env.ANTHROPIC_DEFAULT_FABLE_MODEL` do `modelos/settings.json`, não o alias `fable`, que acompanha a versão do Claude Code |
+
+- **O global ganhou uma exceção, e só uma.** O hook de abertura deixa passar a variável do Code
+  Mode, o inventário a classifica como `global` e o `aplicar` a mantém. `advisorModel` no global
+  segue acusado; o inventário o manda para o `settings.local.json` (destino `local`).
+- **O script não conserta arquivo.** JSON inválido, ou `env` que não é objeto: para com erro e
+  não grava. Regrava com a indentação e o fim de linha do original, por arquivo temporário na
+  mesma pasta. Do home, o advisor é recusado: lá o `settings.local.json` seria global.
+- **Advisor, medido** (v2.1.325, Windows): com `advisorModel` no `settings.local.json` de uma
+  pasta, `claude -p "/advisor"` responde `Advisor: Fable 5.2`; sem ele, `Advisor: off`. No Git
+  Bash o argumento precisa de `MSYS_NO_PATHCONV=1`, senão `/advisor` vira caminho e segue como
+  prompt. Só da documentação: os subagents herdam o advisor (executor, revisor e coletor podem
+  consultar o Fable, e o hook de modelo não vê, porque o advisor não é o `model` da chamada).
+
+**Code Mode, medido em sessão real** (v2.1.325, Windows, uma sessão interativa em pseudo-terminal
+com HOME falso, o plugin e um plugin-sonda que grava a entrada de todo hook):
+
+- **Liga e desliga.** Com a variável gravada pelo `opcional.py` no settings do usuário, a sessão
+  abre no diálogo de confirmação (a opção marcada é **No**) e depois mostra
+  `Code Mode (experimental) is on`; com ele ligado, o `--continue` retoma a sessão. Desligado
+  pelo script, o `--continue` é recusado com a instrução de pôr a variável em 1, e a sessão
+  nova abre sem Code Mode.
+- **Os hooks valem dentro do código.** O código roda numa chamada `REPL` (`tool_input.code`), e
+  cada chamada que ele faz dispara `PreToolUse` e `PostToolUse` com o nome normal (`Bash`,
+  `Read`, `Edit`, `Skill`, `Grep`…) e os mesmos campos. `Agent` e `Poll` (espera de código em
+  segundo plano) o modelo chama direto.
+- **Lembrete da documentação:** o `git commit` de dentro do código foi recusado uma vez (o
+  modelo recebe a lista de chamadas recusadas, com o texto do hook), a skill rodou por
+  `tools.Skill(...)` (o hook a vê como `Skill`) e o commit seguinte passou.
+- **Hook de modelo:** o `Explore` sem `model` rodou em Haiku nas quatro chamadas — o
+  `updatedInput` vale ali.
+- **Trava de leitura:** os subagents também rodam em Code Mode (o `Explore` usou `REPL`; o
+  coletor, com `tools:` fechado, fez direto a única chamada dele), e as chamadas de dentro do
+  código deles chegam ao hook com `agent_type`: um `date` do `Explore` foi recusado pela trava.
+  O ambiente é selado (`require` não carrega módulo; sem `process` nem `fetch`), e num agente
+  sem a ferramenta `Write` a função `write()` falha com `Write tool is not available in this
+  REPL context`. Por isso o `REPL` fica fora do matcher: o que grava continua passando por
+  ferramenta, e cada ferramenta pelo hook.
+- **`medir`:** o transcript grava cada chamada de dentro do código como mensagem `<synthetic>`
+  (`isVirtual`, uso zerado) com o `tool_use` normal. Commits, lembretes, subagents e correções
+  saíram iguais ao registro da sonda; `<synthetic>` não entra em tokens nem em turnos.
+- **Não medido:** hook que falha ou estoura o tempo dentro do Code Mode — o
+  `onFailure: "continue"` do lembrete vem da documentação; `revisor` e `leitor` (mesma
+  configuração do coletor); auto mode.
+
+**Ganho do Code Mode, medido** (v2.1.325, Windows, Opus 5.5 medium, uma cópia deste repositório
+com o padrão aplicado e defeitos plantados). Três tarefas na mesma sessão, com o aceite escrito
+antes: achar os links quebrados dos .md, renomear um script citado em 10 arquivos e rodar seis
+verificações independentes. Custo a preço de lista, pelo transcript:
+
+| Rodada | Requisições | Tempo | US$ | Contexto por requisição |
+|---|---|---|---|---|
+| sem Code Mode (3 rodadas) | 9–10 | 72–77 s | 0,39 | 49K → 61K |
+| com Code Mode, cache quente (1) | 9 | 82 s | 0,34 | 26K → 39K |
+| com Code Mode, cache frio (1) | 11 | 91 s | 0,47 | 26K → 39K |
+
+- **Mesma qualidade:** as cinco rodadas passaram em todo o aceite, e o `testar.sh` do projeto
+  passou depois da renomeação em todas.
+- **Não poupou requisição.** Sem Code Mode o Opus já resolve cada tarefa com dois ou três
+  comandos de shell (`grep | xargs sed`, um script Python no heredoc); o Code Mode embrulha os
+  mesmos comandos em JavaScript.
+- **O ganho vem do contexto menor:** a sessão com Code Mode abre com 26,1K tokens, contra
+  48,7K da comum, e a diferença de uns 22 mil segue em toda requisição. Com o cache quente isso
+  deu 13% a menos nesta sessão curta; é um valor fixo por requisição (cache lido), então pesa
+  menos quanto maior o contexto da sessão.
+- **Cache frio custa caro:** o prefixo do Code Mode é outro, e a primeira sessão com ele o
+  regrava inteiro (26 mil tokens de escrita de 1 h) — saiu 21% mais cara que a sessão comum,
+  cujo prefixo estava quente. Quem liga e desliga paga isso a cada troca.
+- **Um pouco mais lento:** 82 e 91 s de relógio, contra 72 a 77 s.
+- **Limites:** sessões curtas (contexto até 62K), nenhuma delegação (as tarefas eram pequenas e
+  a sessão não chamou subagent), um repositório, poucas rodadas. Sessão longa, lote no
+  executor e tarefa com muita chamada que o shell não faz (MCP, `WebFetch`, vários `Agent`)
+  não foram medidos. Por isso a política de modelos não mudou.
 
 ## Testes
 
@@ -257,7 +346,10 @@ tabela não entra no custo nem nas faixas e é listado à parte.
 - que nenhum modelo de `skills/aplicar/modelos/` mudou sem subir o carimbo (soma do texto);
 - as duas status lines, o comando do `settings.json` do plugin (com o `${CLAUDE_PLUGIN_ROOT}`
   trocado), o inventário (não imprime valor do `env`) e as contas do `medir`
-  (inclusive custo, faixas de contexto, Haiku acima de 100K e período sem requisição).
+  (inclusive custo, faixas de contexto, Haiku acima de 100K e período sem requisição);
+- os opcionais: ligar, desligar e estado do `opcional.py` com HOME e projeto falsos (o resto do
+  settings, a indentação e o CRLF preservados; JSON inválido intocado; o home recusado), a
+  variável do Code Mode calada no hook de abertura e o `onFailure` de cada hook no `hooks.json`.
 
 O CI tem ainda um job `diagramas`, que passa todo bloco Mermaid dos .md pelo parser oficial
 (`.github/scripts/validar-mermaid.mjs`, com `mermaid` e `jsdom` instalados só ali). O parser não
@@ -286,7 +378,13 @@ O que só a interface mostra (linha dos subagents, status line, diálogos) não 
 `@lydell/node-pty` (sobe o `claude` com o HOME falso e o token na env) e `@xterm/headless`
 (remonta a tela), gravando a tela em texto a cada mudança. No HOME falso, ponha
 `hasTrustDialogAccepted` para a pasta em `.claude.json` e `skipDangerousModePermissionPrompt`
-no settings, senão a sessão para nos diálogos de abertura.
+no settings, senão a sessão para nos diálogos de abertura. É o único jeito de testar o Code
+Mode, que não roda em `claude -p`: o diálogo dele abre com **No** marcado (seta para baixo e
+Enter — confira na tela o cursor no **Yes** antes do Enter e o aviso `is on` depois: seta
+mandada cedo demais se perde, e a sessão abre sem Code Mode). `autoUpdates: false` no `.claude.json` falso vira `env.DISABLE_AUTOUPDATER` no settings
+global, e o hook de abertura acusa. Com um servidor de linguagem instalado, o diálogo de LSP
+aparece no meio da sessão. Texto que começa por `/` (`/exit`) passado pelo Git Bash ao script
+que digita na sessão pede `MSYS_NO_PATHCONV=1`.
 
 **`claude plugin eval`: ensaiado, não adotado** (v2.1.322, Windows, três casos de teste). Roda
 com a assinatura, guarda o relatório local e custa ~US$ 0,10 por rodada, mas não alcança o que

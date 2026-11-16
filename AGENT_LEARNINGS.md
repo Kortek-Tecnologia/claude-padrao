@@ -57,6 +57,11 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 - Evitar: tratar o corte da trava como parser de shell em hook que precisa acertar (ele corta a mais de propósito: na trava, errar para o lado de negar é seguro).
 - Fazer: tirar o corpo dos heredocs antes do corte (`sem_heredoc` no script) e pôr no `testar.sh` um caso com o comando citado em texto; hook novo passa por sessão real no sandbox antes de fechar.
 
+### Argumento que começa por barra no Git Bash (2026-11-16)
+- Erro: rodei `claude -p "/advisor"` pelo Git Bash; o MSYS trocou o argumento por `C:/Program Files/Git/advisor`, o comando virou prompt comum e a sondagem (paga) teve de ser repetida. Repeti logo depois, com `/exit` passado a um script Node que digitava na sessão.
+- Evitar: passar a programa nativo do Windows (`claude`, `node`, `python`), pelo Git Bash, argumento que começa por `/` e não é caminho (slash command, opção no estilo `/x`).
+- Fazer: `MSYS_NO_PATHCONV=1` no comando (ou rodar pelo PowerShell) e conferir a saída antes de concluir.
+
 ### Saída de comando pago passada por filtro (2026-11-10)
 - Erro: rodei o `claude plugin eval` com a saída num `| sed …` de expressão errada; o `sed` morreu, a saída sumiu e a rodada (paga) teve de ser repetida.
 - Evitar: encadear filtro novo direto na saída de comando que custa dinheiro ou demora (sessão aninhada, eval, suíte).

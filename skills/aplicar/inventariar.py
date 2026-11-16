@@ -48,7 +48,12 @@ DESTINO = {
     "skipDangerousModePermissionPrompt": "global",
     "switchModelsOnFlag": "local",
     "autoMode": "global",
+    "advisorModel": "local",  # o /advisor grava no global; vale de qualquer settings (/padrao:advisor)
 }
+
+# Variável de `env` que só vale no escopo user: o Claude Code a descarta dos
+# settings de projeto, então fica no global (/padrao:code-mode a liga e desliga).
+ENV_GLOBAL = {"CLAUDE_CODE_EXPERIMENTAL_CODE_MODE"}
 
 # permissions.<chave>: `allow` pode ser regra do time ou liberação pessoal
 # (pergunte); diretórios extras são caminhos desta máquina; o resto é do time.
@@ -84,7 +89,12 @@ def destino_settings(cfg: dict) -> list[dict]:
             continue
         if k == "env" and isinstance(v, dict):
             for nome in sorted(v):
-                d = "padrao" if nome in env_padrao else "local" if SEGREDO.search(nome) else "time"
+                d = (
+                    "padrao" if nome in env_padrao
+                    else "global" if nome in ENV_GLOBAL
+                    else "local" if SEGREDO.search(nome)
+                    else "time"
+                )
                 itens.append({"chave": f"env.{nome}", "valor": "(oculto)", "destino": d})
             continue
         itens.append({"chave": k, "valor": v, "destino": DESTINO.get(k, "avaliar")})

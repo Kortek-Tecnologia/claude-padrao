@@ -152,11 +152,21 @@ def turno_novo(o: dict, vistos: set[str]) -> bool:
     return True
 
 
+# Mensagem que o próprio Claude Code grava, sem requisição a modelo: aviso de erro
+# e, no Code Mode, cada chamada de ferramenta feita de dentro do código (o
+# `tool_use` dela conta para commits e subagents; tokens e turnos, não).
+SINTETICO = "<synthetic>"
+
+
+def de_modelo(msg: dict) -> bool:
+    return bool(msg.get("model")) and msg["model"] != SINTETICO
+
+
 def guardar_uso(usos: dict, msg: dict) -> None:
     """Uso de tokens por resposta: as linhas de um mesmo message.id repetem o uso,
     e a última traz o final — guarda por id, sobrescrevendo."""
     uso = msg.get("usage")
-    if isinstance(uso, dict) and msg.get("model"):
+    if isinstance(uso, dict) and de_modelo(msg):
         usos[msg.get("id") or f"sem-id-{len(usos)}"] = (msg["model"], uso)
 
 
@@ -181,8 +191,6 @@ def imprimir_custo(uso_principal: dict, uso_sub: dict) -> None:
     sobrepreco = 0.0
     for rotulo, usos in (("principal", uso_principal), ("subagents", uso_sub)):
         for modelo, uso in usos.values():
-            if modelo == "<synthetic>":  # aviso do próprio Claude Code, não é requisição a modelo
-                continue
             prefixo = prefixo_preco(modelo)
             if prefixo is None:
                 sem_preco[modelo] += 1
@@ -296,7 +304,7 @@ def main() -> None:
             if o.get("type") != "assistant" or not isinstance(msg, dict):
                 continue
             guardar_uso(uso_principal, msg)
-            if msg.get("model") and turno_novo(o, vistos):
+            if de_modelo(msg) and turno_novo(o, vistos):
                 turnos_principal[msg["model"]] += 1
             for c in msg.get("content") or []:
                 if not isinstance(c, dict) or c.get("type") != "tool_use":
@@ -328,7 +336,7 @@ def main() -> None:
             msg = o.get("message")
             if o.get("type") == "assistant" and isinstance(msg, dict):
                 guardar_uso(uso_sub, msg)
-                if msg.get("model") and turno_novo(o, vistos):
+                if de_modelo(msg) and turno_novo(o, vistos):
                     turnos_sub[msg["model"]] += 1
 
     print(f"últimos {dias} dias · {sessoes} sessão(ões) · {sem_delegar} sem nenhuma delegação")

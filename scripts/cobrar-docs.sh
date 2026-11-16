@@ -24,7 +24,9 @@
 # apaga, e a skill varre os de mais de 7 dias (skill que rodou sem commit).
 #
 # Falha ABERTA, ao contrário das travas: sem jq, sem session_id ou sem onde
-# anotar, o hook se cala e o commit segue.
+# anotar, o hook se cala e o commit segue. No hooks.json ele leva
+# `onFailure: "continue"`: no Code Mode, hook que falha ou estoura o tempo sem
+# essa chave recusa a chamada.
 entrada=$(cat)
 # Roda em todo `git …` do Bash: sai sem abrir jq quando não é commit nem a skill.
 case "$entrada" in *commit* | *atualizar-docs*) ;; *) exit 0 ;; esac

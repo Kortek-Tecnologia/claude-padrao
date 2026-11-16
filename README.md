@@ -9,7 +9,7 @@ verdadeira. Funciona no Windows (Git Bash) e no Linux.
 
 - [O que ele resolve](#o-que-ele-resolve)
 - [Visão geral](#visão-geral)
-- [Os três comandos](#os-três-comandos)
+- [Os comandos](#os-comandos)
 - [O que roda sozinho](#o-que-roda-sozinho)
 - [Modelos e delegação](#modelos-e-delegação)
 - [Onde mora cada configuração](#onde-mora-cada-configuração)
@@ -39,13 +39,15 @@ flowchart LR
   H1 -.->|"global sujo"| A
 ```
 
-## Os três comandos
+## Os comandos
 
 | Comando | Quando | Pergunta |
 |---|---|---|
 | `/padrao:aplicar` | ao adotar o padrão, ou quando o hook de abertura avisar | um OK no plano |
 | `/padrao:arrumar [foco]` | quando a documentação ou o `CLAUDE.md` envelhecerem | um OK no plano |
 | `/padrao:medir` | para ver se a política de modelos pegou | nenhuma |
+| `/padrao:code-mode ligar` (ou `desligar`) | opcional: o Code Mode do Claude Code, nesta máquina | nenhuma |
+| `/padrao:advisor ligar` (ou `desligar`) | opcional: o Fable 5.2 como advisor, neste projeto | nenhuma |
 
 ### `/padrao:aplicar` — o global vai para o projeto
 
@@ -157,6 +159,35 @@ estimativa a preço de lista; o que mais pesa é o contexto grande na sessão pr
 a `atualizar-docs` antes = o Claude repetiu o commit depois do lembrete sem rodar a skill, ou o
 hook não rodou naquela sessão (plugin antigo, `jq` ausente).
 
+### `/padrao:code-mode` e `/padrao:advisor` — os opcionais
+
+Dois recursos experimentais do Claude Code que o padrão **não liga**: ficam fora da política de
+modelos, e cada comando só grava ou tira uma chave. Sem argumento, mostra o estado.
+
+| | `/padrao:code-mode` | `/padrao:advisor` |
+|---|---|---|
+| O que liga | [Code Mode](https://code.claude.com/docs/en/code-mode): o Claude escreve JavaScript que faz várias chamadas de ferramenta num passo só | [advisor](https://code.claude.com/docs/en/advisor): o modelo da sessão consulta o Fable 5.2 nos pontos de decisão |
+| Onde grava | `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` no `~/.claude/settings.json` | `advisorModel: "claude-fable-5-2"` no `.claude/settings.local.json` do projeto |
+| Vale para | a máquina inteira, da próxima sessão em diante | você, neste projeto, da próxima sessão em diante |
+| Pede | Claude Code v2.1.323+, sessão interativa no terminal | v2.1.321+ e acesso ao Fable |
+
+- **Code Mode no global, e é a única exceção.** O Claude Code descarta essa variável dos settings
+  de projeto: só liga do shell ou do settings do usuário. O hook de abertura a deixa passar e o
+  `aplicar` não a tira. Sessão aberta com Code Mode só é retomada com ele ligado, e só no
+  terminal. Os hooks do padrão valem dentro do código: cada chamada passa por eles com o nome
+  normal da ferramenta, também nos subagents (conferido em sessão real, v2.1.325).
+- **Advisor no projeto, não no global.** O `/advisor` do Claude Code grava no global, e o hook de
+  abertura acusa; o `/padrao:advisor` grava no arquivo pessoal do projeto, com o ID que o padrão
+  fixa. Cada consulta relê a conversa inteira no preço do Fable, sem cache, e os subagents
+  herdam o advisor — executor, revisor e coletor também podem consultá-lo.
+- **Ganho do Code Mode, medido: pequeno.** Em três tarefas curtas no Opus 5.5 (achar links
+  quebrados, renomear um script citado em 10 arquivos, seis verificações), a qualidade e o
+  número de requisições foram os mesmos com e sem: o Opus já resolve cada uma com dois ou três
+  comandos de shell. Com o cache quente o custo caiu 13%, porque o contexto de cada requisição
+  fica uns 22 mil tokens menor; na primeira sessão, de cache frio, saiu 21% mais caro; e levou
+  11 a 23% mais tempo. Sessão longa e delegação não foram medidas, e o ganho do advisor também
+  não: antes de adotar num time, rode as suas tarefas com e sem e compare o `/padrao:medir`.
+
 ## O que roda sozinho
 
 | Peça | Quando | O que faz |
@@ -227,12 +258,13 @@ flowchart LR
     g1["statusLine"]
     g2["autoMemoryEnabled: false"]
     g3["defaultMode e skipDangerous…<br/>só se você já usava"]
-    g1 ~~~ g2 ~~~ g3
+    g4["Code Mode (env)<br/>só pelo /padrao:code-mode"]
+    g1 ~~~ g2 ~~~ g3 ~~~ g4
   end
   subgraph P["projeto"]
     direction TB
     p1[".claude/settings.json<br/>time, no git: modelos, env, permissões, plugin"]
-    p2[".claude/settings.local.json<br/>pessoal, fora do git: idioma, segredos"]
+    p2[".claude/settings.local.json<br/>pessoal, fora do git: idioma, segredos, advisor"]
     p3[".mcp.json<br/>MCP do projeto"]
     p4["CLAUDE.md + docs/agente/<br/>contexto, sob demanda"]
     p1 ~~~ p2 ~~~ p3 ~~~ p4
@@ -253,7 +285,7 @@ Requisitos:
 
 - Claude Code **v2.1.319+** (antes da 2.1.317, subagent herda o effort da sessão em vez do
   effort do próprio modelo; antes da 2.1.319, a linha dos subagents que o plugin traz não
-  roda); o Fable 5.2 pede a v2.1.321.
+  roda); o Fable 5.2 pede a v2.1.321 e o Code Mode, a v2.1.323.
 - Windows: **Git Bash** (os hooks rodam em `bash`).
 - **jq** — `winget install jqlang.jq` | `sudo apt install jq`. Sem ele, os agentes que só leem
   ficam sem Bash e o hook de abertura se cala: falha fechado. O lembrete da documentação
@@ -321,9 +353,9 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 ```
 .claude-plugin/   manifesto do plugin e do marketplace (version: semver)
 hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc
-scripts/          os hooks em sh, py.sh e testar.sh
+scripts/          os hooks em sh, py.sh, opcional.py e testar.sh
 agents/           coletor, leitor, revisor, executor
-skills/           aplicar (+ inventário e modelos), arrumar, medir, atualizar-docs
+skills/           aplicar (+ inventário e modelos), arrumar, medir, code-mode, advisor, atualizar-docs
 statusline/       status line principal e dos subagents
 settings.json     a única setting que o plugin traz: a linha dos subagents
 docs/             como funciona por dentro

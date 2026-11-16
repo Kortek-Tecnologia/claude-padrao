@@ -12,7 +12,9 @@ interface do terminal e tem de aparecer em qualquer pasta, inclusive no home —
 `~/.claude/statusline.py`. A linha dos subagents (`subagentStatusLine`) vem do `settings.json`
 do próprio plugin, onde ele está ligado: no global ela venceria a do plugin, então sai. As chaves
 que o Claude Code recusa de projeto — `permissions.defaultMode` (bypass/auto só valem do escopo
-user) e `skipDangerousModePermissionPrompt` — ficam se o usuário já as tem; o padrão não as cria.
+user), `skipDangerousModePermissionPrompt` e `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` (o Code
+Mode, que o `/padrao:code-mode` liga e desliga) — ficam se o usuário já as tem; o padrão não as
+cria.
 
 Os modelos estão em `modelos/` e o inventário em `inventariar.py`, ao lado deste arquivo
 (o diretório base desta skill). Plugin NÃO carrega settings — por isso esta skill os grava.
@@ -61,6 +63,8 @@ Mostre uma tabela item → destino → ação, cobrindo TODO o inventário. Mexe
 | `env.*` que o modelo já define (destino `padrao`) | descartados: o `modelos/settings.json` fixa |
 | chaves `time` (`env.*` comuns, `hooks`, `permissions.deny/ask`, `enabledPlugins`, `extraKnownMarketplaces`) | `.claude/settings.json` dos projetos que usam |
 | chaves `local` (`env.*` com nome de segredo — TOKEN, KEY, SECRET, PASS, AUTH, URL…; `permissions.additionalDirectories`; `language`, `tui`, `theme`, `outputStyle`, `switchModelsOnFlag`…) | `.claude/settings.local.json` (fora do git) |
+| `advisorModel` (destino `local`; o `/advisor` o grava no global) | `.claude/settings.local.json` só dos projetos em que o usuário quer o advisor — PERGUNTE quais; é onde o `/padrao:advisor` o grava |
+| `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` (destino `global`) | fica no global: o Claude Code a descarta dos settings de projeto; liga e desliga pelo `/padrao:code-mode` |
 | `permissions.allow` (destino `avaliar`) | pergunte regra a regra: do time → `.claude/settings.json`; liberação pessoal → `.claude/settings.local.json` |
 | `permissions.defaultMode`, `skipDangerousModePermissionPrompt` | ficam no global (únicas), se já existem; o padrão não as cria |
 | `autoMode` (só vale em user/managed) | descartar se desatualizado (repo confiável que não existe mais etc.); senão pergunte |
@@ -210,9 +214,9 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
 
 ## 8. Limpe o global e feche
 
-1. Grave `~/.claude/settings.json` como `modelos/global.json`, mais `permissions.defaultMode` e
-   `skipDangerousModePermissionPrompt` SÓ se o usuário já os tinha (com o mesmo valor; não os
-   crie), `<PYTHON>` = o interpretador que o `py.sh` acha nesta máquina (`python3`,
+1. Grave `~/.claude/settings.json` como `modelos/global.json`, mais `permissions.defaultMode`,
+   `skipDangerousModePermissionPrompt` e `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` SÓ se o
+   usuário já os tinha (com o mesmo valor; não os crie), `<PYTHON>` = o interpretador que o `py.sh` acha nesta máquina (`python3`,
    `python` ou `py`) e `<HOME>` = o home com `/` (no Git Bash, `cygpath -m "$HOME"`; trocar as
    barras do caminho do Windows à mão come as barras). Copie `<plugin>/statusline/statusline.py`
    para `~/.claude/` (rodar a skill de novo o atualiza; o hook de abertura avisa se ficar
