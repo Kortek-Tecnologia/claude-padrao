@@ -506,7 +506,9 @@ agora=$(date -u +%Y-%m-%dT%H:%M:%S)
   # m7 = 1k·4 + 700k·0,2 = 0,144. Principal = 0,013 + 0,006 + 1,942 = 1,961.
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m4","model":"claude-opus-5-5[1m]","usage":{"input_tokens":10000,"cache_read_input_tokens":140000,"cache_creation_input_tokens":50000,"cache_creation":{"ephemeral_1h_input_tokens":20000},"output_tokens":1},"content":[{"type":"thinking","thinking":""}]}}\n' "$agora"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m4","model":"claude-opus-5-5[1m]","usage":{"input_tokens":10000,"cache_read_input_tokens":140000,"cache_creation_input_tokens":50000,"cache_creation":{"ephemeral_1h_input_tokens":20000},"output_tokens":1000},"content":[{"type":"text","text":"ok"}]}}\n' "$agora"
-  printf '{"type":"assistant","timestamp":"%s","message":{"id":"m5","model":"claude-opus-5-5[1m]","usage":{"input_tokens":300000},"content":[]}}\n' "$agora"
+  # m5 consultou o advisor: os tokens do Fable vêm em usage.iterations, fora do uso de topo
+  # (50k·8 + 3k·40 = 0,52; não entra nas faixas de contexto nem nos turnos)
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"m5","model":"claude-opus-5-5[1m]","usage":{"input_tokens":300000,"iterations":[{"type":"message","input_tokens":300000},{"type":"advisor_message","model":"claude-fable-5-2","input_tokens":50000,"output_tokens":3000}]},"content":[]}}\n' "$agora"
   # aviso sintético do Claude Code: não é requisição a modelo, não entra em "sem preço"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m9","model":"<synthetic>","usage":{"input_tokens":0,"output_tokens":0},"content":[]}}\n' "$agora"
   # fable: 100k lidos·0,2 + 500·40 = 0,04 (o cache lido do Fable custa o mesmo que o do Opus);
@@ -519,7 +521,7 @@ agora=$(date -u +%Y-%m-%dT%H:%M:%S)
 # subagents: sonnet 10k·2 + 10k escrita 5 min·2,5 + 100k lidos·0,1 + 2,5k·10 = 0,08; haiku com
 # 100.000 exatos = faixa baixa (100k·0,1 + 1k·0,5 = 0,0105); com 100.001 = alta (1·0,5 + 100k·0,05
 # + 10k·2,5 = 0,0300005; na baixa seria 0,0060001: sobrepreço 0,024). Subagents = 0,1205005;
-# total = 2,0815005 (subagents 6%).
+# com a principal (2,001) e o advisor (0,52), total = 2,6415005 (subagents 5%, advisor 20%).
 mkdir -p "$CASA/.claude/projects/$chave/s/subagents"
 {
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"a1","model":"claude-sonnet-5-5","usage":{"input_tokens":10000,"cache_creation_input_tokens":10000,"cache_read_input_tokens":100000,"output_tokens":2500},"content":[]}}\n' "$agora"
@@ -532,7 +534,8 @@ for re in '1 correção\(ões\) de papel fixo \(Explore=1\) · 1 recusa\(s\)' '^
   '^  principal  claude-opus-5-5\[1m\]    US\$ 1\.94$' '^  principal  claude-opus-5-5        US\$ 0\.02$' \
   '^  principal  claude-fable-5-2 +US\$ 0\.04$' \
   '^  subagents  claude-sonnet-5-5      US\$ 0\.08$' '^  subagents  claude-haiku-5-5       US\$ 0\.04$' \
-  '^  total      US\$ 2\.12 · subagents 6%$' \
+  '^advisor: 1 consulta\(s\) · claude-fable-5-2=1$' '^  advisor +claude-fable-5-2 +50k · 0 · 3k$' \
+  '^  advisor    claude-fable-5-2 +US\$ 0\.52$' '^  total      US\$ 2\.64 · subagents 5% · advisor 20%$' \
   '^  até 100K         3 · 3%$' '^  100–200K         1 · 20%$' '^  200–400K         1 · 60%$' '^  400–600K         1 · 10%$' '^  acima de 600K    1 · 7%$' \
   '^Haiku acima de 100K: 1 de 2 requisições · sobrepreço US\$ 0\.02$' '^sem preço na tabela \(fora da conta\): claude-opus-4-8=2$'; do
   printf '%s\n' "$med" | grep -Eq "$re" || { echo "divergiu: medir-modelos sem /$re/: $med"; FALHAS=$((FALHAS + 1)); }

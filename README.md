@@ -180,13 +180,20 @@ modelos, e cada comando só grava ou tira uma chave. Sem argumento, mostra o est
   abertura acusa; o `/padrao:advisor` grava no arquivo pessoal do projeto, com o ID que o padrão
   fixa. Cada consulta relê a conversa inteira no preço do Fable, sem cache, e os subagents
   herdam o advisor — executor, revisor e coletor também podem consultá-lo.
-- **Ganho do Code Mode, medido: pequeno.** Em três tarefas curtas no Opus 5.5 (achar links
-  quebrados, renomear um script citado em 10 arquivos, seis verificações), a qualidade e o
-  número de requisições foram os mesmos com e sem: o Opus já resolve cada uma com dois ou três
-  comandos de shell. Com o cache quente o custo caiu 13%, porque o contexto de cada requisição
-  fica uns 22 mil tokens menor; na primeira sessão, de cache frio, saiu 21% mais caro; e levou
-  11 a 23% mais tempo. Sessão longa e delegação não foram medidas, e o ganho do advisor também
-  não: antes de adotar num time, rode as suas tarefas com e sem e compare o `/padrao:medir`.
+- **Ganho do Code Mode, medido: pequeno.** Em sessões do Opus 5.5 com e sem ele — três tarefas
+  curtas, e depois uma sessão mais longa com coleta, lote no executor e revisão —, a qualidade
+  foi a mesma e as requisições não diminuíram: o Opus já resolve cada tarefa com poucos
+  comandos de shell. O custo caiu de 11 a 13% com o cache quente, porque o contexto de cada
+  requisição fica de 22 a 30 mil tokens menor; na primeira sessão depois de ligar, de cache
+  frio, saiu 21% mais caro.
+- **Custo do advisor, medido.** Ligado e sem pedido, o Opus não o consultou numa tarefa
+  mecânica, e a sessão custou o mesmo. Cada consulta ao Fable saiu por uns US$ 0,50, porque ele
+  relê a conversa inteira sem cache: com duas, a sessão custou 6 vezes mais e levou 4 vezes
+  mais tempo. Se a orientação melhora o resultado não foi medido. O `/padrao:medir` mostra as
+  consultas e o custo delas à parte.
+- Antes de adotar qualquer um dos dois num time, rode as suas tarefas com e sem e compare o
+  `/padrao:medir`. Os números e os limites de cada medição estão em
+  [docs/como-funciona.md](docs/como-funciona.md#os-opcionais--opcionalpy).
 
 ## O que roda sozinho
 

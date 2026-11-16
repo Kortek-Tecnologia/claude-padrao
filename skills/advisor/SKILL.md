@@ -33,8 +33,10 @@ Depois de rodar, diga o estado em uma linha e, se mudou, o que vale saber:
   `Advisor Tool (experimental) is on`. Para uma sessão só, sem gravar nada:
   `claude --advisor fable` ao abrir.
 - **Custo:** cada consulta relê a conversa inteira no preço do Fable, sem cache — em sessão
-  longa é a parte cara. Ligar ou desligar não invalida o cache do modelo da sessão. A consulta
-  aparece no transcript como `Advising` (`Ctrl+O` mostra a orientação) e entra no `/usage`.
+  longa é a parte cara. Medido numa sessão curta do Opus: uns US$ 0,50 por consulta; ligado e
+  sem consulta, custo nenhum. Ligar ou desligar não invalida o cache do modelo da sessão. A
+  consulta aparece no transcript como `Advising` (`Ctrl+O` mostra a orientação) e entra no
+  `/usage`; o `/padrao:medir` mostra as consultas e o custo delas à parte.
 - **Os subagents herdam o advisor:** executor, revisor e coletor também podem consultar o Fable.
   O hook de modelo não vê isso, porque o advisor não é o `model` da chamada. Onde isso pesar,
   desligue.

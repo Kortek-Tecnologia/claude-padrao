@@ -14,7 +14,9 @@ projeto e conta:
 - commits da sessão principal: quantos tiveram a `padrao:atualizar-docs` antes e
   quantas vezes o hook da documentação precisou lembrar;
 - custo estimado a preço de lista por modelo, o contexto por requisição da
-  sessão principal (o que mais pesa) e as requisições do Haiku acima de 100K.
+  sessão principal (o que mais pesa) e as requisições do Haiku acima de 100K;
+- consultas ao advisor (/padrao:advisor) e o custo do modelo consultado, que
+  não aparece no uso da mensagem do modelo da sessão.
 
     sh <plugin>/scripts/py.sh <dir da skill>/medir-modelos.py [--dias N] [--projeto P]
 
@@ -170,6 +172,18 @@ def guardar_uso(usos: dict, msg: dict) -> None:
         usos[msg.get("id") or f"sem-id-{len(usos)}"] = (msg["model"], uso)
 
 
+def guardar_advisor(usos: dict, msg: dict) -> None:
+    """Consultas ao advisor. Os tokens do modelo consultado ficam fora do uso de
+    topo da mensagem: vêm em `usage.iterations`, uma entrada `advisor_message`
+    por consulta, com o modelo dela (a leitura da conversa por ele não usa cache).
+    Guarda por id da mensagem e posição: as linhas de um mesmo id repetem o uso."""
+    uso = msg.get("usage")
+    iteracoes = uso.get("iterations") if isinstance(uso, dict) else None
+    for i, it in enumerate(iteracoes if isinstance(iteracoes, list) else []):
+        if isinstance(it, dict) and it.get("type") == "advisor_message":
+            usos[f"{msg.get('id')}#{i}"] = (it.get("model") or "advisor", it)
+
+
 def somar_uso(usos: dict) -> dict[str, Counter[str]]:
     por_modelo: dict[str, Counter[str]] = defaultdict(Counter)
     for modelo, uso in usos.values():
@@ -180,16 +194,17 @@ def somar_uso(usos: dict) -> dict[str, Counter[str]]:
     return por_modelo
 
 
-def imprimir_custo(uso_principal: dict, uso_sub: dict) -> None:
+def imprimir_custo(uso_principal: dict, uso_sub: dict, uso_advisor: dict) -> None:
     """Custo a preço de lista, contexto da sessão principal e Haiku acima de 100K.
-    Uma requisição = um message.id (o uso guardado já é o final de cada um)."""
-    custo = {"principal": Counter(), "subagents": Counter()}
+    Uma requisição = um message.id (o uso guardado já é o final de cada um); do
+    advisor, uma consulta."""
+    custo = {"principal": Counter(), "subagents": Counter(), "advisor": Counter()}
     faixa_n: Counter[str] = Counter()
     faixa_custo: Counter[str] = Counter()
     sem_preco: Counter[str] = Counter()
     haiku = haiku_alto = 0
     sobrepreco = 0.0
-    for rotulo, usos in (("principal", uso_principal), ("subagents", uso_sub)):
+    for rotulo, usos in (("principal", uso_principal), ("subagents", uso_sub), ("advisor", uso_advisor)):
         for modelo, uso in usos.values():
             prefixo = prefixo_preco(modelo)
             if prefixo is None:
@@ -215,8 +230,10 @@ def imprimir_custo(uso_principal: dict, uso_sub: dict) -> None:
             print(f"  {rotulo:<10} {modelo:<22} US$ {v:.2f}")
     principal = sum(custo["principal"].values())
     sub = sum(custo["subagents"].values())
-    total = principal + sub
-    print(f"  total      US$ {total:.2f} · subagents {(sub / total if total else 0):.0%}")
+    advisor = sum(custo["advisor"].values())
+    total = principal + sub + advisor
+    print(f"  total      US$ {total:.2f} · subagents {(sub / total if total else 0):.0%}"
+          + (f" · advisor {advisor / total:.0%}" if advisor else ""))
     print("contexto por requisição da sessão principal (requisições · % do custo dela):")
     for nome, _ in FAIXAS:
         parte = faixa_custo[nome] / principal if principal else 0
@@ -263,6 +280,7 @@ def main() -> None:
     turnos_sub: Counter[str] = Counter()
     uso_principal: dict = {}
     uso_sub: dict = {}
+    uso_advisor: dict = {}
     recusas = sessoes = sem_delegar = 0
     commits = com_docs = lembretes = 0
     vistos: set[str] = set()
@@ -304,6 +322,7 @@ def main() -> None:
             if o.get("type") != "assistant" or not isinstance(msg, dict):
                 continue
             guardar_uso(uso_principal, msg)
+            guardar_advisor(uso_advisor, msg)
             if de_modelo(msg) and turno_novo(o, vistos):
                 turnos_principal[msg["model"]] += 1
             for c in msg.get("content") or []:
@@ -336,6 +355,7 @@ def main() -> None:
             msg = o.get("message")
             if o.get("type") == "assistant" and isinstance(msg, dict):
                 guardar_uso(uso_sub, msg)
+                guardar_advisor(uso_advisor, msg)
                 if de_modelo(msg) and turno_novo(o, vistos):
                     turnos_sub[msg["model"]] += 1
 
@@ -345,6 +365,9 @@ def main() -> None:
           + (f" ({correcoes})" if correcoes else "") + f" · {recusas} recusa(s)")
     print(f"documentação antes do commit: {commits} commit(s) · {com_docs} com a atualizar-docs antes"
           f" · {lembretes} lembrete(s) do hook")
+    if uso_advisor:
+        consultas = Counter(modelo for modelo, _ in uso_advisor.values())
+        print(f"advisor: {len(uso_advisor)} consulta(s) · " + "  ".join(f"{m}={n}" for m, n in consultas.most_common()))
     total: Counter[str] = Counter()
     print("subagents (tipo: modelo em que rodou × chamadas):")
     for tipo, por_modelo in sorted(chamadas.items()):
@@ -353,7 +376,7 @@ def main() -> None:
         print(f"  {tipo:<20} " + "  ".join(f"{m}={n}" for m, n in por_modelo.most_common()))
     print("  total                " + "  ".join(f"{m}={n}" for m, n in total.most_common()))
     print("tokens por modelo (entrada · cache lido · saída):")
-    for rotulo, usos in (("principal", uso_principal), ("subagents", uso_sub)):
+    for rotulo, usos in (("principal", uso_principal), ("subagents", uso_sub), ("advisor", uso_advisor)):
         for modelo, c in sorted(somar_uso(usos).items(), key=lambda kv: -sum(kv[1].values())):
             print(f"  {rotulo:<10} {modelo:<22} {fmt(c['entrada'])} · {fmt(c['cache lido'])} · {fmt(c['saída'])}")
     print(
@@ -363,7 +386,7 @@ def main() -> None:
     print(
         "turnos dos subagents:       " + "  ".join(f"{m}={n}" for m, n in turnos_sub.most_common())
     )
-    imprimir_custo(uso_principal, uso_sub)
+    imprimir_custo(uso_principal, uso_sub, uso_advisor)
 
 
 if __name__ == "__main__":

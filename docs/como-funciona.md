@@ -247,6 +247,9 @@ sessão principal; Haiku acima de 100.000 paga a requisição inteira no preço 
 tabela não entra no custo nem nas faixas e é listado à parte. Mensagem `<synthetic>` (aviso do
 Claude Code; no Code Mode, cada chamada feita de dentro do código) não é requisição: o
 `tool_use` dela conta para commits e subagents, e ela fica fora de tokens, turnos e custo.
+Consulta ao advisor: os tokens do modelo consultado vêm em `usage.iterations` (entrada
+`advisor_message`), fora do uso de topo da mensagem; o script os soma numa linha `advisor`
+(consultas, tokens e custo), fora das faixas de contexto e dos turnos.
 
 ## Os opcionais — `opcional.py`
 
@@ -268,11 +271,31 @@ uma chave e mostra o estado.
 - **O script não conserta arquivo.** JSON inválido, ou `env` que não é objeto: para com erro e
   não grava. Regrava com a indentação e o fim de linha do original, por arquivo temporário na
   mesma pasta. Do home, o advisor é recusado: lá o `settings.local.json` seria global.
-- **Advisor, medido** (v2.1.325, Windows): com `advisorModel` no `settings.local.json` de uma
-  pasta, `claude -p "/advisor"` responde `Advisor: Fable 5.2`; sem ele, `Advisor: off`. No Git
-  Bash o argumento precisa de `MSYS_NO_PATHCONV=1`, senão `/advisor` vira caminho e segue como
-  prompt. Só da documentação: os subagents herdam o advisor (executor, revisor e coletor podem
-  consultar o Fable, e o hook de modelo não vê, porque o advisor não é o `model` da chamada).
+
+**Advisor, medido em sessão real** (v2.1.325, Windows, Opus 5.5 medium, três sessões `claude -p`
+da mesma tarefa: renomear um script citado em 13 arquivos; as três passaram no aceite):
+
+| Sessão | Consultas | Tempo | US$ |
+|---|---|---|---|
+| sem advisor | 0 | 33 s | 0,22 |
+| advisor ligado pelo `opcional.py` | 0 | 37 s | 0,22 |
+| advisor ligado, com o prompt pedindo duas consultas | 2 | 146 s | 1,34 (1,03 do Fable) |
+
+- **Ligado não é consultado à toa:** em tarefa mecânica o Opus não chamou o advisor, e a sessão
+  custou o mesmo. Quem decide é o modelo; pedir no prompt funciona.
+- **Cada consulta custou uns US$ 0,50:** o Fable leu a conversa inteira sem cache (37K e 44K
+  tokens de entrada) e devolveu cerca de 4,7K de saída. Com duas, a sessão saiu 6 vezes mais
+  cara e 4 vezes mais lenta. Cresce com o contexto: em sessão longa cada consulta relê tudo.
+- **No transcript:** a consulta é um bloco `server_tool_use` de nome `advisor`, e a resposta vem
+  cifrada (`advisor_redacted_result`: a orientação não dá para ler dali). Os tokens ficam em
+  `usage.iterations`, numa entrada `advisor_message` com o `model`, **fora** do uso de topo da
+  mensagem; o `medir` soma essas entradas e mostra o advisor à parte.
+- **Configuração:** com `advisorModel` no `settings.local.json` da pasta, `claude -p "/advisor"`
+  responde `Advisor: Fable 5.2`; sem ele, `Advisor: off`. No Git Bash o argumento precisa de
+  `MSYS_NO_PATHCONV=1`, senão `/advisor` vira caminho e segue como prompt.
+- **Não medido:** se a orientação melhora o resultado (a tarefa era mecânica) e os subagents
+  herdando o advisor — isso vem só da documentação: executor, revisor e coletor podem consultar
+  o Fable, e o hook de modelo não vê, porque o advisor não é o `model` da chamada.
 
 **Code Mode, medido em sessão real** (v2.1.325, Windows, uma sessão interativa em pseudo-terminal
 com HOME falso, o plugin e um plugin-sonda que grava a entrada de todo hook):
@@ -329,10 +352,32 @@ verificações independentes. Custo a preço de lista, pelo transcript:
   regrava inteiro (26 mil tokens de escrita de 1 h) — saiu 21% mais cara que a sessão comum,
   cujo prefixo estava quente. Quem liga e desliga paga isso a cada troca.
 - **Um pouco mais lento:** 82 e 91 s de relógio, contra 72 a 77 s.
-- **Limites:** sessões curtas (contexto até 62K), nenhuma delegação (as tarefas eram pequenas e
-  a sessão não chamou subagent), um repositório, poucas rodadas. Sessão longa, lote no
-  executor e tarefa com muita chamada que o shell não faz (MCP, `WebFetch`, vários `Agent`)
-  não foram medidos. Por isso a política de modelos não mudou.
+
+Sessão mais longa, com delegação: quatro tarefas na mesma sessão — ler cinco arquivos grandes,
+uma coleta pelo `padrao:coletor`, um lote de 13 arquivos pelo `padrao:executor` com o diff
+conferido pelo `padrao:revisor`, e as seis verificações na sessão principal. Duas rodadas por
+braço:
+
+| Rodada | Requisições da sessão | Tempo | US$ sessão | US$ subagents | US$ total | Contexto máximo |
+|---|---|---|---|---|---|---|
+| sem Code Mode, 1 | 15 | 194 s | 1,40 | 0,20 | 1,61 | 144K |
+| sem Code Mode, 2 | 15 | 304 s | 1,37 | 0,11 | 1,48 | 138K |
+| com Code Mode, 1 | 19 | 176 s | 1,27 | 0,15 | 1,42 | 115K |
+| com Code Mode, 2 | 17 | 163 s | 1,20 | 0,12 | 1,32 | 113K |
+
+- **11% a menos nas duas rodadas**, com o mesmo aceite e a mesma delegação (um coletor, um
+  executor e um revisor em cada sessão) e o `testar.sh` do projeto passando depois do lote.
+- **Mais requisições, não menos** (17 a 19 contra 15): a economia continua vindo do contexto,
+  25 a 30 mil tokens menor do começo ao fim. O custo dos subagents ficou na mesma faixa.
+- **Tempo:** 163 e 176 s contra 194 e 304 s; a rodada de 304 s teve uma verificação lenta na
+  última tarefa, então a diferença de relógio não é conclusiva.
+- **Limites:** contexto até 144K, delegação pedida no prompt, um repositório, duas ou três
+  rodadas por braço. Sessão de centenas de milhares de tokens e tarefa com muita chamada que o
+  shell não faz (MCP, `WebFetch`, vários `Agent`) não foram medidas.
+
+Somando as duas medições: 11 a 13% a menos com o cache quente, sem poupar requisição, e mais
+caro na primeira sessão depois de ligar. É ganho real e pequeno; por isso a política de
+modelos não mudou e o Code Mode segue opcional.
 
 ## Testes
 
@@ -346,7 +391,8 @@ verificações independentes. Custo a preço de lista, pelo transcript:
 - que nenhum modelo de `skills/aplicar/modelos/` mudou sem subir o carimbo (soma do texto);
 - as duas status lines, o comando do `settings.json` do plugin (com o `${CLAUDE_PLUGIN_ROOT}`
   trocado), o inventário (não imprime valor do `env`) e as contas do `medir`
-  (inclusive custo, faixas de contexto, Haiku acima de 100K e período sem requisição);
+  (inclusive custo, faixas de contexto, Haiku acima de 100K, consulta ao advisor e período sem
+  requisição);
 - os opcionais: ligar, desligar e estado do `opcional.py` com HOME e projeto falsos (o resto do
   settings, a indentação e o CRLF preservados; JSON inválido intocado; o home recusado), a
   variável do Code Mode calada no hook de abertura e o `onFailure` de cada hook no `hooks.json`.

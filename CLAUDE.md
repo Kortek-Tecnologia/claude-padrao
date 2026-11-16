@@ -52,7 +52,7 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 `bash scripts/testar.sh`: confere as decisões dos
 quatro hooks (inclusive sem `jq`; o `conferir-padrao.sh` com HOME falso), as duas status
 lines, que nenhum modelo mudou sem subir o carimbo, que o inventário não imprime valor do `env`,
-as contas do `medir-modelos.py` (tokens, custo a preço de lista, faixas de contexto) e o
+as contas do `medir-modelos.py` (tokens, custo a preço de lista, faixas de contexto, advisor) e o
 `opcional.py` (liga, desliga, não toca em JSON inválido). Não cobre
 o texto das skills. Depois: `claude plugin validate .`. O CI (`.github/workflows/testes.yml`)
 roda o `testar.sh` no Ubuntu: lá o sh é dash e o awk pode ser mawk. As skills se testam de ponta

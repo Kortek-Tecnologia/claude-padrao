@@ -32,5 +32,8 @@ Leitura:
   modelo (modelo sem preço na tabela fica fora da conta, listado à parte).
 - Contexto: cada requisição relê o contexto inteiro, e requisição grande na sessão principal é o
   que mais custa. Haiku acima de 100K paga a requisição inteira cinco vezes mais (o sobrepreço).
+- Advisor (só aparece se houve consulta, com o `/padrao:advisor` ligado): número de consultas e,
+  nas linhas `advisor`, os tokens e o custo do modelo consultado. Cada consulta relê a conversa
+  inteira sem cache; muita consulta em sessão longa é a parte cara.
 - Os transcripts duram o `cleanupPeriodDays` do padrão (14 dias): `--dias` maior não acha mais.
   O número é desta máquina (os transcripts são locais).

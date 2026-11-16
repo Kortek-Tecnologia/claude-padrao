@@ -7,19 +7,21 @@ on:
 permissions:
   contents: read
 
+# Imagem fixa, e não ubuntu-latest: a suíte depende do sh (dash), do awk, do jq e do
+# python3 que vêm nela, e o rótulo latest troca de versão sem aviso no repositório.
 jobs:
   testar:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      # jq e python3 já vêm no ubuntu-latest
+      - uses: actions/checkout@v7
+      # jq e python3 já vêm na imagem
       - run: bash scripts/testar.sh
 
   diagramas:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - run: npm install --no-save --no-audit --no-fund mermaid@11.4.1 jsdom@25.0.1
