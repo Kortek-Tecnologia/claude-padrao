@@ -126,7 +126,10 @@ ambiente do usuário, ou ponha `.mcp.json` no `.gitignore`. Pergunte qual; copie
 
 Antes de escrever, copie para `<projeto atual>/.claude/backup-global-<AAAA-MM-DD>/` (e garanta
 `.claude/backup-global-*/` no `.gitignore`): `~/.claude/settings.json`, as sobras, os arquivos
-globais que vão mudar e as pastas de memória. NÃO copie `~/.claude.json` (tem tokens).
+globais que vão mudar e as pastas de memória. NÃO copie `~/.claude.json` (tem tokens). O
+`settings.json` copiado leva os valores do `env` global, que podem ser segredo: o backup fica
+fora do git, e o resumo final (passo 8) diz ao usuário para apagá-lo depois de conferir a
+migração.
 
 ## 4. Projeto — time e pessoal
 
@@ -225,7 +228,9 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
 2. Valide todo JSON tocado (`jq empty <arquivo>`).
 3. Confira: `printf '{}' | CLAUDE_PROJECT_DIR=<raiz> sh <plugin>/scripts/conferir-padrao.sh` não
    imprime nada, e rodar o inventário de novo mostra o global vazio.
-4. Resuma o que mudou em cada arquivo/projeto, o que ficou no global e por quê.
+4. Resuma o que mudou em cada arquivo/projeto, o que ficou no global e por quê. Diga onde está o
+   backup e que ele guarda o `settings.json` global como era (com os valores do `env`): apagar
+   depois de conferir.
 5. Diga que vale a partir da PRÓXIMA sessão (confira com `/status` → "Setting sources"), que na
    primeira sessão o Claude Code pede confiança na pasta para instalar o plugin, que o `/model`
    grava no global — o projeto reaplica o Opus 5.5 1M ao abrir, e o hook do padrão avisa — e que

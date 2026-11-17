@@ -56,7 +56,7 @@ flowchart TD
   A["Inventário do global<br/>só lê; de env e MCP, só os nomes"] --> B["Plano: cada item → destino"]
   B --> C{"Seu OK"}
   C -->|"não"| Z["nada muda"]
-  C -->|"sim"| D["Backup em .claude/backup-global-‹data›/<br/>fora do git, sem tokens"]
+  C -->|"sim"| D["Backup em .claude/backup-global-‹data›/<br/>fora do git, sem o ~/.claude.json"]
   D --> E["Projeto: settings.json do time,<br/>settings.local.json pessoal, .mcp.json, .gitignore"]
   E --> F["CLAUDE.md: bloco do padrão<br/>+ docs/agente/padrao-*.md + AGENT_LEARNINGS.md"]
   F --> G["Memórias duráveis viram texto no CLAUDE.md"]
@@ -205,7 +205,7 @@ modelos, e cada comando só grava ou tira uma chave. Sem argumento, mostra o est
 
 | Peça | Quando | O que faz |
 |---|---|---|
-| Hook de abertura | toda sessão | avisa (nunca corrige) se algo voltou para o global, se o projeto saiu do padrão, se o bloco do `CLAUDE.md` ou os `docs/agente/padrao-*.md` são de outro modelo, ou se há versão nova do plugin |
+| Hook de abertura | toda sessão | avisa (nunca corrige) se algo voltou para o global, se o projeto saiu do padrão (inclusive por chave no `settings.local.json`, que vence a do projeto), se o bloco do `CLAUDE.md` ou os `docs/agente/padrao-*.md` são de outro modelo, ou se há versão nova do plugin |
 | Hook de modelo | toda chamada de subagent | corrige o modelo dos papéis fixos e recusa modelo fora da política |
 | Trava de leitura | Bash, MCP e ferramentas que gravam, nos agentes que só leem | deixa `Explore`, coletor, leitor e revisor só lerem: grava, redireciona ou executa → recusa, dizendo o motivo |
 | `atualizar-docs` | antes de cada commit | corrige só a documentação que o diff deixou falsa (porta, comando, variável, caminho) |
@@ -356,7 +356,8 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
   pelo PowerShell (o seu, no terminal, não passa por ele) e não cobra os lotes do
   `/padrao:arrumar`. Se o hook falhar, o commit segue.
 - **Segredos:** o inventário e o `arrumar` nunca imprimem valor de variável; o backup não leva o
-  `~/.claude.json`.
+  `~/.claude.json`, mas guarda o `settings.json` global como era, com os valores do `env`: fica
+  fora do git, e vale apagá-lo depois de conferir a migração.
 - **Windows, caminho com mais de 260 caracteres:** o Python não enxerga (projeto em pasta muito
   funda). O `aplicar` confere pelo Bash o que o hook acusa; o `/padrao:medir` responde "sem
   transcripts".
@@ -380,7 +381,8 @@ bash scripts/testar.sh
 claude plugin validate .
 ```
 
-O CI (Ubuntu) roda o `testar.sh` e valida os diagramas Mermaid a cada push. Publicar: suba a `version` em
+O CI roda o `testar.sh` no Ubuntu e no Windows (este ainda em observação: não reprova o push) e
+valida os diagramas Mermaid a cada push. Publicar: suba a `version` em
 `.claude-plugin/plugin.json` — o aviso de versão nova compara com ela — e dê push. Mudou um
 modelo que vai para o projeto (`skills/aplicar/modelos/`): suba também o carimbo dele. Detalhes,
 árvore de decisão de cada hook e o teste de ponta a ponta das skills:

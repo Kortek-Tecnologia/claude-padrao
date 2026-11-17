@@ -9,7 +9,9 @@
 #    tenha não conta — e as chaves de `env` do padrão (aliases dos subagents na
 #    família 5.5, modelo de subagent sem `model`, memória desligada, subagent
 #    sem subagent) do .claude/settings.json iguais aos de modelos/settings.json
-#    (fonte única). `CLAUDE_CODE_DISABLE_AUTO_MEMORY` vence `autoMemoryEnabled`
+#    (fonte única). O .claude/settings.local.json vence o do projeto: a mesma
+#    chave lá, com outro valor, é acusada (ausente ou igual, passa).
+#    `CLAUDE_CODE_DISABLE_AUTO_MEMORY` vence `autoMemoryEnabled`
 #    nos dois sentidos: por isso basta conferir o env. Checkpoints ligados:
 #    sem `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` (versões antigas o punham).
 # 2. Global limpo: ~/.claude/settings.json só com permissions.defaultMode,
@@ -71,6 +73,14 @@ achados=$(jq -rn \
   ($proj | obj) as $P | ($local | obj) as $L | ($mod | obj) as $M | ($glob | obj) as $G
   | (($inst | obj) // {} | .version // "") as $vi
   | (($pub | obj) // {} | .version // "") as $vp
+  # as chaves que o padrão fixa: [nome no aviso, caminho]
+  | (if $M then
+      [["model", ["model"]], ["effortLevel", ["effortLevel"]]]
+      + ($M.env // {} | keys | map(["env.\(.)", ["env", .]]))
+      + ($M.modelSettings // {} | to_entries | map(.key as $m | .value
+          | if type == "object" then keys else [] end
+          | map(["modelSettings[\"\($m)\"].\(.)", ["modelSettings", $m, .]])) | add // [])
+    else [] end) as $campos
   | ([[$P, ".claude/settings.json"], [$L, ".claude/settings.local.json"]][]
     | select(.[0] != null and (.[0] | has("fallbackModel")))
     | "fallbackModel em \(.[1]) (o padrao e sem fallback: tire a chave)"),
@@ -79,18 +89,22 @@ achados=$(jq -rn \
   (if ($L.syncClaudeAiPlugins | tostring) != "false" then
     "plugins do app (claude.ai) sincronizados (syncClaudeAiPlugins: false no .claude/settings.local.json)" else empty end),
   (if $M then
-    ([["model", ["model"]], ["effortLevel", ["effortLevel"]]]
-      + ($M.env // {} | keys | map(["env.\(.)", ["env", .]]))
-      + ($M.modelSettings // {} | to_entries | map(.key as $m | .value
-          | if type == "object" then keys else [] end
-          | map(["modelSettings[\"\($m)\"].\(.)", ["modelSettings", $m, .]])) | add // [])
-    )[]
+    $campos[]
     | .[1] as $c
     | ($M | getpath($c) | if . == null then "" else tostring end) as $quer
     # o `try`: `modelSettings` do projeto que não é objeto não pode derrubar o jq e calar o resto
     | (($P // {}) | (try getpath($c) catch null) | if . == null then "" else tostring end) as $tem
     | select($tem != $quer)
     | "\(.[0]) do projeto e '\''\($tem)'\'', o padrao e '\''\($quer)'\''"
+  else empty end),
+  # o settings.local.json vence o do projeto: a mesma chave lá, com outro valor
+  (if $M and $L then
+    $campos[]
+    | .[1] as $c
+    | ($M | getpath($c) | tostring) as $quer
+    | ($L | (try getpath($c) catch null)) as $v
+    | select($v != null and ($v | tostring) != $quer)
+    | "\(.[0]) em .claude/settings.local.json e '\''\($v | tostring)'\'' e vence o do projeto (o padrao e '\''\($quer)'\''): tire a chave"
   else empty end),
   (if $P and ($P.env // {} | has("CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING")) then
     "checkpoints (/rewind) desligados: tire env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING do .claude/settings.json" else empty end),

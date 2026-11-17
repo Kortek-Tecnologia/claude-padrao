@@ -43,6 +43,7 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 | Confere | Contra |
 |---|---|
 | `model`, `effortLevel`, `modelSettings` (todos os campos que o modelo define em cada modelo, inclusive `autoCompactWindow`; campo ou modelo só do projeto não conta) e as chaves de `env` do projeto | `modelos/settings.json` |
+| as mesmas chaves no `.claude/settings.local.json` | o local vence o projeto: chave do padrão lá com outro valor é acusada (ausente ou igual, passa) |
 | `fallbackModel` em `settings.json` ou `settings.local.json`; `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` | têm de estar ausentes |
 | `disableClaudeAiConnectors` (projeto) e `syncClaudeAiPlugins: false` (local, único lugar em que vale) | `true` / `false` |
 | `~/.claude/settings.json` | só `permissions.defaultMode`, `skipDangerousModePermissionPrompt`, `autoMemoryEnabled`, a status line principal, o effort que o `/effort` salva (o projeto vence) e, de `env`, só `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` (o Code Mode só liga do escopo user); outra variável sai no aviso como `env.NOME`. `subagentStatusLine` ali é chave fora do padrão, porque o global vence o plugin, e `advisorModel` também (o `/advisor` grava lá; o lugar dele é o `settings.local.json` do projeto) |
@@ -431,9 +432,15 @@ modelos não mudou e o Code Mode segue opcional.
   requisição);
 - as checagens do `arrumar`: todo item com os cinco campos, e o padrão de segredo casando token
   nos formatos conhecidos (na árvore e no histórico, sem imprimir o valor) e não casando prosa;
+- a regra de "o que é commit" nas suas duas cópias: as mesmas entradas passam pelo
+  `cobrar-docs.sh` e pelo `faz_commit` do `medir-modelos.py` e têm de dar a mesma resposta;
 - os opcionais: ligar, desligar e estado do `opcional.py` com HOME e projeto falsos (o resto do
   settings, a indentação e o CRLF preservados; JSON inválido intocado; o home recusado), a
   variável do Code Mode calada no hook de abertura e o `onFailure` de cada hook no `hooks.json`.
+
+O CI roda o mesmo `testar.sh` num job `testar-windows` (Git Bash da imagem do GitHub), com
+`continue-on-error` enquanto estiver em observação: gate novo começa sem reprovar, e a linha sai
+depois de uma sequência de execuções verdes.
 
 O CI tem ainda um job `diagramas`, que passa todo bloco Mermaid dos .md pelo parser oficial
 (`.github/scripts/validar-mermaid.mjs`, com `mermaid` e `jsdom` instalados só ali). O parser não

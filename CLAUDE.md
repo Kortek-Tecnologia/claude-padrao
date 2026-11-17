@@ -55,5 +55,6 @@ lines, que nenhum modelo mudou sem subir o carimbo, que o inventário não impri
 as contas do `medir-modelos.py` (tokens, custo a preço de lista, faixas de contexto, advisor) e o
 `opcional.py` (liga, desliga, não toca em JSON inválido). Não cobre
 o texto das skills. Depois: `claude plugin validate .`. O CI (`.github/workflows/testes.yml`)
-roda o `testar.sh` no Ubuntu: lá o sh é dash e o awk pode ser mawk. As skills se testam de ponta
+roda o `testar.sh` no Ubuntu (lá o sh é dash e o awk pode ser mawk) e no Windows, este em
+observação (`continue-on-error`). As skills se testam de ponta
 a ponta num sandbox: roteiro em `docs/como-funciona.md#testes`.

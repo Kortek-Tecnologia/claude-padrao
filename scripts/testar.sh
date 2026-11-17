@@ -261,6 +261,53 @@ git show HEAD:docs/commit.md
 grep -rn 'git commit' docs
 git commit -m "arrumar: lote 2 — README"
 CASOS
+# A regra de "o que é commit" existe duas vezes: aqui no hook (sh, por segmento) e no
+# medir-modelos.py (regex). As mesmas entradas têm de dar a mesma resposta nas duas.
+DIF=$(mktemp)
+cat >"$DIF" <<'CASOS'
+git commit -m x
+cd /c/proj && git add -A && git commit -m "feat(escopo): y; z"
+git -C sub commit -m x
+git -C "pasta com espaco" commit -m x
+git -c user.name="A B" -c user.email=a@b commit -m x
+git --no-pager commit --amend --no-edit
+X=1 Y=2 git commit -m x
+if git diff --cached --quiet; then echo nada; else git commit -m x; fi
+env X=1 git commit -m x
+time git commit -m x
+../ferramentas/bin/git commit -m x
+git.exe commit -m x
+(cd sub && git commit)
+echo ok | git commit -F -
+x=$(git commit -m x)
+echo "arrumar: lote 1" ; git commit -m real
+git commit -m "fix: arrumar: lote 2 nao e o comeco da mensagem"
+git commit -m "arrumar: lote 1 — x" && git commit -m "outro, comum"
+git -C a commit -m "arrumar: lote 1 — x" && git -C b commit -m "arrumar: lote 2 — y"
+git status --short
+git log --oneline --grep "git commit"
+echo "rode git commit -m x depois"
+git commit-tree abc -m x
+git config commit.gpgsign false
+git -C sub log --oneline -- commit.txt
+git show HEAD:docs/commit.md
+grep -rn 'git commit' docs
+git commit -m "arrumar: lote 2 — README"
+CASOS
+k=0; do_hook=
+while IFS= read -r c; do
+  k=$((k + 1)); r=$(docs "$(cmd_de "df$k" "$c")"); rm -f "$DADOS/docs-df$k"
+  do_hook="$do_hook$([ "$r" = deny ] && echo 1 || echo 0)"
+done <"$DIF"
+do_medir=$(sh "$D/py.sh" -c 'import importlib.util, sys
+spec = importlib.util.spec_from_file_location("medir", sys.argv[1])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+print("".join(str(int(m.faz_commit(l))) for l in sys.stdin.buffer.read().decode("utf-8").splitlines()))' skills/medir/medir-modelos.py <"$DIF" | tr -d '\r')
+[ "$do_hook" = "$do_medir" ] || {
+  echo "divergiu: commit pelo hook e pelo medir (1 = commit cobrado), na ordem da lista:"; echo "  hook  $do_hook"; echo "  medir $do_medir"
+  FALHAS=$((FALHAS + 1)); }
+[ "$k" -ge 25 ] && [ "${#do_hook}" = "$k" ] || { echo "divergiu: teste diferencial do commit rodou $k casos"; FALHAS=$((FALHAS + 1)); }
+rm -f "$DIF"
 espera "PowerShell tambem cobra" deny "$(docs "$(cmd_de ps 'Write-Output oi; git commit -m x' PowerShell)")"
 espera "outra ferramenta passa" PASSA "$(docs "$(cmd_de mon 'git commit -m x' Monitor)")"
 # a sequência numa sessão: recusa, passa (já avisou), recusa de novo no commit seguinte
@@ -327,6 +374,8 @@ jq '. + {effortLevel: "high", modelSettings: {"claude-opus-5-5": {effortLevel: "
 conferir() { printf '{}' | HOME="$CASA" CLAUDE_PROJECT_DIR="$PROJ" sh "$D/conferir-padrao.sh"; }
 # modelo ou campo de modelSettings que só o projeto tem não conta
 jq '.modelSettings["claude-opus-5-5"].extra = 1 | .modelSettings["outro-modelo"] = {effortLevel: "high"}' "$PROJ/.claude/settings.json" >"$PROJ/s" && mv "$PROJ/s" "$PROJ/.claude/settings.json"
+# chave do padrão repetida no settings.local.json com o MESMO valor não conta
+jq '.model = "claude-opus-5-5[1m]" | .env.CLAUDE_CODE_SUBAGENT_MODEL = "sonnet"' "$PROJ/.claude/settings.local.json" >"$PROJ/s" && mv "$PROJ/s" "$PROJ/.claude/settings.local.json"
 [ -z "$(conferir)" ] || { echo "divergiu: conferir-padrao acusou um ambiente limpo: $(conferir)"; FALHAS=$((FALHAS + 1)); }
 jq '.fallbackModel = [] | .modelSettings["claude-sonnet-5-5"].effortLevel = "high" | .modelSettings["claude-opus-5-5"].autoCompactWindow = 200000 | del(.env.ANTHROPIC_DEFAULT_HAIKU_MODEL) | del(.extraKnownMarketplaces["claude-padrao"].autoUpdate) | del(.disableClaudeAiConnectors) | del(.env.CLAUDE_CODE_SUBAGENT_MODEL) | .env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING = "1"' "$PROJ/.claude/settings.json" >"$PROJ/s" && mv "$PROJ/s" "$PROJ/.claude/settings.json"
 # modelSettings com mais que effort já é configuração no global; outra variável de env e o
@@ -340,14 +389,15 @@ mkdir -p "$CASA/.claude/skills/minha"
 # marketplace com versão mais nova que a instalada
 mkdir -p "$CASA/.claude/plugins/marketplaces/claude-padrao/.claude-plugin"
 printf '{"version":"0.9.0"}' >"$CASA/.claude/plugins/marketplaces/claude-padrao/.claude-plugin/plugin.json"
-jq '.fallbackModel = "x" | del(.syncClaudeAiPlugins)' "$PROJ/.claude/settings.local.json" >"$PROJ/s" &&
+# o settings.local.json vence o do projeto: modelo, effort e env do padrão com outro valor lá
+jq '.fallbackModel = "x" | del(.syncClaudeAiPlugins) | .model = "sonnet" | .env.CLAUDE_CODE_SUBAGENT_MODEL = "opus" | .modelSettings = {"claude-opus-5-5": {effortLevel: "max"}}' "$PROJ/.claude/settings.local.json" >"$PROJ/s" &&
   mv "$PROJ/s" "$PROJ/.claude/settings.local.json"
 # modelos antigos: bloco de outro carimbo, doc gerado antes do carimbo, doc ausente
 sed 's/modelo [0-9][0-9.]*/modelo 0.9.0/' skills/aplicar/modelos/claude-md.md >"$PROJ/CLAUDE.md"
 printf '<!-- gerado pelo plugin padrao (/padrao:aplicar); edite no plugin, não aqui -->\n' >"$PROJ/docs/agente/padrao-modelos.md"
 rm "$PROJ/docs/agente/padrao-configuracao.md"
 saida=$(conferir | jq -r .systemMessage)
-for esperado in "bloco do padrao no CLAUDE.md ausente ou de outro modelo do padrao (tem '0.9.0'" "docs/agente/padrao-modelos.md ausente ou de outro modelo do padrao (tem 'nenhum'" "docs/agente/padrao-configuracao.md ausente ou de outro modelo" "chaves fora do padrao: advisorModel, fallbackModel, model, modelSettings, subagentStatusLine, env.OUTRA" "subagent-statusline.py sobrou" "checkpoints (/rewind) desligados" "statusline.py ausente ou diferente" "fallbackModel em .claude/settings.local.json" "fallbackModel em .claude/settings.json" "modelSettings[\"claude-sonnet-5-5\"].effortLevel do projeto e 'high', o padrao e 'medium'" "modelSettings[\"claude-opus-5-5\"].autoCompactWindow do projeto e '200000', o padrao e '400000'" "memoria deste projeto" "env.ANTHROPIC_DEFAULT_HAIKU_MODEL do projeto e ''" "env.CLAUDE_CODE_SUBAGENT_MODEL do projeto e ''" "atualizacao automatica do padrao desligada" "0.9.0 disponivel" "conectores MCP do claude.ai ligados" "plugins do app (claude.ai) sincronizados" "skills tem skills pessoais"; do
+for esperado in "bloco do padrao no CLAUDE.md ausente ou de outro modelo do padrao (tem '0.9.0'" "docs/agente/padrao-modelos.md ausente ou de outro modelo do padrao (tem 'nenhum'" "docs/agente/padrao-configuracao.md ausente ou de outro modelo" "chaves fora do padrao: advisorModel, fallbackModel, model, modelSettings, subagentStatusLine, env.OUTRA" "subagent-statusline.py sobrou" "checkpoints (/rewind) desligados" "statusline.py ausente ou diferente" "fallbackModel em .claude/settings.local.json" "model em .claude/settings.local.json e 'sonnet' e vence o do projeto (o padrao e 'claude-opus-5-5[1m]')" "env.CLAUDE_CODE_SUBAGENT_MODEL em .claude/settings.local.json e 'opus'" "modelSettings[\"claude-opus-5-5\"].effortLevel em .claude/settings.local.json e 'max'" "fallbackModel em .claude/settings.json" "modelSettings[\"claude-sonnet-5-5\"].effortLevel do projeto e 'high', o padrao e 'medium'" "modelSettings[\"claude-opus-5-5\"].autoCompactWindow do projeto e '200000', o padrao e '400000'" "memoria deste projeto" "env.ANTHROPIC_DEFAULT_HAIKU_MODEL do projeto e ''" "env.CLAUDE_CODE_SUBAGENT_MODEL do projeto e ''" "atualizacao automatica do padrao desligada" "0.9.0 disponivel" "conectores MCP do claude.ai ligados" "plugins do app (claude.ai) sincronizados" "skills tem skills pessoais"; do
   case "$saida" in *"$esperado"*) ;; *) echo "divergiu: conferir-padrao nao acusou '$esperado'"; FALHAS=$((FALHAS + 1)) ;; esac
 done
 case "$saida" in *CLAUDE_CODE_EXPERIMENTAL_CODE_MODE*) echo "divergiu: conferir-padrao acusou a variavel do Code Mode no global"; FALHAS=$((FALHAS + 1)) ;; esac
