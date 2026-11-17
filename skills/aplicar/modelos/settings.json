@@ -11,6 +11,12 @@
     },
     "claude-haiku-5-5": {
       "effortLevel": "medium"
+    },
+    "claude-fable-5-2": {
+      "autoCompactWindow": 400000
+    },
+    "claude-mythos-5-2": {
+      "autoCompactWindow": 400000
     }
   },
   "cleanupPeriodDays": 14,

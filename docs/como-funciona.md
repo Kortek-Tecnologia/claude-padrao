@@ -45,7 +45,7 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 
 | Confere | Contra |
 |---|---|
-| `model`, `effortLevel`, `modelSettings` (todos os campos que o modelo define em cada modelo, inclusive `autoCompactWindow`; campo ou modelo só do projeto não conta) e as chaves de `env` do projeto | `modelos/settings.json` |
+| `model`, `effortLevel`, `modelSettings` (todos os campos que o modelo define em cada modelo, inclusive `autoCompactWindow`, que o modelo fixa em 400K no Opus, no Fable 5.2 e no Mythos 5.2; campo ou modelo só do projeto não conta) e as chaves de `env` do projeto | `modelos/settings.json` |
 | as mesmas chaves no `.claude/settings.local.json` | o local vence o projeto: chave do padrão lá com outro valor é acusada (ausente ou igual, passa) |
 | `fallbackModel` em `settings.json` ou `settings.local.json`; `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` | têm de estar ausentes |
 | `disableClaudeAiConnectors` (projeto) e `syncClaudeAiPlugins: false` (local, único lugar em que vale) | `true` / `false` |

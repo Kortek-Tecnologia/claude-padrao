@@ -412,6 +412,13 @@ case "$(conferir | jq -r .systemMessage)" in *"bloco do padrao no CLAUDE.md ause
 # teto ausente no projeto: acusado com o valor vazio
 jq 'del(.modelSettings["claude-opus-5-5"].autoCompactWindow)' skills/aplicar/modelos/settings.json >"$PROJ/.claude/settings.json"
 case "$(conferir | jq -r .systemMessage)" in *"modelSettings[\"claude-opus-5-5\"].autoCompactWindow do projeto e '', o padrao e '400000'"*) ;; *) echo "divergiu: conferir-padrao nao acusou o teto ausente"; FALHAS=$((FALHAS + 1)) ;; esac
+# o teto vale também nos modelos fora do padrão que a sessão pode escolher (Fable, Mythos):
+# projeto de antes dele, sem as duas chaves, é acusado
+jq 'del(.modelSettings["claude-fable-5-2"]) | del(.modelSettings["claude-mythos-5-2"])' skills/aplicar/modelos/settings.json >"$PROJ/.claude/settings.json"
+saida=$(conferir | jq -r .systemMessage)
+for m in claude-fable-5-2 claude-mythos-5-2; do
+  case "$saida" in *"modelSettings[\"$m\"].autoCompactWindow do projeto e '', o padrao e '400000'"*) ;; *) echo "divergiu: conferir-padrao nao acusou o teto ausente em $m"; FALHAS=$((FALHAS + 1)) ;; esac
+done
 # modelSettings do projeto que não é objeto: acusa campo a campo e NÃO cala os avisos seguintes
 jq '.modelSettings = "x"' skills/aplicar/modelos/settings.json >"$PROJ/.claude/settings.json"
 case "$(conferir | jq -r .systemMessage)" in *"modelSettings[\"claude-sonnet-5-5\"].effortLevel do projeto e ''"*"chaves fora do padrao"*) ;; *) echo "divergiu: modelSettings que nao e objeto calou o hook"; FALHAS=$((FALHAS + 1)) ;; esac
@@ -427,7 +434,7 @@ while read -r arq carimbo soma; do
     { echo "divergiu: modelo $arq mudou (carimbo '$tem_c', soma $tem_s): suba o 'modelo X' da 1a linha e registre os dois em testar.sh"; FALHAS=$((FALHAS + 1)); }
 done <<'CARIMBOS'
 claude-md.md 2.2.0 2856927040
-agente/padrao-modelos.md 2.2.0 3731529991
+agente/padrao-modelos.md 2.9.0 2086910817
 agente/padrao-configuracao.md 2.4.0 3993088577
 CARIMBOS
 

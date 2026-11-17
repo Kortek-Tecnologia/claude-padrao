@@ -135,8 +135,9 @@ migração.
 
 - `.claude/settings.json` (time, git): mescle `modelos/settings.json`. As chaves do modelo
   VENCEM — `model` é sempre `claude-opus-5-5[1m]`, `effortLevel` `medium`, `modelSettings` com
-  effort `medium` para Opus, Sonnet e Haiku 5.5 e o teto de compactação automática do Opus em
-  400K (`modelSettings["claude-opus-5-5"].autoCompactWindow: 400000`), os aliases
+  effort `medium` para Opus, Sonnet e Haiku 5.5 e o teto de compactação automática em 400K no
+  Opus, no Fable 5.2 e no Mythos 5.2 (`modelSettings["<modelo>"].autoCompactWindow: 400000`; nos
+  dois últimos só o teto, sem effort: não são do padrão, mas a sessão pode escolhê-los), os aliases
   (`env.ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL` na família 5.5 e
   `env.ANTHROPIC_DEFAULT_FABLE_MODEL` no Fable 5.2), sem "atualizar", e a memória
   desligada (`env.CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1"`, que vence `autoMemoryEnabled` nos dois
@@ -235,7 +236,8 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
    primeira sessão o Claude Code pede confiança na pasta para instalar o plugin, que o `/model`
    grava no global — o projeto reaplica o Opus 5.5 1M ao abrir, e o hook do padrão avisa — e que
    toda sessão abre em effort medium: o `/effort` muda a sessão (com `s` no seletor, sem gravar no
-   global) e a próxima volta a medium. A compactação automática do Opus fica em 400K (cada
+   global) e a próxima volta a medium. A compactação automática fica em 400K no Opus, e
+   também no Fable 5.2 e no Mythos 5.2 se a sessão trocar para eles (cada
    requisição relê o contexto inteiro); a sessão que precisar de mais abre com
    `claude --autocompact 1M`. Subir ao Fable 5.2 é o último degrau e vale só na sessão:
    `/model`, escolher o Fable e teclar `s`, de preferência depois de `/compact` (o cache é por

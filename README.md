@@ -240,9 +240,10 @@ flowchart LR
 
 - Tudo na **família 5.5 com 1M de contexto**, effort **medium**. Toda sessão abre em medium; o
   `/effort` muda só a sessão em curso (o projeto vence o global na próxima).
-- **Teto de 400K no Opus:** a compactação automática da sessão dispara aos 400K tokens
-  (`modelSettings["claude-opus-5-5"].autoCompactWindow`), não perto de 1M — cada requisição relê
-  o contexto inteiro. O bloco do `CLAUDE.md` diz o que preservar ao compactar. Sessão que precisar
+- **Teto de 400K na sessão:** a compactação automática dispara aos 400K tokens
+  (`modelSettings["<modelo>"].autoCompactWindow`), não perto de 1M — cada requisição relê
+  o contexto inteiro. Vale no Opus e também no Fable 5.2 e no Mythos 5.2: não são do padrão, mas
+  a sessão que trocar para eles compacta no mesmo ponto. O bloco do `CLAUDE.md` diz o que preservar ao compactar. Sessão que precisar
   de mais: `claude --autocompact 1M`.
 - **Lote com ficha vai para o executor.** Lote com ficha fechada (arquivos, mudança, critério de
   aceite, verificação que roda) vai para o `padrao:executor` quando tem muitos passos ou a sessão

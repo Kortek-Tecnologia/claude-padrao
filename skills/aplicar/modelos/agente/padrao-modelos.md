@@ -1,11 +1,12 @@
-<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.2.0; edite no plugin, não aqui -->
+<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.9.0; edite no plugin, não aqui -->
 # Modelos e delegação
 
 Tudo na família **5.5, com 1M de contexto** (nativo nela), fixado no `.claude/settings.json`:
 a sessão principal é Opus 5.5 1M effort medium; subagents Sonnet 5.5 e Haiku 5.5 effort medium.
-A compactação automática do Opus acontece aos 400K
-(`modelSettings["claude-opus-5-5"].autoCompactWindow`), não perto de 1M: cada requisição relê o
-contexto inteiro. Sessão que precisar de mais abre com `claude --autocompact 1M`.
+A compactação automática da sessão acontece aos 400K, não perto de 1M: cada requisição relê o
+contexto inteiro. O teto vale no Opus e também no Fable 5.2 e no Mythos 5.2, que não são do
+padrão mas podem ser escolhidos na sessão (`modelSettings["<modelo>"].autoCompactWindow`).
+Sessão que precisar de mais abre com `claude --autocompact 1M`.
 Sem a chave `fallbackModel`, indisponibilidade não troca de modelo; a única troca automática é a
 de segurança: mensagem sinalizada (cibersegurança, biologia) é refeita num modelo anterior, com
 aviso no transcript (`switchModelsOnFlag: false` no `settings.local.json` faz perguntar antes).

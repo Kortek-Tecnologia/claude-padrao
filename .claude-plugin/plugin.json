@@ -1,6 +1,6 @@
 {
   "name": "padrao",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "license": "MIT",
   "description": "Padrão de Claude Code igual em todos os projetos: configuração no projeto, papel fixo por modelo, documentação que não mente e checagens de segurança e de CI.",
   "author": {

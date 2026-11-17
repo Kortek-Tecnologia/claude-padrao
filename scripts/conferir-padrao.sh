@@ -4,8 +4,8 @@
 # versões, outro para o ~/.claude.json (pode ser grande; não vai como argumento).
 #
 # 1. Modelos e env: `model`, `effortLevel`, todo campo que o modelo de
-#    settings define em cada chave de `modelSettings` (effort; no Opus, o teto
-#    de compactação `autoCompactWindow`) — campo ou modelo que só o projeto
+#    settings define em cada chave de `modelSettings` (effort; no Opus, no Fable
+#    e no Mythos, o teto de compactação `autoCompactWindow`) — campo ou modelo que só o projeto
 #    tenha não conta — e as chaves de `env` do padrão (aliases dos subagents na
 #    família 5.5, modelo de subagent sem `model`, memória desligada, subagent
 #    sem subagent) do .claude/settings.json iguais aos de modelos/settings.json
