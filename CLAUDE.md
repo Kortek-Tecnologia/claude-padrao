@@ -11,6 +11,7 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 
 | Caminho | Conteúdo |
 |---|---|
+| `hooks/register.ts` | mod da linha dos subagents (TypeScript; hook `ui.render` em `AgentRow`, 2.1.326+), declarado em `modules` no `hooks.json`; testes em `hooks/register.test.tsx` (`claude plugin test .`) |
 | `hooks/hooks.json` | SessionStart → `conferir-padrao.sh`; PreToolUse `Agent` → `travar-modelo-subagent.sh`; PreToolUse Bash, PowerShell, `mcp__*` e as ferramentas que executam ou gravam (regex no matcher) → `trava-leitura.sh`; PreToolUse `Skill` e Bash/PowerShell com `git` (`if`) → `cobrar-docs.sh` |
 | `scripts/conferir-padrao.sh` | só avisa (nunca corrige): global sujo (o effort salvo pelo `/effort` passa: o projeto vence; de `env`, só a variável do Code Mode), modelos fora da 5.5, conectores/plugins do app claude.ai ligados, auto memory ligado, checkpoints desligados ou `fallbackModel` no projeto, bloco do `CLAUDE.md` ou `docs/agente/padrao-*.md` de outro modelo (carimbo), versão nova no marketplace |
 | `scripts/travar-modelo-subagent.sh` | corrige `Plan`=opus, `Explore`/`coletor`/`leitor`=haiku e `revisor`/`executor`=sonnet (`updatedInput`); recusa `model` fora de haiku/sonnet/opus (o Fable 5.2 é degrau só da sessão); sem `model` vale o `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`; `fork` passa |
@@ -20,7 +21,7 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 | `scripts/opcional.py` | os dois opcionais, fora da política de modelos e desligados por padrão: Code Mode (`env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` no settings global, o único em que vale) e Fable como advisor (`advisorModel` no `.claude/settings.local.json` do projeto); liga, desliga e mostra o estado |
 | `agents/` | `coletor` (haiku), `leitor` (haiku, sem CLAUDE.md), `revisor` (sonnet), `executor` (sonnet) |
 | `skills/` | os comandos — `aplicar` (+ `inventariar.py`, `modelos/`), `arrumar` (levanta, um OK, executa tudo; + `checagens.md`, os desvios de segurança e de CI da trilha B), `medir` (+ `medir-modelos.py`) e os opcionais `code-mode` e `advisor` (só chamam o `opcional.py`) — e `atualizar-docs`, fora do menu: o Claude a chama antes de commitar (o `cobrar-docs.sh` cobra) |
-| `statusline/`, `settings.json` | `statusline.py` (principal; a skill `aplicar` a instala em `~/.claude/`) e `subagent-statusline.py` (linha dos subagents; roda direto do plugin, pelo `subagentStatusLine` do `settings.json` da raiz) |
+| `statusline/`, `settings.json` | `statusline.py` (principal; a skill `aplicar` a instala em `~/.claude/`) e `subagent-statusline.py` (linha dos subagents de reserva, para versão sem o mod; roda direto do plugin, pelo `subagentStatusLine` do `settings.json` da raiz — obsoleto no Claude Code, sai quando a versão mínima tiver o mod) |
 | `avaliacao/revisor/` | avaliação do `padrao:revisor` com defeitos plantados (18 casos): projeto de exemplo (`base/`), os casos (`casos.py`) e o `avaliar.py` (`--conferir` não custa; a rodada de verdade abre uma sessão por caso) |
 | `docs/como-funciona.md` | para quem mantém: peças, decisões dos hooks, skills, testes e publicação (o README é para quem usa) |
 | `AGENT_LEARNINGS.md` | erros do agente neste repositório e a abordagem certa; lido sob demanda (modelo e `docs/agente/padrao-*.md` em `skills/aplicar/modelos/`) |
@@ -32,6 +33,8 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
   mantenha esse comportamento (falhar fechado). O lembrete da documentação é o contrário de
   propósito: falha aberto, porque commit preso é pior que doc velha.
 - Python só biblioteca padrão, 3.9+, sempre via `scripts/py.sh`.
+- TypeScript só no mod (`hooks/register.ts`): sem dependência, sem Node nem DOM — tudo de fora vem pelo `$`. A API é de acesso antecipado: confira com `claude plugin validate .` e `claude plugin test .` a cada versão do Claude Code.
+  A linha do mod e a do `subagent-statusline.py` têm de dizer o mesmo.
 - `version` no `.claude-plugin/plugin.json`: o aviso de versão nova compara com ela.
   Toda mudança publicada sobe a `version` (semver). O `marketplace.json` da raiz
   publica este mesmo diretório (`source: "./"`).

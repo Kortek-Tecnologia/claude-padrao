@@ -658,6 +658,16 @@ arv=$(cd "$REPO" && git grep -nIE "$P" | cut -d: -f1,2)
 [ "$arv" = "conf.txt:3" ] || { echo "divergiu: checagem S1 devolveu '$arv'"; FALHAS=$((FALHAS + 1)); }
 rm -rf "$REPO"
 
+# Linha dos subagents como mod: o hooks.json aponta um módulo que existe, e os testes dele
+# passam onde há o Claude Code (o CI não tem: lá fica só a conferência do arquivo).
+mod=$(jq -r '.modules // [] | join(" ")' hooks/hooks.json | tr -d '\r')
+[ "$mod" = ./register.ts ] && [ -r hooks/register.ts ] && [ -r hooks/register.test.tsx ] ||
+  { echo "divergiu: hooks.json sem o modulo da linha dos subagents (modules = '$mod')"; FALHAS=$((FALHAS + 1)); }
+if command -v claude >/dev/null 2>&1; then
+  claude plugin test . >/dev/null 2>&1 ||
+    { echo "divergiu: testes do modulo: $(claude plugin test . 2>&1 | tail -n 6)"; FALHAS=$((FALHAS + 1)); }
+fi
+
 # Avaliação do revisor: os casos aplicam, o gabarito tem linha e os testes de cada diff passam
 # (sem chamar o Claude; a rodada de verdade é paga e roda à parte).
 sh "$D/py.sh" avaliacao/revisor/avaliar.py --conferir >/dev/null 2>&1 ||

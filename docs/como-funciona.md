@@ -21,7 +21,8 @@ flowchart LR
   CP -->|"compara com"| MOD
   AP -->|"copia para ~/.claude/"| ST["statusline/statusline.py"]
   CP -->|"confere a cópia"| ST
-  PS["settings.json do plugin:<br/>subagentStatusLine"] --> SU["py.sh →<br/>subagent-statusline.py"]
+  UI["ui.render: AgentRow"] --> RT["hooks/register.ts<br/>(mod)"]
+  PS["settings.json do plugin:<br/>subagentStatusLine (reserva)"] --> SU["py.sh →<br/>subagent-statusline.py"]
 ```
 
 | Caminho | Papel |
@@ -32,7 +33,8 @@ flowchart LR
 | `agents/*.md` | os quatro agentes; os que só leem têm `tools` fechado e `disallowedTools` |
 | `statusline/` | `statusline.py` é de terceiro (Jhonatan de Souza); nossas linhas ficam entre `padrao: início` e `padrao: fim` ou marcadas `# padrao` |
 | `scripts/opcional.py` | liga, desliga e mostra os dois opcionais (Code Mode e Fable como advisor); as skills `code-mode` e `advisor` só o chamam — ver [Os opcionais](#os-opcionais--opcionalpy) |
-| `settings.json` | a única setting que o plugin traz: `subagentStatusLine`, que roda o `subagent-statusline.py` direto do plugin (de plugin só valem ela e `agent`) |
+| `hooks/register.ts` | o mod da linha dos subagents: hook `ui.render` em `AgentRow`, declarado em `modules` no `hooks.json`; testes em `hooks/register.test.tsx` |
+| `settings.json` | a única setting que o plugin traz: `subagentStatusLine`, reserva da linha dos subagents para versão sem o mod (de plugin só valem ela e `agent`) |
 
 ## Hook de abertura — `conferir-padrao.sh`
 
@@ -52,21 +54,45 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 | versão instalada × `~/.claude/plugins/marketplaces/claude-padrao` | por **diferença**, não por ordem: a numeração recomeçou em 1.0.0 |
 | carimbo `modelo X` do bloco do `CLAUDE.md` e dos `docs/agente/padrao-*.md` do projeto | o da 1ª linha do arquivo em `modelos/`; só o carimbo, não o texto — quem grava no projeto é o Claude, e espaço ou CRLF dariam aviso falso. A marca vale só no começo da linha (prosa que cita o marcador não conta), e carimbo mais novo que o do plugin manda atualizar o plugin, não rodar o `aplicar` |
 
-## Linha dos subagents — `settings.json` do plugin
+## Linha dos subagents — `hooks/register.ts` (mod) e `settings.json` (reserva)
 
-O `subagentStatusLine` vem do `settings.json` da raiz, sem cópia em `~/.claude`: atualizou o
-plugin, atualizou a linha. Medido na v2.1.322, numa sessão interativa dentro de um
-pseudo-terminal (ver [Testes](#testes)):
+A linha de cada subagent no painel de agentes vem do plugin, sem cópia em `~/.claude`, por dois
+caminhos que desenham o mesmo texto:
 
-- o comando roda pelo Git Bash, com `${CLAUDE_PLUGIN_ROOT}` já trocado (a troca só existe da
-  v2.1.319 em diante) e com `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA` e `CLAUDE_PROJECT_DIR`
-  no ambiente;
-- o painel chama o comando a cada 5 s enquanto há subagent visível; nos primeiros segundos
-  aparece a linha padrão do Claude Code. Por isso o `py.sh` serve (~0,6 s no Windows, com o
-  teste de versão do Python) e não foi preciso um lançador próprio;
-- **o global vence o plugin**: `subagentStatusLine` em `~/.claude/settings.json` (o padrão a
-  punha lá até a 2.2.1) esconde a do plugin. O hook de abertura acusa a chave e a cópia antiga
-  do script, e o `aplicar` tira as duas.
+| | Mod: `hooks/register.ts` | Reserva: `subagentStatusLine` do `settings.json` |
+|---|---|---|
+| O que é | módulo TypeScript que o `hooks.json` declara em `modules`; hook `ui.render` no componente `AgentRow` | comando: `py.sh` → `subagent-statusline.py` |
+| Vale em | Claude Code 2.1.326+, onde os módulos de plugin estão liberados para a conta | qualquer versão desde a 2.1.319 |
+| Custo | roda dentro do Claude Code, sem processo | um Python a cada 5 s com subagent visível (~0,6 s no Windows) |
+| Mostra a mais | custo do subagent (a partir de US$ 0,01) e aviso de Haiku acima de 100K (paga 5×) | — |
+
+O `claude plugin validate` avisa que o `subagentStatusLine` está obsoleto e vai parar numa versão
+futura, sem data: por isso o mod. A reserva fica enquanto houver versão sem o `AgentRow`. Medido
+em 2026-11-17, v2.1.326, em sessão interativa num pseudo-terminal (ver [Testes](#testes)):
+
+- **Os dois convivem.** O `hooks.json` leva `modules` ao lado dos quatro hooks de comando; numa
+  sessão real o módulo carregou (`hooks module padrao loaded … events: ui.render`) e os hooks em
+  sh agiram (abertura e modelo do `Explore`).
+- **Com os dois ativos, o mod vence:** em 98 de 98 desenhos da linha saiu a marca que só o mod
+  punha. Sem o `subagentStatusLine`, o mod sozinho desenha a linha.
+- **Versão antiga ignora o mod, não quebra.** Nas 2.1.319, 2.1.323, 2.1.324 e 2.1.325 o
+  `plugin validate` aceita o `hooks.json` e diz que o `AgentRow` não existe ali ("it never
+  runs"): quem desenha é a reserva. O `AgentRow` existe a partir da 2.1.326.
+- **Liberação por conta.** O log da sessão mostra os módulos de plugin instalado atrás de uma
+  chave de liberação (`tengu_plugin_hooks_modules`): conta sem ela fica na reserva.
+- **A API de mods é de acesso antecipado e muda entre versões.** Hook de mod que falha é
+  pulado sozinho, e a linha volta a ser a da reserva (ou a do Claude Code). O que o módulo usa
+  está em `claude plugin validate .` ("hooks: ui.render{component=AgentRow}; calls:
+  $.clock.now").
+- **O global ainda vence a reserva:** `subagentStatusLine` em `~/.claude/settings.json` (o
+  padrão a punha lá até a 2.2.1) esconde a do plugin. O hook de abertura acusa a chave e a
+  cópia antiga do script, e o `aplicar` tira as duas.
+- **Mexeu numa, mexa na outra:** as duas linhas têm de dizer o mesmo. Os testes do mod estão em
+  `hooks/register.test.tsx` (`claude plugin test .`; o `testar.sh` os roda onde há o `claude`) e
+  os da reserva, no `testar.sh`.
+- **Arquivos que o Claude Code gera** ao carregar o plugin de uma pasta (`--plugin-dir`):
+  `.claude-plugin/types/` (com `.gitignore` próprio) e o `tsconfig.json` da raiz, versionado,
+  que só aponta para ela.
 
 ## Hook de modelo — `travar-modelo-subagent.sh`
 

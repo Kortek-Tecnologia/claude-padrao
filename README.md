@@ -210,7 +210,7 @@ modelos, e cada comando só grava ou tira uma chave. Sem argumento, mostra o est
 | Trava de leitura | Bash, MCP e ferramentas que gravam, nos agentes que só leem | deixa `Explore`, coletor, leitor e revisor só lerem: grava, redireciona ou executa → recusa, dizendo o motivo |
 | `atualizar-docs` | antes de cada commit | corrige só a documentação que o diff deixou falsa (porta, comando, variável, caminho) |
 | Lembrete da documentação | todo `git commit` que o Claude roda | se a `atualizar-docs` não rodou desde o commit anterior, recusa uma vez e manda rodá-la; a repetição passa |
-| Status lines | sempre; a dos subagents, onde o plugin está ligado | modelo, effort, contexto, limites e cache na linha; uma linha por subagent, que vem do próprio plugin |
+| Status lines | sempre; a dos subagents, onde o plugin está ligado | modelo, effort, contexto, limites e cache na linha; uma linha por subagent, que vem do próprio plugin (na 2.1.326+, com o custo e o aviso de Haiku acima de 100K) |
 
 ```
 Opus 5.5 · loja · main · medium
@@ -366,12 +366,12 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 
 ```
 .claude-plugin/   manifesto do plugin e do marketplace (version: semver)
-hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc
+hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc; register.ts: a linha dos subagents (mod)
 scripts/          os hooks em sh (a regra da trava de leitura em awk), py.sh, opcional.py e testar.sh
 agents/           coletor, leitor, revisor, executor
 skills/           aplicar (+ inventário e modelos), arrumar (+ checagens), medir, code-mode, advisor, atualizar-docs
 statusline/       status line principal e dos subagents
-settings.json     a única setting que o plugin traz: a linha dos subagents
+settings.json     a única setting que o plugin traz: a linha dos subagents de reserva (versão sem o mod)
 docs/             como funciona por dentro
 avaliacao/        avaliação do revisor com defeitos plantados (roda à parte: custa)
 .github/          CI: testes e validação dos diagramas
