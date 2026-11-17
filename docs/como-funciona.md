@@ -340,8 +340,18 @@ gravidade e o destino da correção.
   medir) e não viraram desvio; os tokens falsos não foram parar em `_audit/` nem na resposta; e
   o plano pôs em lote só o que é `infra` — token no código, chave no histórico e dependência
   vulnerável ficaram de fora e abriram o relatório.
+- **Fase 3 com os lotes de infra, medida** (v2.1.326, a mesma API com os desvios plantados:
+  `claude -p "/padrao:arrumar só infra"` e depois `--resume <id> "Aprovar e executar"`; US$ 0,54
+  no plano e US$ 1,26 na execução, uma rodada). Três lotes, um commit cada no branch
+  `padrao/arrumar-<data>`, sem push: CI (`pull_request` no lugar de `pull_request_target`,
+  `permissions: contents: read`, sem o segredo, com o lint), compose em modo produção com um
+  Dockerfile novo, e `.env` no `.gitignore` com um `.env.example` só de nomes. Nenhum arquivo de
+  `src/` mudou, o `.env` não entrou em commit, os tokens falsos não aparecem nos diffs, em
+  `_audit/` nem na resposta, e o `docker build` saiu como `não verificado` (Docker parado). O
+  relatório abre com os dois segredos expostos, e o revisor achou um defeito antigo (build sem
+  `@types/node`), que ficou em aberto por pedir mudança no lockfile.
 - **Não medido:** `C1`, `C2` e `C4` com tempo de CI real (pede um repositório no GitHub com
-  execuções), a fase 3 em cima desses lotes e outra stack que não Node. O `revisor` não lê a
+  execuções) e outra stack que não Node. O `revisor` não lê a
   lista: entra depois de haver uma avaliação dele.
 
 **`atualizar-docs`** — `user-invocable: false`: fora do menu. Quem a dispara é o modelo: o bloco
@@ -352,7 +362,12 @@ do `CLAUDE.md` manda chamá-la antes de todo commit, e o `cobrar-docs.sh` cobra 
 é o efetivo pela regra do hook; chamada recusada não conta como rodada; tokens por `message.id`
 (as linhas de uma resposta repetem o uso). Commits da sessão principal: reconhecidos pela regra do
 `cobrar-docs.sh` (sem os do `arrumar`), refeita em regex — em forma rara os dois podem divergir, com a `atualizar-docs` chamada desde o commit anterior
-ou não; tentativa que o hook recusou conta como lembrete, não como commit. Cada `message.id` é uma requisição: o custo estimado
+ou não; tentativa que o hook recusou conta como lembrete, não como commit. Dos mesmos commits sai a
+linha de verificação: teste, build ou lint rodado na sessão desde o commit anterior (`VERIFICA`,
+pelos nomes comuns, no começo de um segmento do comando), chamada ao `padrao:revisor` ou lote
+pelo `padrao:executor`; a verificação vista antes de uma tentativa recusada vale para a
+repetição. É o modo de observação de um gate que não existe: neste repositório, em 14 dias,
+21 de 26 commits tiveram teste ou build antes, e os 5 sem nenhuma decidem se o gate vale. Cada `message.id` é uma requisição: o custo estimado
 sai da tabela `PRECO` (preço de lista por milhão, com a data da fonte em `PRECO_EM`, que sai no
 cabeçalho; modelo casado por prefixo, escrita de cache de
 1 h à parte da de 5 min); contexto = entrada + cache lido + escrita, distribuído em faixas na

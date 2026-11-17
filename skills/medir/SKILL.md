@@ -26,6 +26,13 @@ Leitura:
   quantos tiveram a `padrao:atualizar-docs` desde o commit anterior. Lembrete = o hook recusou a
   primeira tentativa. Commit sem a skill = o Claude repetiu depois do lembrete sem rodá-la (às
   vezes com razão: dois commits do mesmo diff), ou o hook não rodou naquela sessão.
+- Verificação antes do commit: dos mesmos commits, quantos tiveram desde o commit anterior um
+  teste, build, checagem de tipos ou lint rodado na sessão, uma chamada ao `padrao:revisor` (ou
+  skill de revisão) ou um lote pelo `padrao:executor` — um commit pode contar em mais de uma — e
+  quantos saíram sem nenhuma. Só mede: não há hook cobrando. O comando é reconhecido pelos nomes
+  comuns (`pytest`, `npm test`, `cargo test`, `tsc`, `testar.sh`…); teste do projeto com outro
+  nome não entra, e commit só de documentação também aparece como "sem nenhuma". Muitos sem
+  nenhuma em diff de código = caso para pedir a verificação na ficha ou um gate.
 - Tokens: o custo está em "entrada" e "saída"; "cache lido" sai bem mais barato. Opus com muita
   entrada e haiku perto de zero = leitura que devia ir ao coletor.
 - `effort na chamada do subagent` (só aparece se houve): chamadas `Agent` que pediram um

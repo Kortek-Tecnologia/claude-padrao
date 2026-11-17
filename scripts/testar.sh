@@ -565,6 +565,9 @@ agora=$(date -u +%Y-%m-%dT%H:%M:%S)
   # A última (d3) vem como o Code Mode grava a chamada feita de dentro do código: model
   # `<synthetic>` e uso zerado — os commits dela contam; tokens e turnos, não.
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"d1","content":[{"type":"tool_use","id":"k1","name":"Skill","input":{"skill":"padrao:atualizar-docs"}},{"type":"tool_use","id":"k2","name":"Bash","input":{"command":"cd /x && git add -A && git commit -m \\"a (b)\\""}}]}}\n' "$agora"
+  # verificação antes do commit: um pytest rodado antes da tentativa que o hook recusa (vale para
+  # a repetição dela); `npm test` citado num echo e `cat testar.sh` não são verificação
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"d1b","content":[{"type":"tool_use","id":"k2b","name":"Bash","input":{"command":"cd /x && python -m pytest -q 2>&1 | tail -3"}},{"type":"tool_use","id":"k2c","name":"Bash","input":{"command":"echo npm test; cat testar.sh"}}]}}\n' "$agora"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"d2","content":[{"type":"tool_use","id":"k3","name":"Bash","input":{"command":"git commit -m b"}}]}}\n' "$agora"
   printf '{"type":"user","timestamp":"%s","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"k3","is_error":true,"content":"PreToolUse:Bash hook error: padrao: lembrete de rotina: antes deste commit, rode a skill padrao:atualizar-docs"}]}}\n' "$agora"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"d3","model":"<synthetic>","usage":{"input_tokens":0,"output_tokens":0},"content":[{"type":"tool_use","id":"k4","name":"Bash","input":{"command":"git commit -m b"}},{"type":"tool_use","id":"k5","name":"Bash","input":{"command":"git commit -m \\"arrumar: lote 1 — x\\""}},{"type":"tool_use","id":"k6","name":"Bash","input":{"command":"git log --grep \\"git commit\\""}},{"type":"tool_use","id":"k7","name":"Bash","input":{"command":"(cd y && git commit)"}}]}}\n' "$agora"
@@ -609,8 +612,9 @@ for re in '1 correção\(ões\) de papel fixo \(Explore=1\) · 1 recusa\(s\)' '^
   printf '%s\n' "$med" | grep -Eq "$re" || { echo "divergiu: medir-modelos sem /$re/: $med"; FALHAS=$((FALHAS + 1)); }
 done
 case "$med" in *"<synthetic>"*) echo "divergiu: medir-modelos listou <synthetic> como modelo"; FALHAS=$((FALHAS + 1)) ;; esac
-# effort pedido na chamada do subagent (o hook de modelo não olha) e a data da tabela de preços
-for re in '^effort na chamada do subagent: 1 chamada\(s\) · max=1$' '^custo estimado a preço de lista de 20[0-9]{2}-[0-9]{2}-[0-9]{2} '; do
+# effort pedido na chamada do subagent (o hook de modelo não olha), a data da tabela de preços e
+# a verificação antes do commit: dos 3 commits, só a repetição que veio depois do pytest conta
+for re in '^verificação antes do commit: 3 commit\(s\) · 1 com teste ou build · 0 com revisor · 0 com executor · 2 sem nenhuma$' '^effort na chamada do subagent: 1 chamada\(s\) · max=1$' '^custo estimado a preço de lista de 20[0-9]{2}-[0-9]{2}-[0-9]{2} '; do
   printf '%s\n' "$med" | grep -Eq "$re" || { echo "divergiu: medir-modelos sem /$re/: $med"; FALHAS=$((FALHAS + 1)); }
 done
 # período sem requisição: as seções saem com zeros, sem quebrar

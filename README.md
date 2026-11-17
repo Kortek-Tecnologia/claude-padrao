@@ -138,6 +138,7 @@ Lê os transcripts locais do projeto (últimos 14 dias) e mostra quem fez o quê
 ```
 hook de modelo: 1 correção(ões) de papel fixo (Explore=1) · 1 recusa(s)
 documentação antes do commit: 3 commit(s) · 3 com a atualizar-docs antes · 1 lembrete(s) do hook
+verificação antes do commit: 3 commit(s) · 2 com teste ou build · 1 com revisor · 0 com executor · 1 sem nenhuma
 subagents (tipo: modelo em que rodou × chamadas):
   Explore              haiku=1
   padrao:executor      sonnet=3
@@ -162,7 +163,9 @@ Haiku acima de 100K: 0 de 4 requisições · sobrepreço US$ 0.00
 
 Haiku perto de zero com muita entrada no Opus = leitura que devia ter ido ao coletor. O custo é
 estimativa a preço de lista, da data que o cabeçalho mostra; o que mais pesa é o contexto grande na sessão principal. Commit sem
-a `atualizar-docs` antes = o Claude repetiu o commit depois do lembrete sem rodar a skill, ou o
+verificação = nem teste ou build rodado na sessão, nem revisor, nem lote pelo executor desde o
+commit anterior (só mede: não há hook cobrando; teste com nome fora do comum não é reconhecido).
+Commit sem a `atualizar-docs` antes = o Claude repetiu o commit depois do lembrete sem rodar a skill, ou o
 hook não rodou naquela sessão (plugin antigo, `jq` ausente).
 
 ### `/padrao:code-mode` e `/padrao:advisor` — os opcionais

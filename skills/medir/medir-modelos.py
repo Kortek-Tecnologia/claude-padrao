@@ -11,6 +11,9 @@ projeto e conta:
 - correções (papel fixo) e recusas do hook de modelo;
 - tokens e turnos por modelo, do agente principal e dos subagents;
 - sessões sem nenhuma delegação (preocupa só a sessão longa);
+- commits da sessão principal: quantos tiveram verificação desde o commit anterior
+  (teste ou build rodado na sessão, `padrao:revisor`, lote pelo `padrao:executor`) e
+  quantos saíram sem nenhuma — só mede, não há hook cobrando;
 - commits da sessão principal: quantos tiveram a `padrao:atualizar-docs` antes e
   quantas vezes o hook da documentação precisou lembrar;
 - custo estimado a preço de lista por modelo, o contexto por requisição da
@@ -60,6 +63,32 @@ COMMIT = re.compile(
 )
 # Mensagem de lote do /padrao:arrumar: `-m "arrumar: lote …"` ou a 1ª linha do heredoc.
 LOTE = re.compile(r"-m\s*[\"']arrumar: lote |-m\s*\"\$\(cat\s*<<[^\n]*\n\s*arrumar: lote ")
+
+
+# Comando que verifica: roda teste, build, checagem de tipos ou lint. Heurística pelos
+# nomes comuns, fora de aspas e de heredoc; script do projeto com outro nome não entra
+# (a conta de "sem nenhuma" sai para mais).
+VERIFICA = re.compile(
+    # no começo de um segmento do comando (como no COMMIT): `echo npm test`, `cat testar.sh`
+    # e `grep pytest` não contam. Na frente podem vir atribuições, um lançador e um caminho.
+    r"(?:^|[;&|(){}\n`]|\$\()\s*"
+    r"(?:(?:time|env|sudo|npx|bunx|uvx|bash|sh|uv\s+run|poetry\s+run|pipenv\s+run|py(?:thon[\d.]*)?\s+-m)\s+"
+    r"|[A-Za-z_]\w*=\S*\s+)*"
+    r"(?:[^\s\"']*[/\\])?(?:"
+    r"pytest|unittest|tox|nox|ruff|mypy|pyright|"
+    r"jest|vitest|playwright|cypress|tsc|eslint|oxlint|biome|"
+    r"(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|build|lint|typecheck|check)[\w:-]*|deno\s+test|"
+    r"go\s+(?:test|build|vet)|cargo\s+(?:test|build|check|clippy)|"
+    r"(?:mvn|gradle|gradlew)\s+[\w:-]*(?:test|build|check|verify)|dotnet\s+(?:test|build)|"
+    r"make\s+(?:test|check|build|lint)|phpunit|rspec|"
+    r"testar\.sh|tests?\.sh|run-tests[\w.-]*|claude\s+plugin\s+(?:validate|test)"
+    r")(?=[\s;&|)]|$)"
+)
+
+
+def verifica(comando: str) -> bool:
+    """O comando roda teste, build, checagem de tipos ou lint."""
+    return bool(VERIFICA.search(ASPAS.sub("''", HEREDOC.sub(" ", comando))))
 
 
 def faz_commit(comando: str) -> bool:
@@ -291,15 +320,20 @@ def main() -> None:
     uso_advisor: dict = {}
     recusas = sessoes = sem_delegar = 0
     commits = com_docs = lembretes = 0
+    # verificação antes do commit: [teste ou build, revisor, executor] e os sem nenhuma
+    com_verif = [0, 0, 0]
+    sem_verif = 0
     vistos: set[str] = set()
 
     for arq in pasta.glob("*.jsonl"):
         delegou = ativa = False
         # id da chamada Agent → (tipo, modelo), para tirar da conta a que foi recusada
         ids_agent: dict[str, tuple[str, str]] = {}
-        # id do commit → se a atualizar-docs rodou desde o commit anterior
-        ids_commit: dict[str, bool] = {}
+        # id do commit → (se a atualizar-docs rodou desde o commit anterior, a verificação
+        # vista desde o commit anterior: teste ou build, revisor, executor)
+        ids_commit: dict[str, tuple[bool, tuple[bool, bool, bool]]] = {}
         docs_antes = False
+        verif = [False, False, False]
         for o, _ in linhas(arq, desde):
             ativa = True
             msg = o.get("message")
@@ -316,7 +350,13 @@ def main() -> None:
                         # o hook recusou: a tentativa não é commit
                         lembretes += 1
                         commits -= 1
-                        com_docs -= ids_commit.pop(c["tool_use_id"])
+                        teve_docs, vista = ids_commit.pop(c["tool_use_id"])
+                        com_docs -= teve_docs
+                        # a verificação vista vale para a repetição do commit
+                        for k in range(3):
+                            com_verif[k] -= vista[k]
+                            verif[k] = verif[k] or vista[k]
+                        sem_verif -= not any(vista)
                     if (
                         isinstance(c, dict)
                         and c.get("type") == "tool_result"
@@ -337,7 +377,12 @@ def main() -> None:
                 if not isinstance(c, dict) or c.get("type") != "tool_use":
                     continue
                 i = c.get("input") or {}
-                if c.get("name") == "Skill" and "atualizar-docs" in str(i.get("skill") or ""):
+                nome_skill = str(i.get("skill") or "") if c.get("name") == "Skill" else ""
+                if "review" in nome_skill or "verify" in nome_skill:
+                    verif[1] = True
+                if c.get("name") in ("Bash", "PowerShell") and verifica(str(i.get("command") or "")):
+                    verif[0] = True
+                if c.get("name") == "Skill" and "atualizar-docs" in nome_skill:
                     docs_antes = True
                 elif (
                     c.get("name") in ("Bash", "PowerShell")
@@ -346,8 +391,13 @@ def main() -> None:
                 ):
                     commits += 1
                     com_docs += docs_antes
-                    ids_commit[c.get("id")] = docs_antes
+                    vista = (verif[0], verif[1], verif[2])
+                    for k in range(3):
+                        com_verif[k] += vista[k]
+                    sem_verif += not any(vista)
+                    ids_commit[c.get("id")] = (docs_antes, vista)
                     docs_antes = False
+                    verif = [False, False, False]
                 if c.get("name") in ("Agent", "Task"):
                     tipo = i.get("subagent_type") or "general-purpose"
                     modelo, corrigida = modelo_efetivo(tipo, i.get("model") or "")
@@ -355,6 +405,10 @@ def main() -> None:
                     corrigidas[tipo] += corrigida
                     if i.get("effort"):
                         com_effort[str(i["effort"])] += 1
+                    if tipo == "padrao:revisor":
+                        verif[1] = True
+                    elif tipo == "padrao:executor":
+                        verif[2] = True
                     ids_agent[c.get("id")] = (tipo, modelo)
                     delegou = True
         sessoes += ativa
@@ -375,6 +429,8 @@ def main() -> None:
           + (f" ({correcoes})" if correcoes else "") + f" · {recusas} recusa(s)")
     print(f"documentação antes do commit: {commits} commit(s) · {com_docs} com a atualizar-docs antes"
           f" · {lembretes} lembrete(s) do hook")
+    print(f"verificação antes do commit: {commits} commit(s) · {com_verif[0]} com teste ou build"
+          f" · {com_verif[1]} com revisor · {com_verif[2]} com executor · {sem_verif} sem nenhuma")
     if com_effort:
         print(f"effort na chamada do subagent: {sum(com_effort.values())} chamada(s) · "
               + "  ".join(f"{e}={n}" for e, n in com_effort.most_common()))
