@@ -84,6 +84,24 @@ Tempo vem de medição: `gh run list --workflow <arquivo> --limit 10 --json crea
 por passo, `gh run view <id> --json jobs`. Sem `gh` autenticado ou sem execução registrada, o
 tempo é `não verificável` e os itens C1, C2 e C4 não viram desvio — CI rápido não se otimiza.
 
+C5, C6 e C7 medem outra coisa: execução que não precisava ter rodado. Valem também em CI
+rápido, com gravidade baixa, porque cada job é cobrado arredondado para cima, ao minuto. Saem das
+últimas 100 execuções, gravadas uma vez (sem elas, `não verificável`):
+
+    gh run list --limit 100 --json workflowName,event,headSha,headBranch,conclusion,createdAt,updatedAt >_audit/raw/execucoes.json
+
+    DUP='[group_by(.workflowName + .headSha)[] | select([.[].event] | unique | length > 1) | .[] | select(.event == "push")]'
+    SUP='[group_by(.workflowName + .event + .headBranch)[] | sort_by(.createdAt) as $g | range(0; ($g | length) - 1) as $i | select($g[$i].conclusion != "cancelled" and ($g[$i + 1].createdAt | fromdate) < ($g[$i].updatedAt | fromdate)) | $g[$i]]'
+    TEMPO='{execucoes: length, segundos: (map((.updatedAt | fromdate) - (.createdAt | fromdate)) | add // 0)}'
+
+Os três só viram desvio com **5 execuções ou mais, ou mais de 10 minutos somados**, e a evidência
+é essa contagem com o tempo. Gravidade baixa; média quando o tempo somado passa de 30 minutos.
+Conte só execução de evento que o workflow ainda dispara: a lista guarda as de um `on:` que já
+mudou, e desperdício que o workflow de hoje não repete não é desvio.
+
+Toda correção de CI diz no plano o que troca: dividir em jobs paralelos encurta a espera e soma
+minutos (cada job repete o setup); filtrar ou cancelar corta minutos e deixa commit sem resultado.
+
 ### C1 — Etapas independentes em série
 - Vale quando: a mediana das execuções passa de 5 minutos.
 - Conferir: lint, checagem de tipos, build e testes como passos de um job só, ou jobs presos por
@@ -117,3 +135,36 @@ tempo é `não verificável` e os itens C1, C2 e C4 não viram desvio — CI rá
   equilibrados pelo tempo gravado de cada teste; no PR, só os testes que o diff alcança, se o
   runner souber (ex.: `vitest --changed`, `jest --changedSince`, `nx affected`), com a suíte
   inteira no branch principal.
+
+### C5 — O mesmo commit roda duas vezes
+- Vale quando: um workflow dispara em `push` sem filtro de branch e também em `pull_request`.
+- Conferir: `jq "$DUP | $TEMPO" _audit/raw/execucoes.json` — as execuções de `push` cujo commit
+  também rodou pelo `pull_request` do mesmo workflow.
+- Desvio: a contagem e o tempo somado, com a linha do `on:` no workflow.
+- Gravidade: baixa (média acima de 30 minutos somados).
+- Correção: `infra`, como decisão assumida no plano (branch sem PR aberto deixa de rodar o CI) —
+  `push` só no branch principal (`branches: [<principal>]`), mantendo o `pull_request`.
+
+### C6 — CI inteiro em commit só de documentação
+- Vale quando: nenhum passo do workflow lê a documentação (lint de markdown, validação de
+  diagrama, build de site) e ele não tem `paths` nem `paths-ignore`.
+- Conferir: para cada execução de `push` de `execucoes.json`,
+  `git diff-tree --no-commit-id --name-only -r -m --first-parent <sha> | grep -qvE '(\.md|\.txt)$|^docs/|^LICENSE' || echo <sha>`
+  — os commits devolvidos só tocam documentação; some o tempo das execuções deles.
+- Desvio: a contagem e o tempo somado, com um commit de exemplo.
+- Gravidade: baixa (média acima de 30 minutos somados).
+- Correção: `infra` — `paths-ignore: ['**.md', 'docs/**']` no `push`. No `pull_request`, só se o
+  workflow não for check obrigatório do branch
+  (`gh api repos/<dono>/<repo>/branches/<principal>/protection/required_status_checks`; 403 ou 404
+  = não há): check obrigatório que não roda fica pendente e trava o merge.
+
+### C7 — Execução superada segue até o fim
+- Vale quando: o workflow não tem `concurrency` e não publica nada (release, deploy, disparo por
+  tag): execução que publica não se cancela.
+- Conferir: `jq "$SUP | $TEMPO" _audit/raw/execucoes.json` — as execuções que terminaram com
+  outra mais nova já aberta no mesmo branch, evento e workflow.
+- Desvio: a contagem e o tempo somado, com o workflow e o branch.
+- Gravidade: baixa (média acima de 30 minutos somados).
+- Correção: `infra` — `concurrency` com `group: ${{ github.workflow }}-${{ github.ref }}` e
+  `cancel-in-progress: ${{ github.event_name == 'pull_request' }}`. Cancelar também no branch
+  principal é decisão assumida no plano: o commit intermediário fica sem resultado.

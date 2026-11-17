@@ -120,8 +120,8 @@ desvio. O que o repositório não mostra (VPS, DNS, segredos em runtime, runner)
 
 **Checagens.** Depois do levantamento, confira você a lista de `checagens.md`, ao lado deste
 arquivo: segurança (segredo versionado ou no histórico, debug em produção, dependência
-vulnerável, permissão do CI) e tempo de CI. Só o item cujo "Vale quando" bate, só com evidência,
-e os de CI só com o tempo medido. Cada desvio entra no `INFRA.md` com o id da checagem.
+vulnerável, permissão do CI), tempo de CI e execução de CI que não precisava ter rodado. Só o
+item cujo "Vale quando" bate, só com evidência, e os de CI só com o tempo ou a contagem medidos. Cada desvio entra no `INFRA.md` com o id da checagem.
 
 ### Trilha C — o que a documentação diz → `CONFRONTO.md`
 

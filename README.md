@@ -122,9 +122,11 @@ flowchart TD
   docstring; regra documentada que o código contraria fica, e o código vai para o relatório.
 - **Segurança e CI, só com evidência:** a trilha de infraestrutura confere uma lista fechada
   (`skills/arrumar/checagens.md`): segredo versionado ou no histórico do git, `.env` fora do
-  `.gitignore`, debug em produção, dependência vulnerável, permissão do CI e tempo de CI. Cada
-  item só vale para o projeto em que faz sentido, e os de CI só com o tempo medido (CI rápido
-  não ganha sugestão). O que se corrige em configuração entra em lote; o que pede mudança de
+  `.gitignore`, debug em produção, dependência vulnerável, permissão do CI, tempo de CI e execução
+  de CI desperdiçada (o mesmo commit rodando duas vezes, CI inteiro em commit só de documentação,
+  execução superada que segue até o fim). Cada item só vale para o projeto em que faz sentido, e
+  os de CI só com medição: CI rápido não ganha sugestão de tempo, e desperdício só conta a partir
+  de 5 execuções ou 10 minutos somados nas últimas 100. O que se corrige em configuração entra em lote; o que pede mudança de
   código ou troca de chave vai para o relatório.
 - **Seguro de desfazer:** um commit por lote no branch `padrao/arrumar-<data>`, sem push;
   `git revert <hash>` desfaz um lote. O

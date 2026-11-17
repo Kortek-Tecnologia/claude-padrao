@@ -315,8 +315,10 @@ stateDiagram-v2
 | `raw/` | saída bruta dos subagentes |
 
 As **checagens** da trilha B moram em `skills/arrumar/checagens.md`: seis de segurança (`S1`–`S6`)
-e quatro de CI (`C1`–`C4`), cada uma com "Vale quando", o comando que confere, o desvio, a
-gravidade e o destino da correção.
+e sete de CI (`C1`–`C7`), cada uma com "Vale quando", o comando que confere, o desvio, a
+gravidade e o destino da correção. `C1`–`C4` olham o tempo; `C5`–`C7`, a execução que não
+precisava ter rodado (o mesmo commit por `push` e por `pull_request`, commit só de documentação,
+execução superada), contada nas últimas 100 do `gh run list`.
 
 - **No plugin, não no projeto:** não pesa no contexto de quem usa, atualiza com o plugin e não
   tem carimbo. No bloco do `CLAUDE.md` carregaria em toda requisição de todo projeto, e a
@@ -350,8 +352,32 @@ gravidade e o destino da correção.
   `_audit/` nem na resposta, e o `docker build` saiu como `não verificado` (Docker parado). O
   relatório abre com os dois segredos expostos, e o revisor achou um defeito antigo (build sem
   `@types/node`), que ficou em aberto por pedir mudança no lockfile.
-- **Não medido:** `C1`, `C2` e `C4` com tempo de CI real (pede um repositório no GitHub com
-  execuções) e outra stack que não Node. O `revisor` não lê a
+- **`C5`–`C7`, conferidas em projetos reais** (2.10.0; só os comandos da lista, por script, contra
+  as últimas 100 execuções de cinco repositórios — sem sessão do `arrumar`). As práticas vêm do
+  relato de redução de CI do OpenClaw (etapas por evento, pular antes do setup, cancelar a
+  execução superada); os limiares, destas medições:
+
+| Projeto | `C5` duplicada | `C6` só documentação | `C7` superada |
+|---|---|---|---|
+| plugin GLPI (PHP, CI de 17 s, `on: [push, pull_request]`) | 23 execuções · 417 s | 10 · 170 s | 0 |
+| outro plugin GLPI, mesmo workflow | 11 · 166 s | 22 · 364 s | 0 |
+| app Android (Gradle, CI de 12 min 44 s, já com `concurrency`) | 0 | 1 · 764 s | 0 |
+| app Python em runner Windows | 0 | 9 · 720 s | 7 · 436 s |
+| este repositório (o CI valida os diagramas dos `.md`) | 0 | 0 | 0 |
+
+  O limiar (5 execuções ou 10 minutos somados) saiu daí: pega o CI de 17 s que roda em dobro 23
+  vezes e o de 12 minutos que rodou inteiro por um commit que só mexeu no `CLAUDE.md`. No app
+  Python, as 7 superadas eram de `push` no branch principal, disparo que o workflow de hoje não
+  tem mais — daí a regra de contar só evento que o workflow ainda dispara. No app Android, a
+  única execução mediu também a `C1`: testes (462 s) e build dos APKs (248 s) em série num job.
+  Proteção de branch não pôde ser lida (repositório privado em plano sem o recurso: 403), que a
+  `C6` trata como "sem check obrigatório".
+- **Do mesmo relato, de fora:** apagar teste de pouco valor e limitar linhas de teste, desligar o
+  isolamento do Vitest e estreitar fixture (mudam código e teste; o `arrumar` não altera código),
+  trocar de typechecker ou linter (a `C3` não propõe ferramenta que o projeto não tem) e seleção
+  de testes por grafo de dependência próprio (a `C4` já cobre a seleção que o runner sabe fazer).
+- **Não medido:** `C5`–`C7` numa sessão do `arrumar` (o plano e os lotes que saem delas), `C2` e
+  `C4` com tempo de CI real e outra stack que não Node. O `revisor` não lê a
   lista: entra depois de haver uma avaliação dele.
 
 **`atualizar-docs`** — `user-invocable: false`: fora do menu. Quem a dispara é o modelo: o bloco

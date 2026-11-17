@@ -639,7 +639,7 @@ rm -rf "$CASA" "$PROJ"
 # formatos conhecidos, na árvore e no histórico, sem imprimir o valor; prosa não casa.
 CH=skills/arrumar/checagens.md
 itens=$(grep -c '^### [SC][0-9]' "$CH")
-[ "$itens" -ge 10 ] || { echo "divergiu: checagens com $itens itens"; FALHAS=$((FALHAS + 1)); }
+[ "$itens" -ge 13 ] || { echo "divergiu: checagens com $itens itens"; FALHAS=$((FALHAS + 1)); }
 for campo in 'Vale quando' 'Conferir' 'Desvio' 'Gravidade' 'Correção'; do
   n=$(grep -c "^- $campo: " "$CH")
   [ "$n" = "$itens" ] || { echo "divergiu: checagens: campo '$campo' em $n de $itens itens"; FALHAS=$((FALHAS + 1)); }
@@ -668,6 +668,24 @@ case "$his" in *ghp_*) echo "divergiu: checagem S2 imprimiu o valor"; FALHAS=$((
 arv=$(cd "$REPO" && git grep -nIE "$P" | cut -d: -f1,2)
 [ "$arv" = "conf.txt:3" ] || { echo "divergiu: checagem S1 devolveu '$arv'"; FALHAS=$((FALHAS + 1)); }
 rm -rf "$REPO"
+# C5 e C7: os filtros de execução desperdiçada, tirados do arquivo como o padrão de segredo.
+# s1 rodou por push e por pull_request (C5 conta a de push); a 1ª de main terminou com a 2ª já
+# aberta (C7); a cancelada não conta; outro workflow no mesmo commit não é duplicata.
+DUP=$(sed -n "s/^    DUP='\(.*\)'\$/\1/p" "$CH"); SUP=$(sed -n "s/^    SUP='\(.*\)'\$/\1/p" "$CH")
+TEMPO=$(sed -n "s/^    TEMPO='\(.*\)'\$/\1/p" "$CH")
+[ -n "$DUP" ] && [ -n "$SUP" ] && [ -n "$TEMPO" ] || { echo "divergiu: checagens sem os filtros DUP, SUP ou TEMPO"; FALHAS=$((FALHAS + 1)); }
+EXE=$(mktemp)
+ex() { printf '{"workflowName":"%s","event":"%s","headSha":"%s","headBranch":"%s","conclusion":"%s","createdAt":"2026-01-01T%s:00Z","updatedAt":"2026-01-01T%s:00Z"}\n' "$@"; }
+{ ex ci push s1 f success 10:00 10:01; ex ci pull_request s1 f success 10:00 10:02
+  ex ci push s2 main success 11:00 11:05; ex ci push s3 main success 11:02 11:04
+  ex ci push s4 main cancelled 12:00 12:03; ex ci push s5 main success 12:01 12:02
+  ex rel push s2 main success 11:00 11:10; } | jq -s . >"$EXE"
+for par in "C5|$DUP|{\"execucoes\":1,\"segundos\":60}" "C7|$SUP|{\"execucoes\":1,\"segundos\":300}"; do
+  id=${par%%|*}; quer=${par##*|}; filtro=${par#*|}; filtro=${filtro%|*}
+  tem=$(jq -c "$filtro | $TEMPO" "$EXE" 2>&1 | tr -d '\r')
+  [ "$tem" = "$quer" ] || { echo "divergiu: checagem $id devolveu '$tem', esperado '$quer'"; FALHAS=$((FALHAS + 1)); }
+done
+rm -f "$EXE"
 
 # Linha dos subagents como mod: o hooks.json aponta um módulo que existe, e os testes dele
 # passam onde há o Claude Code (o CI não tem: lá fica só a conferência do arquivo).
