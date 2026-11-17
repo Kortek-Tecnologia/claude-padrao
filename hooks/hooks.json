@@ -9,7 +9,7 @@
             "type": "command",
             "shell": "bash",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/conferir-padrao.sh\"",
-            "timeout": 10
+            "timeout": 30
           }
         ]
       }

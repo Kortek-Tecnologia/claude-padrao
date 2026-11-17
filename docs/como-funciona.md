@@ -27,7 +27,7 @@ flowchart LR
 
 | Caminho | Papel |
 |---|---|
-| `hooks/hooks.json` | liga os quatro hooks; todos com `shell: bash` e timeout de 10 s (a trava de leitura, 30 s); as duas travas com `onFailure: "block"` (falhou, bloqueia), o lembrete da documentação com `onFailure: "continue"` (falhou, o commit segue — por extenso, porque no Code Mode o hook que falha sem a chave recusa a chamada) |
+| `hooks/hooks.json` | liga os quatro hooks; todos com `shell: bash` e timeout de 10 s (a trava de leitura e o hook de abertura, 30 s); as duas travas com `onFailure: "block"` (falhou, bloqueia), o lembrete da documentação com `onFailure: "continue"` (falhou, o commit segue — por extenso, porque no Code Mode o hook que falha sem a chave recusa a chamada) |
 | `skills/aplicar/modelos/` | **fonte única** do padrão: o `aplicar` grava a partir dela e o hook de abertura compara com ela |
 | `scripts/py.sh` | acha `python3`, `python` ou `py` 3.9+ (no Windows o `python3` costuma ser o atalho quebrado da Store) e roda com `-I` |
 | `agents/*.md` | os quatro agentes; os que só leem têm `tools` fechado e `disallowedTools` |
@@ -38,7 +38,8 @@ flowchart LR
 
 ## Hook de abertura — `conferir-padrao.sh`
 
-Roda a cada `startup` e `resume`, e a primeira resposta espera por ele (~1 s). **Só avisa**: o
+Roda a cada `startup` e `resume`, e a primeira resposta espera por ele (menos de 1 s; a medição
+está no fim desta seção). **Só avisa**: o
 que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), apontando o
 `/padrao:aplicar`. Sem `jq`, fica calado.
 
@@ -53,6 +54,28 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 | `~/.claude.json` e `~/.claude/projects/<chave>/memory` | sem MCP de escopo user nem local deste projeto; sem memória deste projeto |
 | versão instalada × `~/.claude/plugins/marketplaces/claude-padrao` | por **diferença**, não por ordem: a numeração recomeçou em 1.0.0 |
 | carimbo `modelo X` do bloco do `CLAUDE.md` e dos `docs/agente/padrao-*.md` do projeto | o da 1ª linha do arquivo em `modelos/`; só o carimbo, não o texto — quem grava no projeto é o Claude, e espaço ou CRLF dariam aviso falso. A marca vale só no começo da linha (prosa que cita o marcador não conta), e carimbo mais novo que o do plugin manda atualizar o plugin, não rodar o `aplicar` |
+
+**Custo.** No Windows abrir um processo custa de 100 a 800 ms, e até a 2.7.1 o hook abria uns 45
+(`cat` de cada settings, `sed` de cada carimbo, `ls` de cada pasta). Desde a 2.7.2 os arquivos
+são lidos com o `read` do shell, as pastas conferidas por glob e o carimbo tirado sem `sed`:
+sobram dois `jq`, um `cmp` e, quando há aviso, o `jq` que monta a saída. Medido lado a lado,
+cinco vezes cada, em 2026-11-17, neste repositório (20 avisos):
+
+| | 2.7.1 | 2.7.2 |
+|---|---|---|
+| hook de abertura | 2,2 a 3,0 s | 0,74 a 0,93 s |
+| lembrete da documentação, num `git status` da sessão principal | 0,17 a 0,23 s | 0,11 a 0,22 s |
+
+- **Mesma saída:** a suíte rodou numa cópia em que o hook era um comparador (versão antiga e
+  nova no mesmo cenário): seis cenários do `testar.sh` e este repositório, saída idêntica byte
+  a byte.
+- **Uma mudança de propósito:** a chave do projeto em `~/.claude/projects` passou a sair do `jq`,
+  caractere a caractere, como no `medir` e no `inventariar`. O `sed` de antes trocava byte a
+  byte, e num caminho com acento dava uma chave diferente da dos scripts Python.
+- **Timeout de 30 s** (era 10): com a máquina carregada a versão antiga chegava perto do limite.
+- **Duas armadilhas do `read`:** a variável do laço não pode ser `_` (no shell ela vale o último
+  argumento do comando anterior e nunca fica vazia: o laço não termina), e o `jq` do Windows
+  termina cada linha em CRLF — o CR sai do fim de cada aviso, sem abrir `tr`.
 
 ## Linha dos subagents — `hooks/register.ts` (mod) e `settings.json` (reserva)
 
@@ -147,7 +170,7 @@ flowchart TD
 - **Matcher** (`hooks.json`): Bash, PowerShell, `mcp__*` e as embutidas que executam, gravam ou
   falam com fora (Monitor, Workflow, CronCreate/Delete, RemoteTrigger, Enter/ExitWorktree,
   SendMessage, SendToProject*, PushNotification, TaskStop). Ferramenta nova desse tipo entra
-  ali. Não é `*` de propósito: cada chamada custa ~90 ms no Windows.
+  ali. Não é `*` de propósito: cada chamada abre um `sh`, e no Windows isso custa de 100 a 800 ms.
 - **Lista de leitura** (`so-le.awk`): `cat grep head tail wc ls stat diff cmp echo printf jq test
   readlink realpath basename dirname cd pwd cut tr column nl`, mais estes com checagem:
 

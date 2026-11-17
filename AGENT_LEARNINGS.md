@@ -82,6 +82,11 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 - Evitar: editar vários arquivos por script passado em heredoc ou em `-c` pelo Git Bash.
 - Fazer: gravar o script num arquivo do scratchpad e rodar `python -I arquivo.py`; substituição exata que confere a contagem (`s.count(antigo) == 1`) antes de gravar, para falhar sem deixar arquivo pela metade.
 
+### Script de shell conferido só com `sh -n` (2026-11-17)
+- Erro: reescrevi o hook de abertura, conferi a sintaxe com `sh -n` e pus a suíte para rodar em segundo plano; um laço `while read -r _ || [ -n "$_" ]` não terminava (`$_` nunca fica vazia) e a rodada ficou travada até o usuário perguntar.
+- Evitar: mandar para segundo plano, sem limite de tempo, um script de shell que só passou pela checagem de sintaxe.
+- Fazer: rodar o script uma vez à mão com `timeout 60` e comparar a saída com a da versão anterior antes da rodada longa; todo comando de segundo plano que chama código novo leva `timeout`.
+
 ### Tempo de hook medido uma vez só (2026-11-17)
 - Erro: medi a trava de leitura em 4 a 6 s por comando com a máquina carregada e, horas depois, a mesma versão levava 1,3 a 1,6 s; quatro sessões pagas em paralelo estouraram os 10 s do hook em 5 de 12.
 - Evitar: concluir sobre o tempo de um hook por uma medição, ou comparar medições de horas diferentes (no Windows abrir um processo varia de 100 a 800 ms).

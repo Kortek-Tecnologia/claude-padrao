@@ -32,6 +32,8 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
   obrigatório: sem ele a trava fecha os agentes que só leem e a conferência do padrão se cala —
   mantenha esse comportamento (falhar fechado). O lembrete da documentação é o contrário de
   propósito: falha aberto, porque commit preso é pior que doc velha.
+- Hook roda em toda chamada, e no Windows abrir um processo custa de 100 a 800 ms: leia a
+  entrada com o `read` do shell e não abra `cat`, `sed` ou `ls` onde um `case` ou um glob resolve.
 - Python só biblioteca padrão, 3.9+, sempre via `scripts/py.sh`.
 - TypeScript só no mod (`hooks/register.ts`): sem dependência, sem Node nem DOM — tudo de fora vem pelo `$`. A API é de acesso antecipado: confira com `claude plugin validate .` e `claude plugin test .` a cada versão do Claude Code.
   A linha do mod e a do `subagent-statusline.py` têm de dizer o mesmo.

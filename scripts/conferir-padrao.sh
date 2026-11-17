@@ -49,20 +49,40 @@
 #
 # Achou algo: avisa o usuário (systemMessage) e o Claude (additionalContext),
 # apontando o /padrao:aplicar. Sem jq: silêncio.
-cat >/dev/null
+#
+# Custo: a 1ª resposta da sessão espera por este hook, e no Windows abrir um
+# processo custa de 100 a 800 ms. Por isso os arquivos são lidos com o `read`
+# do shell, as pastas conferidas por glob e o carimbo tirado sem sed: sobram
+# dois jq, um cmp e, quando há o que avisar, o jq que monta a saída.
+# (a variável não pode ser `_`: no shell ela vale o último argumento do comando
+# anterior, nunca fica vazia, e o laço não terminaria)
+while IFS= read -r linha || [ -n "$linha" ]; do :; done
 command -v jq >/dev/null 2>&1 || exit 0
-raiz=${CLAUDE_PROJECT_DIR:-$(pwd)}
-plugin="$(dirname "$0")/.."
+raiz=${CLAUDE_PROJECT_DIR:-$PWD}
+case "$0" in */*) plugin="${0%/*}/.." ;; *) plugin=.. ;; esac
 g="$HOME/.claude"
-le() { cat "$1" 2>/dev/null; }
+nl='
+'
+# ler ARQUIVO: o conteúdo em $LIDO (vazio se não der para ler), sem abrir processo.
+ler() {
+  LIDO=
+  [ -r "$1" ] || return 0
+  while IFS= read -r linha || [ -n "$linha" ]; do LIDO="$LIDO$linha$nl"; done <"$1"
+}
+ler "$raiz/.claude/settings.json"; t_proj=$LIDO
+ler "$raiz/.claude/settings.local.json"; t_local=$LIDO
+ler "$plugin/skills/aplicar/modelos/settings.json"; t_mod=$LIDO
+ler "$g/settings.json"; t_glob=$LIDO
+ler "$plugin/.claude-plugin/plugin.json"; t_inst=$LIDO
+ler "$g/plugins/marketplaces/claude-padrao/.claude-plugin/plugin.json"; t_pub=$LIDO
 
-achados=$(jq -rn \
-  --arg proj "$(le "$raiz/.claude/settings.json")" \
-  --arg local "$(le "$raiz/.claude/settings.local.json")" \
-  --arg mod "$(le "$plugin/skills/aplicar/modelos/settings.json")" \
-  --arg glob "$(le "$g/settings.json")" \
-  --arg inst "$(le "$plugin/.claude-plugin/plugin.json")" \
-  --arg pub "$(le "$g/plugins/marketplaces/claude-padrao/.claude-plugin/plugin.json")" '
+# A 1ª linha da saída é a chave do projeto em ~/.claude/projects (todo caractere
+# não alfanumérico do caminho vira "-"), seguida de "|"; as demais, os achados.
+# As duas variáveis desligam, só nesta chamada, a conversão de caminho do Git
+# Bash: sem elas um $raiz como /tmp/x chegaria ao jq do Windows já trocado.
+saida=$(MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' jq -rn --arg raiz "$raiz" \
+  --arg proj "$t_proj" --arg local "$t_local" --arg mod "$t_mod" \
+  --arg glob "$t_glob" --arg inst "$t_inst" --arg pub "$t_pub" '
   def obj: (try fromjson catch null) | if type == "object" then . else null end;
   # modelSettings que só guarda effort por modelo (o que o /effort grava)
   def so_effort: type == "object"
@@ -70,7 +90,8 @@ achados=$(jq -rn \
   # `env` do global: fora a variável do Code Mode, cada nome é chave fora do padrão
   def env_fora: if type == "object"
     then keys - ["CLAUDE_CODE_EXPERIMENTAL_CODE_MODE"] | map("env." + .) else ["env"] end;
-  ($proj | obj) as $P | ($local | obj) as $L | ($mod | obj) as $M | ($glob | obj) as $G
+  (($raiz | gsub("[^A-Za-z0-9]"; "-")) + "|"),
+  (($proj | obj) as $P | ($local | obj) as $L | ($mod | obj) as $M | ($glob | obj) as $G
   | (($inst | obj) // {} | .version // "") as $vi
   | (($pub | obj) // {} | .version // "") as $vp
   # as chaves que o padrão fixa: [nome no aviso, caminho]
@@ -119,7 +140,30 @@ achados=$(jq -rn \
       + (($G.permissions // {}) | keys - ["defaultMode"] | map("permissions." + .))
     | select(length > 0) | "~/.claude/settings.json tem chaves fora do padrao: \(join(", "))")
   else empty end)
-  ' 2>/dev/null | sed '/^$/d; s/^/- /')
+  | "- " + .)
+  ' 2>/dev/null)
+case "$saida" in
+  *"|"*)
+    chave_projeto=${saida%%|*}
+    case "$saida" in *"$nl"*) bruto=${saida#*"$nl"} ;; *) bruto= ;; esac
+    # O jq do Windows termina a linha em CRLF: o que sobra da 1ª linha depois do
+    # "|" é esse CR (ou nada, no Linux), e ele sai do fim de cada achado.
+    cr=${saida#*|}; cr=${cr%%"$nl"*}
+    achados=
+    if [ -n "$bruto" ]; then
+      while IFS= read -r linha || [ -n "$linha" ]; do
+        [ -n "$cr" ] && linha=${linha%"$cr"}
+        [ -n "$linha" ] && achados="${achados:+$achados$nl}$linha"
+      done <<EOF
+$bruto
+EOF
+    fi
+    ;;
+  *) # o jq falhou: sem os achados dele, mas as conferências de pasta seguem
+    achados=
+    chave_projeto=$(printf '%s' "$raiz" | sed 's/[^A-Za-z0-9]/-/g')
+    ;;
+esac
 
 anota() { achados="${achados:+$achados
 }- $1"; }
@@ -133,7 +177,21 @@ fi
 # carimbo ARQUIVO MARCA: o X de `modelo X` na 1ª linha do arquivo que casa com a
 # marca. A marca vem ancorada no começo da linha: prosa do projeto que cite o
 # marcador ("o bloco fica entre <!-- padrao:inicio e ...") não pode valer por ele.
-carimbo() { sed -n "/$2/{s/.*modelo \([0-9][0-9.]*\).*/\1/p;q;}" "$1" 2>/dev/null; }
+# O resultado sai em $CARIMBO, pelo `read` do shell: a 1ª linha que começa pela
+# marca e, nela, o que segue o último `modelo ` que vem antes de um dígito.
+carimbo() {
+  CARIMBO=
+  [ -r "$1" ] || return 0
+  while IFS= read -r linha || [ -n "$linha" ]; do
+    case "$linha" in "$2"*) ;; *) continue ;; esac
+    resto=$linha
+    while :; do
+      case "$resto" in *"modelo "*) resto=${resto#*modelo } ;; *) break ;; esac
+      case "$resto" in [0-9]*) CARIMBO=${resto%%[!0-9.]*} ;; esac
+    done
+    return 0
+  done <"$1"
+}
 # maior A B: a versão A é maior que a B (campo a campo, numérico)
 maior() {
   awk -v a="$1" -v b="$2" 'BEGIN {
@@ -145,9 +203,9 @@ maior() {
     exit 1 }'
 }
 em_dia() { # em_dia MODELO ARQUIVO_DO_PROJETO MARCA NOME_NO_AVISO
-  quer=$(carimbo "$plugin/skills/aplicar/modelos/$1" "$3")
+  carimbo "$plugin/skills/aplicar/modelos/$1" "$3"; quer=$CARIMBO
   [ -n "$quer" ] || return 0
-  tem=$(carimbo "$raiz/$2" "$3")
+  carimbo "$raiz/$2" "$3"; tem=$CARIMBO
   [ "$tem" = "$quer" ] && return 0
   # Carimbo do projeto mais novo: um colega aplicou com o plugin já atualizado e
   # esta sessão ainda roda o antigo — rodar o aplicar aqui rebaixaria o texto.
@@ -157,19 +215,33 @@ em_dia() { # em_dia MODELO ARQUIVO_DO_PROJETO MARCA NOME_NO_AVISO
     anota "$4 ausente ou de outro modelo do padrao (tem '${tem:-nenhum}', o plugin traz '$quer')"
   fi
 }
-em_dia claude-md.md CLAUDE.md '^<!-- padrao:inicio' "bloco do padrao no CLAUDE.md"
+em_dia claude-md.md CLAUDE.md '<!-- padrao:inicio' "bloco do padrao no CLAUDE.md"
 for doc in padrao-modelos.md padrao-configuracao.md; do
-  em_dia "agente/$doc" "docs/agente/$doc" '^<!-- gerado pelo plugin padrao' "docs/agente/$doc"
+  em_dia "agente/$doc" "docs/agente/$doc" '<!-- gerado pelo plugin padrao' "docs/agente/$doc"
 done
 
+# tem_algo CAMINHO: arquivo que existe, ou pasta com alguma entrada (ocultas
+# também) — o `ls -A` não vazio, por glob, sem abrir processo.
+tem_algo() {
+  [ -d "$1" ] || { [ -e "$1" ]; return; }
+  for entrada in "$1"/* "$1"/.[!.]* "$1"/..?*; do
+    if [ -e "$entrada" ] || [ -L "$entrada" ]; then return 0; fi
+  done
+  return 1
+}
 for item in CLAUDE.md agents commands output-styles rules workflows; do
-  [ -e "$g/$item" ] && [ -n "$(ls -A "$g/$item" 2>/dev/null)" ] && anota "~/.claude/$item existe"
+  tem_algo "$g/$item" && anota "~/.claude/$item existe"
 done
 # synced/ e as pastas ocultas (a .trash, lixeira do sync do claude.ai) sao estado do app
-[ -n "$(ls -A "$g/skills" 2>/dev/null | grep -v -e '^synced$' -e '^\.')" ] && anota "~/.claude/skills tem skills pessoais"
+for entrada in "$g/skills"/*; do
+  if [ -e "$entrada" ] || [ -L "$entrada" ]; then
+    [ "${entrada##*/}" = synced ] && continue
+    anota "~/.claude/skills tem skills pessoais"
+    break
+  fi
+done
 
-chave_projeto=$(printf '%s' "$raiz" | sed 's/[^A-Za-z0-9]/-/g')
-[ -n "$(ls -A "$g/projects/$chave_projeto/memory" 2>/dev/null)" ] &&
+tem_algo "$g/projects/$chave_projeto/memory" &&
   anota "memoria deste projeto em ~/.claude/projects/$chave_projeto/memory"
 
 if [ -r "$HOME/.claude.json" ]; then

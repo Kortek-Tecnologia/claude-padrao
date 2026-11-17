@@ -27,8 +27,12 @@
 # anotar, o hook se cala e o commit segue. No hooks.json ele leva
 # `onFailure: "continue"`: no Code Mode, hook que falha ou estoura o tempo sem
 # essa chave recusa a chamada.
-entrada=$(cat)
-# Roda em todo `git …` do Bash: sai sem abrir jq quando não é commit nem a skill.
+# Roda em todo `git …` do Bash: lê a entrada com o `read` do shell e sai sem abrir
+# processo nenhum quando não é commit nem a skill (no Windows cada um pesa).
+nl='
+'
+entrada=
+while IFS= read -r linha || [ -n "$linha" ]; do entrada="$entrada$linha$nl"; done
 case "$entrada" in *commit* | *atualizar-docs*) ;; *) exit 0 ;; esac
 command -v jq >/dev/null 2>&1 || exit 0
 
