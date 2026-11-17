@@ -570,6 +570,39 @@ done
 case "$med" in *"sem preço"*) echo "divergiu: medir-modelos (vazio) listou modelo sem preço"; FALHAS=$((FALHAS + 1)) ;; esac
 rm -rf "$CASA" "$PROJ"
 
+# Checagens do arrumar: todo item traz os cinco campos, e o padrão de segredo casa token nos
+# formatos conhecidos, na árvore e no histórico, sem imprimir o valor; prosa não casa.
+CH=skills/arrumar/checagens.md
+itens=$(grep -c '^### [SC][0-9]' "$CH")
+[ "$itens" -ge 10 ] || { echo "divergiu: checagens com $itens itens"; FALHAS=$((FALHAS + 1)); }
+for campo in 'Vale quando' 'Conferir' 'Desvio' 'Gravidade' 'Correção'; do
+  n=$(grep -c "^- $campo: " "$CH")
+  [ "$n" = "$itens" ] || { echo "divergiu: checagens: campo '$campo' em $n de $itens itens"; FALHAS=$((FALHAS + 1)); }
+done
+P=$(sed -n "s/^    P='\(.*\)'\$/\1/p" "$CH")
+[ -n "$P" ] || { echo "divergiu: checagens sem o padrao de segredo"; FALHAS=$((FALHAS + 1)); }
+# os tokens são montados aqui, para este arquivo não casar com o próprio padrão
+z=$(printf '%040d' 0)
+for tok in "sk-ant-$z" "ghp_$z" "github_pat_$z" "AKIA$(printf '%016d' 0)" "xoxb-$z" "-----BEGIN RSA PRIVATE"" KEY-----"; do
+  printf '%s\n' "x = $tok" | grep -Eq "$P" || { echo "divergiu: padrao de segredo nao casou ${tok%%0*}"; FALHAS=$((FALHAS + 1)); }
+done
+printf '%s\n' 'GITHUB_TOKEN vem do ambiente; ghp_curto; a chave privada fica fora do git' | grep -Eq "$P" \
+  && { echo "divergiu: padrao de segredo casou prosa"; FALHAS=$((FALHAS + 1)); }
+REPO=$(mktemp -d)
+(
+  cd "$REPO" && git init -q . && git config user.email t@t && git config user.name t &&
+  printf 'limpo\n\nTOKEN=%s\n' "ghp_$z" >conf.txt && git add conf.txt && git commit -qm um &&
+  printf 'limpo\n' >conf.txt && git commit -qam dois
+) >/dev/null 2>&1
+arv=$(cd "$REPO" && git grep -nIE "$P" | cut -d: -f1,2)
+his=$(cd "$REPO" && git log --all -G "$P" --format='%h' --name-only | tr -d '\r')
+[ -z "$arv" ] || { echo "divergiu: checagem S1 achou segredo ja removido: $arv"; FALHAS=$((FALHAS + 1)); }
+[ "$(printf '%s\n' "$his" | grep -c '^conf.txt$')" = 2 ] || { echo "divergiu: checagem S2 nao achou os dois commits: $his"; FALHAS=$((FALHAS + 1)); }
+case "$his" in *ghp_*) echo "divergiu: checagem S2 imprimiu o valor"; FALHAS=$((FALHAS + 1)) ;; esac
+(cd "$REPO" && git checkout -q HEAD~1) >/dev/null 2>&1
+arv=$(cd "$REPO" && git grep -nIE "$P" | cut -d: -f1,2)
+[ "$arv" = "conf.txt:3" ] || { echo "divergiu: checagem S1 devolveu '$arv'"; FALHAS=$((FALHAS + 1)); }
+rm -rf "$REPO"
 
 if [ "$FALHAS" -eq 0 ]; then
   echo "hooks: todas as decisoes conferem"

@@ -120,6 +120,12 @@ flowchart TD
 - **O que muda:** documentação, `CLAUDE.md` (o que não vale em toda sessão vai para
   `docs/agente/<tema>.md`, apontado por um índice) e infraestrutura. Código, só comentário e
   docstring; regra documentada que o código contraria fica, e o código vai para o relatório.
+- **Segurança e CI, só com evidência:** a trilha de infraestrutura confere uma lista fechada
+  (`skills/arrumar/checagens.md`): segredo versionado ou no histórico do git, `.env` fora do
+  `.gitignore`, debug em produção, dependência vulnerável, permissão do CI e tempo de CI. Cada
+  item só vale para o projeto em que faz sentido, e os de CI só com o tempo medido (CI rápido
+  não ganha sugestão). O que se corrige em configuração entra em lote; o que pede mudança de
+  código ou troca de chave vai para o relatório.
 - **Seguro de desfazer:** um commit por lote no branch `padrao/arrumar-<data>`, sem push;
   `git revert <hash>` desfaz um lote. O
   rascunho fica em `_audit/` (fora do git) e, se a execução parar, rodar de novo retoma.
@@ -362,7 +368,7 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc
 scripts/          os hooks em sh, py.sh, opcional.py e testar.sh
 agents/           coletor, leitor, revisor, executor
-skills/           aplicar (+ inventário e modelos), arrumar, medir, code-mode, advisor, atualizar-docs
+skills/           aplicar (+ inventário e modelos), arrumar (+ checagens), medir, code-mode, advisor, atualizar-docs
 statusline/       status line principal e dos subagents
 settings.json     a única setting que o plugin traz: a linha dos subagents
 docs/             como funciona por dentro

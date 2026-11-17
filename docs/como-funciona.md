@@ -238,6 +238,36 @@ stateDiagram-v2
 | `PLANO.md` | lotes com verificação checável, decisões assumidas, `<!-- APROVADO … -->` e a situação de cada lote |
 | `raw/` | saída bruta dos subagentes |
 
+As **checagens** da trilha B moram em `skills/arrumar/checagens.md`: seis de segurança (`S1`–`S6`)
+e quatro de CI (`C1`–`C4`), cada uma com "Vale quando", o comando que confere, o desvio, a
+gravidade e o destino da correção.
+
+- **No plugin, não no projeto:** não pesa no contexto de quem usa, atualiza com o plugin e não
+  tem carimbo. No bloco do `CLAUDE.md` carregaria em toda requisição de todo projeto, e a
+  maioria dos itens não vale para a maioria deles.
+- **"Vale quando" e evidência** seguram o falso positivo: os itens de CI pedem tempo medido pelo
+  `gh` (um CI de 18 s, como o deste repositório, não gera desvio), e auditoria de dependência só
+  roda com a ferramenta já instalada.
+- **Correção `infra`, `código` ou `usuário`:** só a primeira entra em lote. O `arrumar` não altera
+  código, e segredo exposto se resolve revogando a chave — vai no topo do relatório.
+- **Os comandos de segredo não imprimem o valor** (`cut -d: -f1,2`, `--name-only`). O padrão `P`
+  cobre formatos comuns de token; não é scanner de entropia.
+- **Medido em sessão real** (v2.1.326, Windows, `claude -p "/padrao:arrumar só infra"` com HOME
+  falso, uma rodada por projeto; para no plano, por não ter como perguntar):
+
+| Projeto | Resultado | Tempo | US$ |
+|---|---|---|---|
+| API Node com sete desvios plantados | os sete achados (`S1`–`S6`, `C3`), com `arquivo:linha` ou commit | 165 s | 0,74 |
+| a mesma API, limpa | nenhum desvio das checagens | 190 s | 0,82 |
+
+  Nos dois, `C1`, `C2` e `C4` saíram `não verificável` (sem remote, o `gh` não tem o que
+  medir) e não viraram desvio; os tokens falsos não foram parar em `_audit/` nem na resposta; e
+  o plano pôs em lote só o que é `infra` — token no código, chave no histórico e dependência
+  vulnerável ficaram de fora e abriram o relatório.
+- **Não medido:** `C1`, `C2` e `C4` com tempo de CI real (pede um repositório no GitHub com
+  execuções), a fase 3 em cima desses lotes e outra stack que não Node. O `revisor` não lê a
+  lista: entra depois de haver uma avaliação dele.
+
 **`atualizar-docs`** — `user-invocable: false`: fora do menu. Quem a dispara é o modelo: o bloco
 do `CLAUDE.md` manda chamá-la antes de todo commit, e o `cobrar-docs.sh` cobra na hora do
 `git commit` (só a linha do bloco, no uso real, cobria cerca de 4% dos commits).
@@ -399,6 +429,8 @@ modelos não mudou e o Code Mode segue opcional.
   trocado), o inventário (não imprime valor do `env`) e as contas do `medir`
   (inclusive custo, faixas de contexto, Haiku acima de 100K, consulta ao advisor e período sem
   requisição);
+- as checagens do `arrumar`: todo item com os cinco campos, e o padrão de segredo casando token
+  nos formatos conhecidos (na árvore e no histórico, sem imprimir o valor) e não casando prosa;
 - os opcionais: ligar, desligar e estado do `opcional.py` com HOME e projeto falsos (o resto do
   settings, a indentação e o CRLF preservados; JSON inválido intocado; o home recusado), a
   variável do Code Mode calada no hook de abertura e o `onFailure` de cada hook no `hooks.json`.

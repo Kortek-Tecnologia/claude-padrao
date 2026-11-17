@@ -118,6 +118,11 @@ build/deploy/rollback, observabilidade. Para cada item: **Situação** (o que ex
 desvio. O que o repositório não mostra (VPS, DNS, segredos em runtime, runner) é
 `não verificável`, nunca inferência.
 
+**Checagens.** Depois do levantamento, confira você a lista de `checagens.md`, ao lado deste
+arquivo: segurança (segredo versionado ou no histórico, debug em produção, dependência
+vulnerável, permissão do CI) e tempo de CI. Só o item cujo "Vale quando" bate, só com evidência,
+e os de CI só com o tempo medido. Cada desvio entra no `INFRA.md` com o id da checagem.
+
 ### Trilha C — o que a documentação diz → `CONFRONTO.md`
 
 Confronte `SISTEMA.md` e `INFRA.md` com `CLAUDE.md`, `AGENTS.md`, `.claude/rules/`, `docs/`, os
@@ -157,7 +162,8 @@ positiva também é achado: reduzir para o que fazer.
 ### PENDENCIAS.md
 
 Colunas: id, tipo, severidade, arquivos, evidência, status.
-- id `DOC-001` (trilha C) ou `INF-001` (trilha B, tipo `Desvio`);
+- id `DOC-001` (trilha C) ou `INF-001` (trilha B, tipo `Desvio`; o que veio de `checagens.md`
+  traz o id da checagem na evidência e a gravidade dela);
 - severidade: **alta** — leva agente ou pessoa a executar algo errado (build, deploy, comando,
   contrato de API); **média** — retrabalho ou decisão com base incompleta; **baixa** —
   incompleto ou cosmético;
@@ -187,8 +193,8 @@ Colunas: id, tipo, severidade, arquivos, evidência, status.
    - risco: o que quebra ou se perde;
    - depende de; e `Situação: pendente`.
 4. **Fica de fora**: ids que dependem de decisão sem resposta recomendável, os
-   `não verificável` e os de arquivos com alteração sem commit (o commit do lote misturaria o
-   trabalho do usuário).
+   `não verificável`, os de arquivos com alteração sem commit (o commit do lote misturaria o
+   trabalho do usuário) e os desvios de `checagens.md` com correção `código` ou `usuário`.
 5. **Critérios de sucesso**: métricas verificáveis para o fim (ex.: carga fixa ≤ 150 linhas,
    nenhuma Divergência alta aberta, todo `docs/agente/*.md` no índice).
 6. **Execução**: branch `padrao/arrumar-<AAAA-MM-DD>`, um commit por lote, sem push.
@@ -261,6 +267,8 @@ de segredos. Algo quebrado → um lote final de correção, pelo mesmo ciclo.
 - Carga fixa antes → depois.
 - Decisões tomadas sozinho (respostas recomendadas, perguntas do executor): o usuário pode
   querer desfazer.
+- Segredo exposto (checagens S1 e S2), se houver, antes de tudo: arquivo ou commit, nunca o
+  valor, e o que só o usuário faz — revogar e trocar a chave.
 - O que ficou: o "Fica de fora", os ids abertos e o que os destrava; código que diverge de
   regra documentada; entradas de `AGENT_LEARNINGS.md` que ficaram falsas.
 - Como revisar e desfazer: `git log --oneline <origem>..padrao/arrumar-<data>`,
