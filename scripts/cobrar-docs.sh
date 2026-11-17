@@ -59,8 +59,9 @@ fi
 case "$ferramenta" in Bash | PowerShell) ;; *) exit 0 ;; esac
 
 cmd=$(printf '%s' "$entrada" | jq -r '.tool_input.command // ""' 2>/dev/null | tr -d '\r')
-lib="$(dirname "$0")/segmentos.sh"
-[ -r "$lib" ] || exit 0
+case "$0" in */*) SEGMENTOS_DIR=${0%/*} ;; *) SEGMENTOS_DIR=. ;; esac
+lib="$SEGMENTOS_DIR/segmentos.sh"
+[ -r "$lib" ] && [ -r "$SEGMENTOS_DIR/segmentos.awk" ] || exit 0
 # shellcheck source=segmentos.sh
 . "$lib"
 # Segmento que é um commit: atribuições (`X=1`, `X="a b"`) e palavras do shell

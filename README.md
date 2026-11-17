@@ -347,8 +347,7 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 ## Segurança e limites
 
 - **Trava de leitura, fechada por padrão.** Cada segmento do comando precisa começar por um
-  leitor conhecido e não gravar; sed e awk só com `--sandbox`. No Windows com antivírus pesado
-  ela pode levar segundos por comando; se passar de 30 s, o agente fica sem Bash naquela chamada. Se o próprio hook falhar, a
+  leitor conhecido e não gravar; sed e awk só com `--sandbox`. Se o próprio hook falhar, a
   chamada é bloqueada. Fica um caso: entrar (`cd`, `git -C`) num repositório bare versionado com
   config hostil — `git config --global safe.bareRepository explicit` fecha.
 - **Lembrete da documentação, aberto por padrão.** É lembrete na hora certa, não trava: recusa o
@@ -368,7 +367,7 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 ```
 .claude-plugin/   manifesto do plugin e do marketplace (version: semver)
 hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc
-scripts/          os hooks em sh, py.sh, opcional.py e testar.sh
+scripts/          os hooks em sh (a regra da trava de leitura em awk), py.sh, opcional.py e testar.sh
 agents/           coletor, leitor, revisor, executor
 skills/           aplicar (+ inventário e modelos), arrumar (+ checagens), medir, code-mode, advisor, atualizar-docs
 statusline/       status line principal e dos subagents
@@ -383,7 +382,7 @@ bash scripts/testar.sh
 claude plugin validate .
 ```
 
-O CI roda o `testar.sh` no Ubuntu e no Windows (este ainda em observação: não reprova o push) e
+O CI roda o `testar.sh` no Ubuntu e no Windows e
 valida os diagramas Mermaid a cada push. Publicar: suba a `version` em
 `.claude-plugin/plugin.json` — o aviso de versão nova compara com ela — e dê push. Mudou um
 modelo que vai para o projeto (`skills/aplicar/modelos/`): suba também o carimbo dele. Detalhes,

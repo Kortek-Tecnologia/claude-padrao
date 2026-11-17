@@ -287,3 +287,177 @@ CASOS = [
         ],
     },
 ]
+# ---------------------------------------------------------------------------
+# Casos difíceis: o defeito não está na linha que o diff mostra de cara. O
+# gabarito pode aceitar mais de um lugar ("gabaritos": [(arquivo, trecho), ...]
+# e "frase"): citar qualquer um deles conta.
+TIPOS = [
+    ("loja/pedidos.py", "def subtotal(pedido):\n",
+     "def subtotal(pedido: Pedido) -> Decimal:\n    \"\"\"Soma de preço × quantidade dos itens.\"\"\"\n"),
+    ("loja/pedidos.py", "def total(pedido):\n",
+     "def total(pedido: Pedido) -> Decimal:\n    \"\"\"Subtotal menos o desconto do cupom, com dois decimais.\"\"\"\n"),
+    ("loja/pedidos.py", "def pode_ver(usuario, pedido):\n",
+     "def pode_ver(usuario: Usuario, pedido: Pedido) -> bool:\n"),
+    ("loja/estoque.py", "    def __init__(self, saldos):\n",
+     "    def __init__(self, saldos: dict[str, int]) -> None:\n"),
+    ("loja/estoque.py", "    def saldo(self, sku):\n", "    def saldo(self, sku: str) -> int:\n"),
+    ("loja/estoque.py", "    def reservar(self, sku, quantidade):\n",
+     "    def reservar(self, sku: str, quantidade: int) -> None:\n"),
+    ("loja/estoque.py", "    def devolver(self, sku, quantidade):\n",
+     "    def devolver(self, sku: str, quantidade: int) -> None:\n"),
+    ("loja/repositorio.py", "    def criar_tabelas(self):\n", "    def criar_tabelas(self) -> None:\n"),
+    ("loja/repositorio.py", "    def salvar(self, pedido_id, dono, total):\n",
+     "    def salvar(self, pedido_id: int, dono: str, total) -> None:\n"),
+    ("loja/repositorio.py", "    def por_dono(self, dono):\n", "    def por_dono(self, dono: str) -> list:\n"),
+    ("loja/repositorio.py", "    def pagina(self, pagina, por_pagina=20):\n",
+     "    def pagina(self, pagina: int, por_pagina: int = 20) -> list:\n"),
+    ("loja/pagamento.py", "def cobrar(gateway, pedido_id, valor):\n",
+     "def cobrar(gateway, pedido_id: int, valor) -> str:\n"),
+    ("loja/checkout.py", "def fechar(pedido, estoque, gateway, repo):\n",
+     "def fechar(pedido: Pedido, estoque: Estoque, gateway, repo) -> str:\n"),
+    ("loja/checkout.py", "from loja.estoque import EstoqueInsuficiente\n",
+     "from loja.estoque import Estoque, EstoqueInsuficiente\n"),
+    ("loja/checkout.py", "from loja.pedidos import total\n", "from loja.pedidos import Pedido, total\n"),
+]
+FICHA_TIPOS = ("Anotações de tipo e docstrings nas funções e métodos de loja/. Nenhuma mudança de "
+               "comportamento. " + VERIFICACAO)
+
+CASOS += [
+    {
+        # o defeito mora num arquivo que o diff NÃO toca: quem chama total()
+        "id": "d1-quem-chama",
+        "tipo": "bug",
+        "ficha": "total(pedido) passa a devolver o par (total, desconto aplicado), para a tela mostrar o "
+                 "desconto. Testes de total atualizados. " + VERIFICACAO,
+        "ops": [
+            ("troca", "loja/pedidos.py",
+             "    return (bruto * (1 - desconto)).quantize(Decimal(\"0.01\"))\n",
+             "    return (bruto * (1 - desconto)).quantize(Decimal(\"0.01\")), desconto\n"),
+            ("troca", "tests/test_loja.py",
+             "        self.assertEqual(total(pedido_de(cupom=\"BEMVINDO10\")), Decimal(\"22.50\"))\n",
+             "        self.assertEqual(total(pedido_de(cupom=\"BEMVINDO10\")), (Decimal(\"22.50\"), Decimal(\"0.10\")))\n"),
+            ("troca", "tests/test_loja.py",
+             "        self.assertEqual(total(pedido_de(cupom=\"NAOEXISTE\")), Decimal(\"25.00\"))\n",
+             "        self.assertEqual(total(pedido_de(cupom=\"NAOEXISTE\")), (Decimal(\"25.00\"), Decimal(\"0\")))\n"),
+        ],
+        "gabaritos": [("loja/checkout.py", "valor = total(pedido)"),
+                      ("loja/pedidos.py", ".quantize(Decimal(\"0.01\")), desconto")],
+        "frase": "fechar() em loja/checkout.py (fora do diff) ainda usa total() como valor: passa a cobrar e "
+                 "gravar uma tupla.",
+    },
+    {
+        # agulha num diff grande: 15 trocas de anotação e uma de comportamento
+        "id": "d2-agulha-no-diff-grande",
+        "tipo": "bug",
+        "ficha": FICHA_TIPOS,
+        "ops": [("troca",) + t for t in TIPOS] + [
+            ("troca", "loja/pedidos.py",
+             "    return usuario.admin or usuario.nome == pedido.dono\n",
+             "    return usuario.admin or usuario.nome is pedido.dono\n"),
+        ],
+        "gabaritos": [("loja/pedidos.py", "usuario.nome is pedido.dono")],
+        "frase": "`==` virou `is` na comparação de nomes: compara identidade do objeto, e só passa nos testes "
+                 "porque as strings literais são a mesma constante.",
+    },
+    {
+        "id": "d3-sem-desfazer",
+        "tipo": "bug",
+        "ficha": "fechar passa a reservar o estoque antes de cobrar, para não cobrar pedido sem estoque (a "
+                 "conferência prévia sai: reservar já levanta EstoqueInsuficiente). Pedido que falha não "
+                 "pode deixar efeito. " + VERIFICACAO,
+        "ops": [
+            ("troca", "loja/checkout.py",
+             "    for item in pedido.itens:\n"
+             "        if estoque.saldo(item.sku) < item.quantidade:\n"
+             "            raise EstoqueInsuficiente(item.sku)\n"
+             "    valor = total(pedido)\n"
+             "    transacao = cobrar(gateway, pedido.id, valor)\n"
+             "    for item in pedido.itens:\n"
+             "        estoque.reservar(item.sku, item.quantidade)\n",
+             "    valor = total(pedido)\n"
+             "    for item in pedido.itens:\n"
+             "        estoque.reservar(item.sku, item.quantidade)\n"
+             "    transacao = cobrar(gateway, pedido.id, valor)\n"),
+            ("troca", "loja/checkout.py", "from loja.estoque import EstoqueInsuficiente\n", ""),
+            ("troca", "tests/test_loja.py",
+             "class Checkout(unittest.TestCase):\n",
+             "class Checkout(unittest.TestCase):\n"
+             "    def test_sem_estoque_nao_cobra(self):\n"
+             "        gateway = Mock()\n"
+             "        with self.assertRaises(EstoqueInsuficiente):\n"
+             "            fechar(pedido_de(), Estoque({\"caneta\": 1, \"caderno\": 2}), gateway, Mock())\n"
+             "        gateway.capturar.assert_not_called()\n"
+             "\n"),
+        ],
+        "gabaritos": [("loja/checkout.py", "estoque.reservar(item.sku, item.quantidade)"),
+                      ("loja/checkout.py", "transacao = cobrar(gateway, pedido.id, valor)")],
+        "frase": "Nada desfaz a reserva: pagamento recusado (ou falta de saldo no segundo item) deixa o "
+                 "estoque baixado de um pedido que não fechou.",
+    },
+    {
+        "id": "d4-dinheiro-em-float",
+        "tipo": "bug",
+        "ficha": "Nova função frete(pedido): 5% do subtotal, com mínimo de 10. Valores em dinheiro são "
+                 "Decimal em todo o módulo. " + VERIFICACAO,
+        "ops": [
+            ("anexa", "loja/pedidos.py",
+             "\n\ndef frete(pedido):\n"
+             "    \"\"\"5% do subtotal, com mínimo de 10.\"\"\"\n"
+             "    return max(Decimal(\"10\"), round(float(subtotal(pedido)) * 0.05, 2))\n"),
+            ("troca", "tests/test_loja.py",
+             "from loja.pedidos import Item, Pedido, Usuario, pode_ver, subtotal, total\n",
+             "from loja.pedidos import Item, Pedido, Usuario, frete, pode_ver, subtotal, total\n"),
+            ("troca", "tests/test_loja.py",
+             "    def test_so_dono_ou_admin_ve(self):\n",
+             "    def test_frete_minimo(self):\n"
+             "        self.assertEqual(frete(pedido_de()), Decimal(\"10\"))\n"
+             "\n"
+             "    def test_so_dono_ou_admin_ve(self):\n"),
+        ],
+        "gabaritos": [("loja/pedidos.py", "round(float(subtotal(pedido)) * 0.05, 2)")],
+        "frase": "Dinheiro em float: acima do mínimo a função devolve float (e abaixo, Decimal) — tipo "
+                 "inconsistente e arredondamento binário, contra a regra do módulo.",
+    },
+    {
+        # o mesmo diff grande do d2, sem a agulha
+        "id": "c5-diff-grande-limpo",
+        "tipo": "limpo",
+        "ficha": FICHA_TIPOS,
+        "ops": [("troca",) + t for t in TIPOS],
+    },
+    {
+        # parece o b5 (nova tentativa na cobrança), mas está certo
+        "id": "c6-nova-tentativa-certa",
+        "tipo": "limpo",
+        "ficha": "cobrar ganha nova tentativa quando a rede falha (ConnectionError), até 3 vezes; na "
+                 "terceira falha o erro sobe. Recusa do gateway continua virando PagamentoRecusado, e "
+                 "qualquer outro erro continua subindo. O gateway é idempotente por pedido_id (está no "
+                 "contrato dele): repetir a captura não cobra duas vezes. " + VERIFICACAO,
+        "ops": [
+            ("troca", "loja/pagamento.py",
+             "    resposta = gateway.capturar(pedido_id, valor)\n",
+             "    for tentativa in range(3):\n"
+             "        try:\n"
+             "            resposta = gateway.capturar(pedido_id, valor)\n"
+             "            break\n"
+             "        except ConnectionError:\n"
+             "            if tentativa == 2:\n"
+             "                raise\n"),
+            ("troca", "tests/test_loja.py",
+             "class Pagamento(unittest.TestCase):\n",
+             "class Pagamento(unittest.TestCase):\n"
+             "    def test_tenta_de_novo_quando_a_rede_falha(self):\n"
+             "        gateway = Mock()\n"
+             "        gateway.capturar.side_effect = [ConnectionError(), {\"aprovado\": True, \"transacao\": \"t9\"}]\n"
+             "        self.assertEqual(cobrar(gateway, 1, Decimal(\"10\")), \"t9\")\n"
+             "\n"
+             "    def test_desiste_na_terceira_falha_de_rede(self):\n"
+             "        gateway = Mock()\n"
+             "        gateway.capturar.side_effect = ConnectionError()\n"
+             "        with self.assertRaises(ConnectionError):\n"
+             "            cobrar(gateway, 1, Decimal(\"10\"))\n"
+             "        self.assertEqual(gateway.capturar.call_count, 3)\n"
+             "\n"),
+        ],
+    },
+]

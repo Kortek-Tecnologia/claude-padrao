@@ -10,7 +10,7 @@ agente `padrao:revisor` deste plugin, com a ficha do lote. A resposta fecha com
 uma linha `ACHADOS:`, que o script lê.
 
 - caso "bug": acerta se a linha `ACHADOS:` cita o arquivo do defeito a até 3
-  linhas dele. A frase do gabarito sai no relatório, para a pessoa conferir se
+  linhas dele (o gabarito pode aceitar mais de um lugar). A frase do gabarito sai no relatório, para a pessoa conferir se
   o achado descreve o defeito (o script só confere o lugar).
 - caso "limpo" (controle): acerta se a linha é `ACHADOS: nenhum`.
 
@@ -86,13 +86,20 @@ def montar(caso, raiz: Path) -> Path:
     return proj
 
 
-def linha_do_gabarito(caso, proj: Path) -> int:
-    arquivo, trecho, _ = caso["gabarito"]
-    linhas = (proj / arquivo).read_bytes().decode("utf-8").splitlines()
-    achadas = [n for n, l in enumerate(linhas, 1) if trecho in l]
-    if len(achadas) != 1:
-        raise SystemExit(f"{caso['id']}: o trecho do gabarito aparece {len(achadas)} vez(es) em {arquivo}")
-    return achadas[0]
+def gabarito(caso, proj: Path) -> tuple[list[tuple[str, int]], str]:
+    """([(arquivo, linha), ...], frase): os lugares em que o defeito pode ser apontado."""
+    if "gabaritos" in caso:
+        pares, frase = caso["gabaritos"], caso["frase"]
+    else:
+        pares, frase = [caso["gabarito"][:2]], caso["gabarito"][2]
+    locais = []
+    for arquivo, trecho in pares:
+        linhas = (proj / arquivo).read_bytes().decode("utf-8").splitlines()
+        achadas = [n for n, l in enumerate(linhas, 1) if trecho in l]
+        if len(achadas) != 1:
+            raise SystemExit(f"{caso['id']}: o trecho do gabarito aparece {len(achadas)} vez(es) em {arquivo}")
+        locais.append((arquivo, achadas[0]))
+    return locais, frase
 
 
 def conferir(casos) -> int:
@@ -102,7 +109,7 @@ def conferir(casos) -> int:
         for caso in casos:
             proj = montar(caso, Path(tmp))
             if caso["tipo"] == "bug":
-                linha_do_gabarito(caso, proj)
+                gabarito(caso, proj)
             r = rodar([sys.executable, "-I", "-m", "unittest", "-q"], proj)
             if not rodar(["git", "diff", "--quiet", "HEAD"], proj).returncode:
                 print(f"{caso['id']}: o diff saiu vazio")
@@ -148,12 +155,15 @@ def avaliar_caso(caso, raiz: Path, saida: Path, claude: str) -> dict:
     if lista is None:
         res["erro"] = "resposta sem a linha ACHADOS:"
     elif caso["tipo"] == "bug":
-        arquivo, _, frase = caso["gabarito"]
-        linha = linha_do_gabarito(caso, proj)
-        res["gabarito"] = f"{arquivo}:{linha}"
+        locais, frase = gabarito(caso, proj)
+
+        def no_gabarito(a, n):
+            return any(a.endswith(arq) and abs(n - linha) <= TOLERANCIA for arq, linha in locais)
+
+        res["gabarito"] = " ou ".join(f"{arq}:{linha}" for arq, linha in locais)
         res["frase"] = frase
-        res["acertou"] = any(a.endswith(arquivo) and abs(n - linha) <= TOLERANCIA for a, n in lista)
-        res["a_mais"] = sum(not (a.endswith(arquivo) and abs(n - linha) <= TOLERANCIA) for a, n in lista)
+        res["acertou"] = any(no_gabarito(a, n) for a, n in lista)
+        res["a_mais"] = sum(not no_gabarito(a, n) for a, n in lista)
     else:
         res["acertou"] = lista == []
         res["a_mais"] = len(lista)

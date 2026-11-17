@@ -1,35 +1,13 @@
 # shellcheck shell=sh
-# Biblioteca dos hooks PreToolUse (sourced; não é hook). Usada por so-le.sh —
-# a trava decide por SEGMENTO de comando, e o segmentador fica num arquivo só
-# para outras travas poderem reaproveitá-lo sem divergir.
+# Biblioteca dos hooks PreToolUse (sourced; não é hook). O corte em segmentos
+# mora em segmentos.awk, no mesmo diretório — o mesmo arquivo que a trava de
+# leitura (so-le.awk) usa, para as duas não divergirem.
 #
-# segmentar CMD: imprime um segmento por linha, respeitando aspas. `;&|(){}` e
-# quebra de linha só partem FORA de aspas (senão o `(escopo)` de uma mensagem
-# de commit vira segmento); `$(` e crase partem também dentro de aspas duplas,
-# porque lá ainda executam. Antes, some com os redirecionamentos inofensivos
-# (2>&1, >/dev/null), que partiriam o segmento no `&`. O /dev/null precisa
-# terminar a palavra: `>/dev/nullX` grava arquivo (no Git Bash, de verdade).
-# Todo `>` que sobra é escrita em arquivo.
+# Quem dá source define antes SEGMENTOS_DIR, a pasta deste arquivo (um script
+# lido por source não sabe onde está).
+#
+# segmentar CMD: imprime um segmento por linha, respeitando aspas. As regras do
+# corte estão no cabeçalho de segmentos.awk.
 segmentar() {
-  printf '%s\n' "$1" |
-    sed -E -e 's/[0-9]*>&[0-9-]//g' -e 's/(&|[0-9]*)>>?[[:space:]]*\/dev\/null([[:space:];&|)]|$)/\2/g' |
-    awk '
-      { t = t $0 "\n" }
-      END {
-        q = ""; s = ""
-        for (i = 1; i <= length(t); i++) {
-          c = substr(t, i, 1)
-          if (q == "\047") { if (c == "\047") q = ""; s = s c; continue }
-          if (c == "\\") { s = s c substr(t, i + 1, 1); i++; continue }
-          if (c == "`" || (c == "$" && substr(t, i + 1, 1) == "(")) {
-            print s; s = ""; if (c == "$") i++; continue
-          }
-          if (q == "\"") { if (c == "\"") q = ""; s = s (c == "\n" ? " " : c); continue }
-          if (c == "\047" || c == "\"") { q = c; s = s c; continue }
-          if (index(";&|(){}\n", c)) { print s; s = ""; continue }
-          s = s c
-        }
-        print s
-      }' |
-    sed -E 's/^[[:space:]]+//'
+  printf '%s\n' "$1" | awk -v listar=1 -f "${SEGMENTOS_DIR:-.}/segmentos.awk"
 }

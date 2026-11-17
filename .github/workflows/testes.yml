@@ -17,12 +17,9 @@ jobs:
       # jq e python3 já vêm na imagem
       - run: bash scripts/testar.sh
 
-  # Windows é onde o plugin mais roda (Git Bash, jq que grava CRLF, caminho longo). Em
-  # observação até uma sequência de execuções verdes: continue-on-error não reprova o push.
-  # Depois, tire a linha.
+  # Windows é onde o plugin mais roda (Git Bash, jq que grava CRLF, caminho longo).
   testar-windows:
     runs-on: windows-2025
-    continue-on-error: true
     defaults:
       run:
         shell: bash

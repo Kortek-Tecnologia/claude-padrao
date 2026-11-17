@@ -14,14 +14,14 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 | `hooks/hooks.json` | SessionStart → `conferir-padrao.sh`; PreToolUse `Agent` → `travar-modelo-subagent.sh`; PreToolUse Bash, PowerShell, `mcp__*` e as ferramentas que executam ou gravam (regex no matcher) → `trava-leitura.sh`; PreToolUse `Skill` e Bash/PowerShell com `git` (`if`) → `cobrar-docs.sh` |
 | `scripts/conferir-padrao.sh` | só avisa (nunca corrige): global sujo (o effort salvo pelo `/effort` passa: o projeto vence; de `env`, só a variável do Code Mode), modelos fora da 5.5, conectores/plugins do app claude.ai ligados, auto memory ligado, checkpoints desligados ou `fallbackModel` no projeto, bloco do `CLAUDE.md` ou `docs/agente/padrao-*.md` de outro modelo (carimbo), versão nova no marketplace |
 | `scripts/travar-modelo-subagent.sh` | corrige `Plan`=opus, `Explore`/`coletor`/`leitor`=haiku e `revisor`/`executor`=sonnet (`updatedInput`); recusa `model` fora de haiku/sonnet/opus (o Fable 5.2 é degrau só da sessão); sem `model` vale o `CLAUDE_CODE_SUBAGENT_MODEL=sonnet`; `fork` passa |
-| `scripts/trava-leitura.sh`, `so-le.sh`, `segmentos.sh` | trava de leitura dos agentes que só leem (coletor, revisor, leitor, `Explore`): Bash por segmento contra uma lista de comandos de leitura (sed e awk só com `--sandbox`), qualquer outra ferramenta do matcher fechada |
+| `scripts/trava-leitura.sh`, `so-le.sh`, `so-le.awk`, `segmentos.awk`, `segmentos.sh` | trava de leitura dos agentes que só leem (coletor, revisor, leitor, `Explore`): Bash por segmento contra uma lista de comandos de leitura (sed e awk só com `--sandbox`), qualquer outra ferramenta do matcher fechada. A regra mora em `so-le.awk` e o corte em `segmentos.awk` (um jq e um awk por chamada; POSIX awk, sem `[[:classe:]]` nem `{n}`); `segmentos.sh` é o `segmentar` do `cobrar-docs.sh`, sobre o mesmo awk |
 | `scripts/cobrar-docs.sh` | lembrete da documentação: `git commit` sem a `padrao:atualizar-docs` desde o commit anterior é recusado uma vez (a repetição passa); anotação por sessão em `${CLAUDE_PLUGIN_DATA}`; falha aberta; não cobra os lotes do `arrumar` |
 | `scripts/py.sh` | acha `python3`/`python`/`py` 3.9+ e roda com `-I` |
 | `scripts/opcional.py` | os dois opcionais, fora da política de modelos e desligados por padrão: Code Mode (`env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` no settings global, o único em que vale) e Fable como advisor (`advisorModel` no `.claude/settings.local.json` do projeto); liga, desliga e mostra o estado |
 | `agents/` | `coletor` (haiku), `leitor` (haiku, sem CLAUDE.md), `revisor` (sonnet), `executor` (sonnet) |
 | `skills/` | os comandos — `aplicar` (+ `inventariar.py`, `modelos/`), `arrumar` (levanta, um OK, executa tudo; + `checagens.md`, os desvios de segurança e de CI da trilha B), `medir` (+ `medir-modelos.py`) e os opcionais `code-mode` e `advisor` (só chamam o `opcional.py`) — e `atualizar-docs`, fora do menu: o Claude a chama antes de commitar (o `cobrar-docs.sh` cobra) |
 | `statusline/`, `settings.json` | `statusline.py` (principal; a skill `aplicar` a instala em `~/.claude/`) e `subagent-statusline.py` (linha dos subagents; roda direto do plugin, pelo `subagentStatusLine` do `settings.json` da raiz) |
-| `avaliacao/revisor/` | avaliação do `padrao:revisor` com defeitos plantados: projeto de exemplo (`base/`), os casos (`casos.py`) e o `avaliar.py` (`--conferir` não custa; a rodada de verdade abre uma sessão por caso) |
+| `avaliacao/revisor/` | avaliação do `padrao:revisor` com defeitos plantados (18 casos): projeto de exemplo (`base/`), os casos (`casos.py`) e o `avaliar.py` (`--conferir` não custa; a rodada de verdade abre uma sessão por caso) |
 | `docs/como-funciona.md` | para quem mantém: peças, decisões dos hooks, skills, testes e publicação (o README é para quem usa) |
 | `AGENT_LEARNINGS.md` | erros do agente neste repositório e a abordagem certa; lido sob demanda (modelo e `docs/agente/padrao-*.md` em `skills/aplicar/modelos/`) |
 
@@ -57,6 +57,5 @@ as contas do `medir-modelos.py` (tokens, custo a preço de lista, faixas de cont
 `opcional.py` (liga, desliga, não toca em JSON inválido) e que os casos da avaliação do revisor
 estão de pé (`avaliar.py --conferir`). Não cobre
 o texto das skills. Depois: `claude plugin validate .`. O CI (`.github/workflows/testes.yml`)
-roda o `testar.sh` no Ubuntu (lá o sh é dash e o awk pode ser mawk) e no Windows, este em
-observação (`continue-on-error`). As skills se testam de ponta
+roda o `testar.sh` no Ubuntu (lá o sh é dash e o awk pode ser mawk) e no Windows. As skills se testam de ponta
 a ponta num sandbox: roteiro em `docs/como-funciona.md#testes`.

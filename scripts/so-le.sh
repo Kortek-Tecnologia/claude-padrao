@@ -6,14 +6,15 @@
 #
 # Regra: FECHADA POR PADRÃO, por segmento. Cada segmento do comando precisa
 # começar por um leitor conhecido (git só com subcomando de leitura) e não
-# redirecionar para arquivo; qualquer outra forma é NEGADA. O corte em
-# segmentos é o de segmentos.sh, no mesmo diretório.
+# redirecionar para arquivo; qualquer outra forma é NEGADA. A regra mora em
+# so-le.awk e o corte em segmentos em segmentos.awk, no mesmo diretório: a
+# decisão inteira sai de um jq e um awk (no Windows cada processo a mais pesa).
 #
 # Contrato PreToolUse: silêncio = segue; permissionDecision=deny = bloqueia.
 
 set -f
 quem=${1:-subagent}
-cmd=$(jq -r '.tool_input.command // ""' 2>/dev/null) || cmd=
+case "$0" in */*) aqui=${0%/*} ;; *) aqui=. ;; esac
 
 negar() {
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s so le: %s"}}\n' "$quem" "$1"
@@ -21,64 +22,7 @@ negar() {
 }
 
 command -v jq >/dev/null 2>&1 || negar "jq ausente, nao consegui analisar o comando"
-lib="$(dirname "$0")/segmentos.sh"
-[ -r "$lib" ] || negar "segmentos.sh ausente, nao consegui analisar o comando"
-# shellcheck source=segmentos.sh
-. "$lib"
-[ -n "$cmd" ] || exit 0
-
-# barra MOTIVO: imprime "motivo|segmento" — a recusa diz ao agente o que mudar.
-barra() { printf '%s|%s\n' "$1" "$seg"; }
-grava='opcao que grava arquivo ou executa programa'
-
-bloqueado=$(segmentar "$cmd" |
-  while IFS= read -r seg; do
-    [ -n "$seg" ] || continue
-    case "$seg" in *'>'*) barra 'grava em arquivo (redirecionamento)'; continue ;; esac
-    set -- $seg
-    case "$1" in
-      cat|grep|egrep|fgrep|head|tail|wc|ls|stat|diff|cmp|echo|printf|jq|test|'['|readlink|realpath|basename|dirname|true|false|cd|pwd|cut|tr|column|nl) ;;
-      # Opção longa vale abreviada (`--outp`, `--in-pl`, `--pro`): por isso casa o
-      # menor prefixo que já não é ambíguo, e não o nome inteiro.
-      sort) printf '%s' "$seg" | grep -Eq -- '[[:space:]](-[A-Za-z]*o|--o|--co)' && barra "$grava" ;;
-      uniq)
-        # `uniq ENTRADA SAIDA` grava SAIDA: nega com dois operandos.
-        printf '%s' "$seg" | awk '{n=0; for(i=2;i<=NF;i++){if($i ~ /^-[fsw]$/){i++;continue} if($i !~ /^-/)n++} exit !(n>=2)}' && barra "$grava" ;;
-      file) printf '%s' "$seg" | grep -Eq -- '[[:space:]](-[A-Za-z]*C|--co)' && barra "$grava" ;;
-      # --hostname-bin roda o programa dado para descobrir o host.
-      rg) printf '%s' "$seg" | grep -Eq -- '--pre|--hostname-bin' && barra "$grava" ;;
-      # sed e awk são linguagens: filtro de texto não fecha (s|a|b|e executa com
-      # qualquer delimitador, o gawk chama system() por @f). Só passam com
-      # --sandbox logo após o nome — antes de um `--`, que o tornaria nome de
-      # arquivo —, que recusa e/r/w no sed e system, redirecionamento e extensão
-      # no gawk. O mawk não tem --sandbox: falha, e fica fechado.
-      sed)
-        case "$seg" in 'sed --sandbox '*) ;; *) barra 'sed e awk so com --sandbox logo apos o nome'; continue ;; esac
-        # o --sandbox não impede -i (grava no lugar)
-        printf '%s' "$seg" | grep -Eq -- '[[:space:]](-[A-Za-z]*i|--i)' && barra "$grava" ;;
-      awk)
-        case "$seg" in 'awk --sandbox '*) ;; *) barra 'sed e awk so com --sandbox logo apos o nome'; continue ;; esac
-        # o --sandbox não impede -d/-p/-o (gravam variáveis, perfil e programa
-        # em arquivo) nem o depurador (-D)
-        printf '%s' "$seg" | grep -Eq -- '[[:space:]](-[A-Za-z]*[dDpo]|--d|--pr)' && barra "$grava" ;;
-      find) printf '%s' "$seg" | grep -Eq -- '-(exec|execdir|ok|okdir|delete|fprint|fls)' && barra "$grava" ;;
-      git)
-        # -c/--config-env mudam config na hora (core.fsmonitor, diff.external
-        # executam programa); -O/--open-files-in-pager do grep também;
-        # --git-dir/--work-tree apontariam para um repositório com config de fora.
-        case "$seg" in *--output*|*--open-files-in-pager*|*--config-env*|*--exec-path*|*--ext-diff*|*--git-dir*|*--work-tree*) barra "$grava"; continue ;; esac
-        # O `-O` também colado a outras opções curtas (`-nO./prog`) e o
-        # `--open-files-in-pager` abreviado (`--op=./prog`): os dois executam.
-        printf '%s' "$seg" | grep -Eq -- '[[:space:]](-c([[:space:]]|$)|-[A-Za-z0-9]*O|--op|--outp)' && { barra "$grava"; continue; }
-        sub=$(printf '%s' "$seg" | awk '{for(i=2;i<=NF;i++){if($i=="-C"){i++;continue} if($i ~ /^-/)continue; print $i; exit}}')
-        case "$sub" in
-          log|show|diff|blame|grep|status|ls-files|ls-tree|rev-parse|rev-list|cat-file|shortlog|merge-base|name-rev|describe) ;;
-          *) barra "git so com subcomando de leitura (log, show, diff, status, grep...)" ;;
-        esac ;;
-      *) barra 'comando fora da lista de leitura; para ler arquivo use Read/Grep/Glob' ;;
-    esac
-  done | head -n 1)
-
-[ -n "$bloqueado" ] &&
-  negar "${bloqueado%%|*}: $(printf '%s' "${bloqueado#*|}" | tr -d '"\\' | cut -c1-80)"
-exit 0
+[ -r "$aqui/segmentos.awk" ] && [ -r "$aqui/so-le.awk" ] ||
+  negar "segmentos.awk ou so-le.awk ausente, nao consegui analisar o comando"
+jq -r '.tool_input.command // ""' 2>/dev/null |
+  awk -v quem="$quem" -f "$aqui/segmentos.awk" -f "$aqui/so-le.awk"

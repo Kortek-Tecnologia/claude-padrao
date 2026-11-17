@@ -15,8 +15,8 @@ flowchart LR
   end
   SS --> CP["conferir-padrao.sh"]
   AG --> TM["travar-modelo-subagent.sh"]
-  BT --> TL["trava-leitura.sh"] --> SL["so-le.sh"] --> SG["segmentos.sh"]
-  GC --> CD["cobrar-docs.sh"] --> SG
+  BT --> TL["trava-leitura.sh"] --> SL["so-le.awk"] --> SG["segmentos.awk"]
+  GC --> CD["cobrar-docs.sh"] --> SH["segmentos.sh"] --> SG
   AP["skill aplicar"] -->|"grava a partir de"| MOD["skills/aplicar/modelos/"]
   CP -->|"compara com"| MOD
   AP -->|"copia para ~/.claude/"| ST["statusline/statusline.py"]
@@ -102,7 +102,7 @@ flowchart TD
 - **Sem jq** não dá para reescrever: os campos saem por regex e o papel fixo fora do modelo é
   recusado com o modelo certo na mensagem.
 
-## Trava de leitura — `trava-leitura.sh` → `so-le.sh` → `segmentos.sh`
+## Trava de leitura — `trava-leitura.sh` → `so-le.awk` + `segmentos.awk`
 
 ```mermaid
 flowchart TD
@@ -122,7 +122,7 @@ flowchart TD
   falam com fora (Monitor, Workflow, CronCreate/Delete, RemoteTrigger, Enter/ExitWorktree,
   SendMessage, SendToProject*, PushNotification, TaskStop). Ferramenta nova desse tipo entra
   ali. Não é `*` de propósito: cada chamada custa ~90 ms no Windows.
-- **Lista de leitura** (`so-le.sh`): `cat grep head tail wc ls stat diff cmp echo printf jq test
+- **Lista de leitura** (`so-le.awk`): `cat grep head tail wc ls stat diff cmp echo printf jq test
   readlink realpath basename dirname cd pwd cut tr column nl`, mais estes com checagem:
 
 | Comando | Recusado quando |
@@ -142,13 +142,29 @@ flowchart TD
   delimitador, e o gawk chama `system()` por chamada indireta (`@f`); nenhum filtro de texto
   fecha isso. O `--sandbox` do GNU sed recusa `e/r/w`, e o do gawk, `system`, redirecionamento e
   extensões. O mawk não tem a opção: falha, e fica fechado.
-- **Timeout de 30 s, e a trava é lenta no Windows.** Num agente que só lê, cada Bash passa por
-  uns 20 processos (`jq`, `sed`, `awk`, `grep`, um par por segmento). Medido em 2026-11-17 numa
-  máquina com antivírus corporativo, em que abrir um processo custava de 300 a 800 ms: 4 a 6 s
-  por `git diff HEAD` (0,7 a 0,9 s na sessão principal, que sai antes do `jq`). Com quatro
-  sessões do revisor em paralelo, o hook estourou os 10 s em 5 de 12 e o agente ficou sem
-  Bash — falha fechada, como deve, mas o revisor trabalhou só com Read e Grep. O timeout subiu
-  para 30 s; cortar processos do `so-le.sh` é o conserto de verdade e segue em aberto.
+- **Um jq e um awk por chamada.** No Windows abrir um processo custa de 100 a 800 ms (antivírus
+  corporativo). Até a 2.5.2 a trava abria uns 20 por comando (`jq`, `sed`, `awk`, `grep`, um par
+  por segmento): com quatro sessões do revisor em paralelo, estourou os 10 s do hook em 5 de 12
+  e o agente ficou sem Bash. Desde a 2.6.0 a `trava-leitura.sh` lê a entrada com o `read` do
+  shell (a sessão principal sai sem abrir processo), um `jq` tira agente, ferramenta e comando e
+  um `awk` decide: `so-le.awk` tem a regra, `segmentos.awk` o corte. Medido lado a lado, cinco
+  vezes cada, em 2026-11-17:
+
+| Chamada | 2.5.2 | 2.6.0 |
+|---|---|---|
+| agente que só lê, `git diff HEAD` | 1,3 a 1,6 s | 0,21 a 0,29 s |
+| agente que só lê, comando de 5 segmentos | 1,1 a 1,5 s | 0,17 a 0,39 s |
+| sessão principal | 0,21 a 0,23 s | 0,14 a 0,16 s |
+
+  O timeout do hook segue em 30 s, de folga.
+- **A reescrita foi conferida contra a versão anterior:** 190 comandos (as listas do
+  `testar.sh` e formas difíceis: aspas abertas, heredoc, crase, `$(…)`, várias linhas) passaram
+  pelas duas e deram os mesmos segmentos, a mesma decisão e o mesmo motivo; sete tipos de agente
+  × quatro ferramentas no `trava-leitura.sh`, idem. Mexeu na regra: repita a comparação com a
+  versão do commit anterior (`git show <commit>:scripts/so-le.awk`).
+- **awk POSIX.** Os dois `.awk` rodam em gawk, mawk e busybox: sem `gensub`, sem classes
+  `[[:space:]]` e sem intervalo `{n}`. O `--sandbox` que a trava exige do sed e do awk do
+  AGENTE é outra coisa: é do comando analisado, não do awk que analisa.
 - **Risco que fica:** `cd` ou `git -C` para dentro de um repositório bare versionado com config
   hostil (`core.fsmonitor`). `safe.bareRepository=explicit` no git do usuário fecha.
 
@@ -449,9 +465,9 @@ modelos não mudou e o Code Mode segue opcional.
   settings, a indentação e o CRLF preservados; JSON inválido intocado; o home recusado), a
   variável do Code Mode calada no hook de abertura e o `onFailure` de cada hook no `hooks.json`.
 
-O CI roda o mesmo `testar.sh` num job `testar-windows` (Git Bash da imagem do GitHub), com
-`continue-on-error` enquanto estiver em observação: gate novo começa sem reprovar, e a linha sai
-depois de uma sequência de execuções verdes.
+O CI roda o mesmo `testar.sh` num job `testar-windows` (Git Bash da imagem do GitHub). Entrou em
+observação (`continue-on-error`) e passou a reprovar depois de três execuções verdes seguidas:
+gate novo começa sem reprovar.
 
 O CI tem ainda um job `diagramas`, que passa todo bloco Mermaid dos .md pelo parser oficial
 (`.github/scripts/validar-mermaid.mjs`, com `mermaid` e `jsdom` instalados só ali). O parser não
@@ -459,8 +475,12 @@ vê layout: diagrama novo, abra numa página local antes, porque largo demais fi
 GitHub e título de bloco (`subgraph`) longo é cortado.
 
 **Avaliação do revisor** (`avaliacao/revisor/`): um projeto de exemplo (`base/`, uma loja em
-Python com testes) e 12 diffs sobre ele em `casos.py` — 8 com um defeito plantado e o gabarito
-(arquivo, linha e uma frase), 4 limpos de controle, um deles ao lado de um defeito antigo. O
+Python com testes) e 18 diffs sobre ele em `casos.py` — 12 com um defeito plantado e o gabarito
+(arquivo, linha e uma frase) e 6 limpos de controle. Oito defeitos são diretos (a linha errada
+está no diff); quatro são difíceis: quem chama a função mudada está num arquivo fora do diff,
+uma troca de `==` por `is` no meio de um diff de 15 anotações de tipo, reserva de estoque sem
+desfazer, dinheiro em float. Dos controles, um fica ao lado de um defeito antigo, um é o mesmo
+diff grande sem a troca e um é a nova tentativa de cobrança escrita certo. O
 `avaliar.py` abre uma sessão `claude -p --agent padrao:revisor` por caso, com a ficha do lote, e
 lê a linha `ACHADOS:` do fim da resposta: o caso com defeito acerta se ela cita o arquivo a até
 3 linhas do gabarito; o de controle, se diz `nenhum`. O script confere o lugar; se o achado
@@ -468,22 +488,25 @@ descreve o defeito, quem confere é a pessoa, pela frase do gabarito. `--conferi
 `testar.sh` e não custa: aplica cada diff e roda os testes do caso (que passam com o defeito —
 defeito que o teste do próprio diff pega não mede o revisor).
 
-Primeira rodada (v2.1.326, Windows, Sonnet 5.5, uma sessão por caso, quatro em paralelo):
+Medido (v2.1.326, Windows, Sonnet 5.5, uma sessão por caso, quatro em paralelo):
 
-| | Resultado |
-|---|---|
-| defeitos plantados | 8 de 8, todos na linha exata, descritos como no gabarito |
-| controles limpos | 4 de 4 sem achado; o defeito antigo saiu na lista à parte, sem segurar o commit |
-| achados a mais nos diffs com defeito | 6, todos reais: o teste do diff não pega o defeito, e um efeito colateral dele |
-| custo e tempo | US$ 0,31 no total; 18 a 51 s por caso |
+| Rodada | Defeitos | Controles | Achados a mais | Custo | Tempo por caso |
+|---|---|---|---|---|---|
+| 12 casos, trava da 2.5.2 | 8 de 8 | 4 de 4 | 6 | US$ 0,31 | 18 a 51 s |
+| 18 casos, trava da 2.6.0 | 12 de 12 | 6 de 6 | 11 | US$ 0,46 | 9 a 22 s |
 
-- **O conjunto saturou.** Nota máxima não distingue um prompt bom de um ótimo: serve de
-  regressão (mexeu no `agents/revisor.md`, rode de novo), não para afinar. Para afinar faltam
-  casos difíceis — defeito que atravessa dois arquivos, diff grande, e os bugs de verdade que
-  escaparam em projetos reais (cada revert vira um caso, com a frase do gabarito).
-- **Uma rodada por caso** é amostra de um, e em 5 dos 12 a trava de leitura estourou o tempo
-  (ver a trava, acima): nesses o revisor não rodou `git diff` e deduziu o diff lendo os
-  arquivos. Acertou mesmo assim.
+- **Todos na linha do gabarito e descritos como nele**, inclusive os quatro difíceis: no caso do
+  arquivo fora do diff o revisor foi até `checkout.py`; no diff grande, achou só a troca de
+  `==` por `is`. Os achados a mais são reais (o teste do diff não pega o defeito; um efeito
+  colateral dele). Nenhum achado falso nos controles; o defeito antigo saiu na lista à parte.
+- **O conjunto saturou, com os difíceis e tudo.** Nota máxima não distingue um prompt bom de um
+  ótimo: serve de regressão (mexeu no `agents/revisor.md`, rode de novo), não para afinar.
+  Caso inventado não chega onde o revisor erra; o que falta são os bugs de verdade que
+  escaparam em projetos reais — cada revert vira um caso, com a frase do gabarito.
+- **Uma rodada por caso** é amostra de um. Na primeira, a trava de leitura estourou o tempo em
+  5 dos 12 e o revisor deduziu o diff lendo os arquivos (acertou mesmo assim); na segunda, com
+  a trava nova, não estourou em nenhum e o tempo por caso caiu pela metade. O revisor não roda
+  `python -m unittest` (não é comando de leitura) e diz isso na resposta.
 - **Como rodar:** `sh scripts/py.sh avaliacao/revisor/avaliar.py --saida <pasta>`, com HOME falso
   e o token na env, como no teste de ponta a ponta abaixo, para não gravar no `~/.claude` real.
 

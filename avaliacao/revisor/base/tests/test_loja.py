@@ -3,6 +3,7 @@ import unittest
 from decimal import Decimal
 from unittest.mock import Mock
 
+from loja.checkout import fechar
 from loja.estoque import Estoque, EstoqueInsuficiente
 from loja.pagamento import PagamentoRecusado, cobrar
 from loja.pedidos import Item, Pedido, Usuario, pode_ver, subtotal, total
@@ -68,6 +69,17 @@ class Pagamento(unittest.TestCase):
         gateway.capturar.return_value = {"aprovado": False, "motivo": "saldo"}
         with self.assertRaises(PagamentoRecusado):
             cobrar(gateway, 1, Decimal("10"))
+
+
+class Checkout(unittest.TestCase):
+    def test_fechar_cobra_e_baixa_o_estoque(self):
+        estoque = Estoque({"caneta": 10, "caderno": 2})
+        gateway = Mock()
+        gateway.capturar.return_value = {"aprovado": True, "transacao": "t7"}
+        repo = Mock()
+        self.assertEqual(fechar(pedido_de(), estoque, gateway, repo), "t7")
+        self.assertEqual(estoque.saldo("caneta"), 6)
+        repo.salvar.assert_called_once()
 
 
 if __name__ == "__main__":
