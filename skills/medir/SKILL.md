@@ -28,7 +28,10 @@ Leitura:
   vezes com razão: dois commits do mesmo diff), ou o hook não rodou naquela sessão.
 - Tokens: o custo está em "entrada" e "saída"; "cache lido" sai bem mais barato. Opus com muita
   entrada e haiku perto de zero = leitura que devia ir ao coletor.
-- Custo: estimativa a preço de lista; em assinatura não é cobrança, é o peso relativo de cada
+- `effort na chamada do subagent` (só aparece se houve): chamadas `Agent` que pediram um
+  effort. O hook de modelo não olha esse campo; subagent em `xhigh` ou `max` é escalada que
+  o padrão deixa para a sessão.
+- Custo: estimativa a preço de lista, da data que o cabeçalho mostra; em assinatura não é cobrança, é o peso relativo de cada
   modelo (modelo sem preço na tabela fica fora da conta, listado à parte).
 - Contexto: cada requisição relê o contexto inteiro, e requisição grande na sessão principal é o
   que mais custa. Haiku acima de 100K paga a requisição inteira cinco vezes mais (o sobrepreço).

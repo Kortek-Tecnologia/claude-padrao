@@ -16,7 +16,9 @@ projeto e conta:
 - custo estimado a preço de lista por modelo, o contexto por requisição da
   sessão principal (o que mais pesa) e as requisições do Haiku acima de 100K;
 - consultas ao advisor (/padrao:advisor) e o custo do modelo consultado, que
-  não aparece no uso da mensagem do modelo da sessão.
+  não aparece no uso da mensagem do modelo da sessão;
+- chamadas de subagent que trouxeram `effort` (o hook de modelo não olha esse
+  campo: a linha só aparece se houve alguma).
 
     sh <plugin>/scripts/py.sh <dir da skill>/medir-modelos.py [--dias N] [--projeto P]
 
@@ -81,6 +83,11 @@ FIXO = {
 
 # Preço de lista em US$ por milhão de tokens: (entrada, escrita de cache 5 min,
 # escrita de cache 1 h, cache lido, saída). O modelo casa por prefixo do nome.
+# Fonte: tabela de modelos da skill claude-api do Claude Code, com a data abaixo
+# (entrada, saída, cache lido e a faixa do Haiku acima de 100K conferidos em
+# 2026-11-17; a escrita de cache é 1,25× e 2× a entrada, não conferida ali).
+# Mudou o preço: mude a tabela e a data — ela sai no cabeçalho do custo.
+PRECO_EM = "2026-11-03"
 PRECO = {
     "claude-opus-5-5": (4, 5, 8, 0.20, 20),
     "claude-sonnet-5-5": (2, 2.5, 4, 0.10, 10),
@@ -224,7 +231,7 @@ def imprimir_custo(uso_principal: dict, uso_sub: dict, uso_advisor: dict) -> Non
                 faixa = next(nome for nome, teto in FAIXAS if contexto <= teto)
                 faixa_n[faixa] += 1
                 faixa_custo[faixa] += v
-    print("custo estimado a preço de lista (em assinatura é peso relativo, não cobrança):")
+    print(f"custo estimado a preço de lista de {PRECO_EM} (em assinatura é peso relativo, não cobrança):")
     for rotulo, por_modelo in custo.items():
         for modelo, v in sorted(por_modelo.items(), key=lambda kv: -kv[1]):
             print(f"  {rotulo:<10} {modelo:<22} US$ {v:.2f}")
@@ -276,6 +283,7 @@ def main() -> None:
 
     chamadas: dict[str, Counter[str]] = defaultdict(Counter)
     corrigidas: Counter[str] = Counter()
+    com_effort: Counter[str] = Counter()
     turnos_principal: Counter[str] = Counter()
     turnos_sub: Counter[str] = Counter()
     uso_principal: dict = {}
@@ -345,6 +353,8 @@ def main() -> None:
                     modelo, corrigida = modelo_efetivo(tipo, i.get("model") or "")
                     chamadas[tipo][modelo] += 1
                     corrigidas[tipo] += corrigida
+                    if i.get("effort"):
+                        com_effort[str(i["effort"])] += 1
                     ids_agent[c.get("id")] = (tipo, modelo)
                     delegou = True
         sessoes += ativa
@@ -365,6 +375,9 @@ def main() -> None:
           + (f" ({correcoes})" if correcoes else "") + f" · {recusas} recusa(s)")
     print(f"documentação antes do commit: {commits} commit(s) · {com_docs} com a atualizar-docs antes"
           f" · {lembretes} lembrete(s) do hook")
+    if com_effort:
+        print(f"effort na chamada do subagent: {sum(com_effort.values())} chamada(s) · "
+              + "  ".join(f"{e}={n}" for e, n in com_effort.most_common()))
     if uso_advisor:
         consultas = Counter(modelo for modelo, _ in uso_advisor.values())
         print(f"advisor: {len(uso_advisor)} consulta(s) · " + "  ".join(f"{m}={n}" for m, n in consultas.most_common()))

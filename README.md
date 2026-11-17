@@ -146,7 +146,7 @@ tokens por modelo (entrada · cache lido · saída):
   principal  claude-opus-5-5        125k · 2.8M · 50k
   subagents  claude-sonnet-5-5      74k · 203k · 9k
   subagents  claude-haiku-5-5       32k · 78k · 9k
-custo estimado a preço de lista (em assinatura é peso relativo, não cobrança):
+custo estimado a preço de lista de 2026-11-03 (em assinatura é peso relativo, não cobrança):
   principal  claude-opus-5-5        US$ 2.11
   subagents  claude-sonnet-5-5      US$ 0.29
   subagents  claude-haiku-5-5       US$ 0.01
@@ -161,7 +161,7 @@ Haiku acima de 100K: 0 de 4 requisições · sobrepreço US$ 0.00
 ```
 
 Haiku perto de zero com muita entrada no Opus = leitura que devia ter ido ao coletor. O custo é
-estimativa a preço de lista; o que mais pesa é o contexto grande na sessão principal. Commit sem
+estimativa a preço de lista, da data que o cabeçalho mostra; o que mais pesa é o contexto grande na sessão principal. Commit sem
 a `atualizar-docs` antes = o Claude repetiu o commit depois do lembrete sem rodar a skill, ou o
 hook não rodou naquela sessão (plugin antigo, `jq` ausente).
 
@@ -347,7 +347,8 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 ## Segurança e limites
 
 - **Trava de leitura, fechada por padrão.** Cada segmento do comando precisa começar por um
-  leitor conhecido e não gravar; sed e awk só com `--sandbox`. Se o próprio hook falhar, a
+  leitor conhecido e não gravar; sed e awk só com `--sandbox`. No Windows com antivírus pesado
+  ela pode levar segundos por comando; se passar de 30 s, o agente fica sem Bash naquela chamada. Se o próprio hook falhar, a
   chamada é bloqueada. Fica um caso: entrar (`cd`, `git -C`) num repositório bare versionado com
   config hostil — `git config --global safe.bareRepository explicit` fecha.
 - **Lembrete da documentação, aberto por padrão.** É lembrete na hora certa, não trava: recusa o
@@ -373,6 +374,7 @@ skills/           aplicar (+ inventário e modelos), arrumar (+ checagens), medi
 statusline/       status line principal e dos subagents
 settings.json     a única setting que o plugin traz: a linha dos subagents
 docs/             como funciona por dentro
+avaliacao/        avaliação do revisor com defeitos plantados (roda à parte: custa)
 .github/          CI: testes e validação dos diagramas
 ```
 

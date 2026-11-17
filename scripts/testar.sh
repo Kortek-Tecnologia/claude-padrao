@@ -557,7 +557,7 @@ agora=$(date -u +%Y-%m-%dT%H:%M:%S)
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m1","model":"claude-opus-5-5","usage":{"input_tokens":2000,"cache_read_input_tokens":5000,"output_tokens":200},"content":[{"type":"tool_use","id":"t1","name":"Agent","input":{"subagent_type":"Explore","prompt":"x"}}]}}\n' "$agora"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m2","model":"claude-opus-5-5","usage":{"input_tokens":1000,"output_tokens":100},"content":[{"type":"tool_use","id":"t2","name":"Agent","input":{"subagent_type":"padrao:coletor","prompt":"y"}}]}}\n' "$agora"
   # chamada que o hook recusou: não conta como se tivesse rodado
-  printf '{"type":"assistant","timestamp":"%s","message":{"id":"m3","model":"claude-opus-5-5","content":[{"type":"tool_use","id":"t3","name":"Agent","input":{"subagent_type":"general-purpose","model":"fable","prompt":"z"}}]}}\n' "$agora"
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"m3","model":"claude-opus-5-5","content":[{"type":"tool_use","id":"t3","name":"Agent","input":{"subagent_type":"general-purpose","model":"fable","effort":"max","prompt":"z"}}]}}\n' "$agora"
   printf '{"type":"user","timestamp":"%s","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t3","content":"model=fable fora da politica"}]}}\n' "$agora"
   # documentação antes do commit: skill e commit na mesma resposta (conta, com a skill); commit
   # que o hook recusou (lembrete, não conta); a repetição e um `(… git commit)` (contam, sem a
@@ -609,6 +609,10 @@ for re in '1 correção\(ões\) de papel fixo \(Explore=1\) · 1 recusa\(s\)' '^
   printf '%s\n' "$med" | grep -Eq "$re" || { echo "divergiu: medir-modelos sem /$re/: $med"; FALHAS=$((FALHAS + 1)); }
 done
 case "$med" in *"<synthetic>"*) echo "divergiu: medir-modelos listou <synthetic> como modelo"; FALHAS=$((FALHAS + 1)) ;; esac
+# effort pedido na chamada do subagent (o hook de modelo não olha) e a data da tabela de preços
+for re in '^effort na chamada do subagent: 1 chamada\(s\) · max=1$' '^custo estimado a preço de lista de 20[0-9]{2}-[0-9]{2}-[0-9]{2} '; do
+  printf '%s\n' "$med" | grep -Eq "$re" || { echo "divergiu: medir-modelos sem /$re/: $med"; FALHAS=$((FALHAS + 1)); }
+done
 # período sem requisição: as seções saem com zeros, sem quebrar
 for f in "$CASA/.claude/projects/$chave/s.jsonl" "$CASA/.claude/projects/$chave/s/subagents/a.jsonl"; do
   sed 's/"timestamp":"[^"]*"/"timestamp":"2000-01-01T00:00:00"/' "$f" >"$f.velho" && mv "$f.velho" "$f"
@@ -653,6 +657,11 @@ case "$his" in *ghp_*) echo "divergiu: checagem S2 imprimiu o valor"; FALHAS=$((
 arv=$(cd "$REPO" && git grep -nIE "$P" | cut -d: -f1,2)
 [ "$arv" = "conf.txt:3" ] || { echo "divergiu: checagem S1 devolveu '$arv'"; FALHAS=$((FALHAS + 1)); }
 rm -rf "$REPO"
+
+# Avaliação do revisor: os casos aplicam, o gabarito tem linha e os testes de cada diff passam
+# (sem chamar o Claude; a rodada de verdade é paga e roda à parte).
+sh "$D/py.sh" avaliacao/revisor/avaliar.py --conferir >/dev/null 2>&1 ||
+  { echo "divergiu: avaliacao do revisor: $(sh "$D/py.sh" avaliacao/revisor/avaliar.py --conferir 2>&1 | tail -n 3)"; FALHAS=$((FALHAS + 1)); }
 
 if [ "$FALHAS" -eq 0 ]; then
   echo "hooks: todas as decisoes conferem"

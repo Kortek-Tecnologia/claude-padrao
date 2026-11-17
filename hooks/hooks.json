@@ -34,7 +34,7 @@
             "type": "command",
             "shell": "bash",
             "command": "sh \"${CLAUDE_PLUGIN_ROOT}/scripts/trava-leitura.sh\"",
-            "timeout": 10,
+            "timeout": 30,
             "statusMessage": "Trava de leitura",
             "onFailure": "block"
           }

@@ -26,7 +26,7 @@ flowchart LR
 
 | Caminho | Papel |
 |---|---|
-| `hooks/hooks.json` | liga os quatro hooks; todos com `shell: bash` e timeout de 10 s; as duas travas com `onFailure: "block"` (falhou, bloqueia), o lembrete da documentação com `onFailure: "continue"` (falhou, o commit segue — por extenso, porque no Code Mode o hook que falha sem a chave recusa a chamada) |
+| `hooks/hooks.json` | liga os quatro hooks; todos com `shell: bash` e timeout de 10 s (a trava de leitura, 30 s); as duas travas com `onFailure: "block"` (falhou, bloqueia), o lembrete da documentação com `onFailure: "continue"` (falhou, o commit segue — por extenso, porque no Code Mode o hook que falha sem a chave recusa a chamada) |
 | `skills/aplicar/modelos/` | **fonte única** do padrão: o `aplicar` grava a partir dela e o hook de abertura compara com ela |
 | `scripts/py.sh` | acha `python3`, `python` ou `py` 3.9+ (no Windows o `python3` costuma ser o atalho quebrado da Store) e roda com `-I` |
 | `agents/*.md` | os quatro agentes; os que só leem têm `tools` fechado e `disallowedTools` |
@@ -96,6 +96,9 @@ flowchart TD
 - `fable` segue recusado em subagent: é o último degrau de escalada da **sessão** (`/model` com
   `s`; amarelo na status line), e o alias está fixado no Fable 5.2 só para não mudar sozinho.
 - A correção devolve a entrada inteira com o `model` trocado (`updatedInput` substitui a entrada).
+- **O `effort` da chamada fica de fora**, por medição: nas 304 chamadas de subagent do
+  histórico local (66 transcripts, 2026-11-17) nenhuma trouxe `effort`. Em vez de regra nova
+  no hook, o `medir` conta essas chamadas; se aparecerem, aí se decide recusar `xhigh` e `max`.
 - **Sem jq** não dá para reescrever: os campos saem por regex e o papel fixo fora do modelo é
   recusado com o modelo certo na mensagem.
 
@@ -139,6 +142,13 @@ flowchart TD
   delimitador, e o gawk chama `system()` por chamada indireta (`@f`); nenhum filtro de texto
   fecha isso. O `--sandbox` do GNU sed recusa `e/r/w`, e o do gawk, `system`, redirecionamento e
   extensões. O mawk não tem a opção: falha, e fica fechado.
+- **Timeout de 30 s, e a trava é lenta no Windows.** Num agente que só lê, cada Bash passa por
+  uns 20 processos (`jq`, `sed`, `awk`, `grep`, um par por segmento). Medido em 2026-11-17 numa
+  máquina com antivírus corporativo, em que abrir um processo custava de 300 a 800 ms: 4 a 6 s
+  por `git diff HEAD` (0,7 a 0,9 s na sessão principal, que sai antes do `jq`). Com quatro
+  sessões do revisor em paralelo, o hook estourou os 10 s em 5 de 12 e o agente ficou sem
+  Bash — falha fechada, como deve, mas o revisor trabalhou só com Read e Grep. O timeout subiu
+  para 30 s; cortar processos do `so-le.sh` é o conserto de verdade e segue em aberto.
 - **Risco que fica:** `cd` ou `git -C` para dentro de um repositório bare versionado com config
   hostil (`core.fsmonitor`). `safe.bareRepository=explicit` no git do usuário fecha.
 
@@ -278,7 +288,8 @@ do `CLAUDE.md` manda chamá-la antes de todo commit, e o `cobrar-docs.sh` cobra 
 (as linhas de uma resposta repetem o uso). Commits da sessão principal: reconhecidos pela regra do
 `cobrar-docs.sh` (sem os do `arrumar`), refeita em regex — em forma rara os dois podem divergir, com a `atualizar-docs` chamada desde o commit anterior
 ou não; tentativa que o hook recusou conta como lembrete, não como commit. Cada `message.id` é uma requisição: o custo estimado
-sai da tabela `PRECO` (preço de lista por milhão, modelo casado por prefixo, escrita de cache de
+sai da tabela `PRECO` (preço de lista por milhão, com a data da fonte em `PRECO_EM`, que sai no
+cabeçalho; modelo casado por prefixo, escrita de cache de
 1 h à parte da de 5 min); contexto = entrada + cache lido + escrita, distribuído em faixas na
 sessão principal; Haiku acima de 100.000 paga a requisição inteira no preço alto. Modelo fora da
 tabela não entra no custo nem nas faixas e é listado à parte. Mensagem `<synthetic>` (aviso do
@@ -446,6 +457,35 @@ O CI tem ainda um job `diagramas`, que passa todo bloco Mermaid dos .md pelo par
 (`.github/scripts/validar-mermaid.mjs`, com `mermaid` e `jsdom` instalados só ali). O parser não
 vê layout: diagrama novo, abra numa página local antes, porque largo demais fica ilegível no
 GitHub e título de bloco (`subgraph`) longo é cortado.
+
+**Avaliação do revisor** (`avaliacao/revisor/`): um projeto de exemplo (`base/`, uma loja em
+Python com testes) e 12 diffs sobre ele em `casos.py` — 8 com um defeito plantado e o gabarito
+(arquivo, linha e uma frase), 4 limpos de controle, um deles ao lado de um defeito antigo. O
+`avaliar.py` abre uma sessão `claude -p --agent padrao:revisor` por caso, com a ficha do lote, e
+lê a linha `ACHADOS:` do fim da resposta: o caso com defeito acerta se ela cita o arquivo a até
+3 linhas do gabarito; o de controle, se diz `nenhum`. O script confere o lugar; se o achado
+descreve o defeito, quem confere é a pessoa, pela frase do gabarito. `--conferir` roda no
+`testar.sh` e não custa: aplica cada diff e roda os testes do caso (que passam com o defeito —
+defeito que o teste do próprio diff pega não mede o revisor).
+
+Primeira rodada (v2.1.326, Windows, Sonnet 5.5, uma sessão por caso, quatro em paralelo):
+
+| | Resultado |
+|---|---|
+| defeitos plantados | 8 de 8, todos na linha exata, descritos como no gabarito |
+| controles limpos | 4 de 4 sem achado; o defeito antigo saiu na lista à parte, sem segurar o commit |
+| achados a mais nos diffs com defeito | 6, todos reais: o teste do diff não pega o defeito, e um efeito colateral dele |
+| custo e tempo | US$ 0,31 no total; 18 a 51 s por caso |
+
+- **O conjunto saturou.** Nota máxima não distingue um prompt bom de um ótimo: serve de
+  regressão (mexeu no `agents/revisor.md`, rode de novo), não para afinar. Para afinar faltam
+  casos difíceis — defeito que atravessa dois arquivos, diff grande, e os bugs de verdade que
+  escaparam em projetos reais (cada revert vira um caso, com a frase do gabarito).
+- **Uma rodada por caso** é amostra de um, e em 5 dos 12 a trava de leitura estourou o tempo
+  (ver a trava, acima): nesses o revisor não rodou `git diff` e deduziu o diff lendo os
+  arquivos. Acertou mesmo assim.
+- **Como rodar:** `sh scripts/py.sh avaliacao/revisor/avaliar.py --saida <pasta>`, com HOME falso
+  e o token na env, como no teste de ponta a ponta abaixo, para não gravar no `~/.claude` real.
 
 Não cobre o texto das skills. Para elas, o **teste de ponta a ponta**:
 

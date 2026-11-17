@@ -21,6 +21,7 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 | `agents/` | `coletor` (haiku), `leitor` (haiku, sem CLAUDE.md), `revisor` (sonnet), `executor` (sonnet) |
 | `skills/` | os comandos — `aplicar` (+ `inventariar.py`, `modelos/`), `arrumar` (levanta, um OK, executa tudo; + `checagens.md`, os desvios de segurança e de CI da trilha B), `medir` (+ `medir-modelos.py`) e os opcionais `code-mode` e `advisor` (só chamam o `opcional.py`) — e `atualizar-docs`, fora do menu: o Claude a chama antes de commitar (o `cobrar-docs.sh` cobra) |
 | `statusline/`, `settings.json` | `statusline.py` (principal; a skill `aplicar` a instala em `~/.claude/`) e `subagent-statusline.py` (linha dos subagents; roda direto do plugin, pelo `subagentStatusLine` do `settings.json` da raiz) |
+| `avaliacao/revisor/` | avaliação do `padrao:revisor` com defeitos plantados: projeto de exemplo (`base/`), os casos (`casos.py`) e o `avaliar.py` (`--conferir` não custa; a rodada de verdade abre uma sessão por caso) |
 | `docs/como-funciona.md` | para quem mantém: peças, decisões dos hooks, skills, testes e publicação (o README é para quem usa) |
 | `AGENT_LEARNINGS.md` | erros do agente neste repositório e a abordagem certa; lido sob demanda (modelo e `docs/agente/padrao-*.md` em `skills/aplicar/modelos/`) |
 
@@ -52,8 +53,9 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 `bash scripts/testar.sh`: confere as decisões dos
 quatro hooks (inclusive sem `jq`; o `conferir-padrao.sh` com HOME falso), as duas status
 lines, que nenhum modelo mudou sem subir o carimbo, que o inventário não imprime valor do `env`,
-as contas do `medir-modelos.py` (tokens, custo a preço de lista, faixas de contexto, advisor) e o
-`opcional.py` (liga, desliga, não toca em JSON inválido). Não cobre
+as contas do `medir-modelos.py` (tokens, custo a preço de lista, faixas de contexto, advisor), o
+`opcional.py` (liga, desliga, não toca em JSON inválido) e que os casos da avaliação do revisor
+estão de pé (`avaliar.py --conferir`). Não cobre
 o texto das skills. Depois: `claude plugin validate .`. O CI (`.github/workflows/testes.yml`)
 roda o `testar.sh` no Ubuntu (lá o sh é dash e o awk pode ser mawk) e no Windows, este em
 observação (`continue-on-error`). As skills se testam de ponta
