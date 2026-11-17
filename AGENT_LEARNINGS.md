@@ -66,3 +66,23 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 - Erro: rodei o `claude plugin eval` com a saída num `| sed …` de expressão errada; o `sed` morreu, a saída sumiu e a rodada (paga) teve de ser repetida.
 - Evitar: encadear filtro novo direto na saída de comando que custa dinheiro ou demora (sessão aninhada, eval, suíte).
 - Fazer: gravar a saída num arquivo do scratchpad (`> saida.log 2>&1`) e filtrar depois, do arquivo.
+
+### Validador lido só pela última linha (2026-11-17)
+- Erro: em quatro rodadas li só o fim do `claude plugin validate .` ("passed with warnings") e não vi o aviso de que o `subagentStatusLine` está obsoleto; só apareceu quando o usuário perguntou por pendências.
+- Evitar: dar um validador ou linter por conferido pela linha de resultado, sem ler quais são os avisos.
+- Fazer: ler os avisos (`claude plugin validate . 2>&1 | grep -n '❯\|⚠'`) e dizer quais são; a cada versão nova do Claude Code, a saída inteira.
+
+### Opção que grava ou executa casada pelo nome inteiro (2026-11-17)
+- Erro: a trava de leitura barrava `--output`, `--in-place`, `--profile` e `-O` pelo nome exato; o GNU e o git aceitam a forma abreviada (`sort --outp`, `sed --in-pl`, `git grep --op=./prog`, `git grep -nO./prog`), e um agente que só lê conseguia gravar e executar programa.
+- Evitar: regra de bloqueio que casa a opção longa inteira, ou a curta só no começo do grupo, em comando que usa getopt.
+- Fazer: casar o menor prefixo que já não é ambíguo e a letra em qualquer posição do grupo de opções curtas; cada regra nova entra no `testar.sh` com a forma abreviada e com a colada, e rode o comando de verdade num sandbox para ver se grava.
+
+### Edição por script inline no Bash (2026-11-17)
+- Erro: três vezes um `python - <<'EOF'` com texto em português e aspas não aplicou a edição: erro de sintaxe do shell, stdin fora de UTF-8 e um caractere ESC cru gravado no arquivo.
+- Evitar: editar vários arquivos por script passado em heredoc ou em `-c` pelo Git Bash.
+- Fazer: gravar o script num arquivo do scratchpad e rodar `python -I arquivo.py`; substituição exata que confere a contagem (`s.count(antigo) == 1`) antes de gravar, para falhar sem deixar arquivo pela metade.
+
+### Tempo de hook medido uma vez só (2026-11-17)
+- Erro: medi a trava de leitura em 4 a 6 s por comando com a máquina carregada e, horas depois, a mesma versão levava 1,3 a 1,6 s; quatro sessões pagas em paralelo estouraram os 10 s do hook em 5 de 12.
+- Evitar: concluir sobre o tempo de um hook por uma medição, ou comparar medições de horas diferentes (no Windows abrir um processo varia de 100 a 800 ms).
+- Fazer: medir a versão antiga e a nova lado a lado, na mesma hora, cinco vezes cada, com `sh -c true` como régua do custo de abrir processo; sessão paga em paralelo, no máximo duas enquanto o hook não tiver folga.

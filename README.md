@@ -298,7 +298,8 @@ Requisitos:
 
 - Claude Code **v2.1.319+** (antes da 2.1.317, subagent herda o effort da sessão em vez do
   effort do próprio modelo; antes da 2.1.319, a linha dos subagents que o plugin traz não
-  roda); o Fable 5.2 pede a v2.1.321 e o Code Mode, a v2.1.323.
+  roda); o Fable 5.2 pede a v2.1.321 e o Code Mode, a v2.1.323. Da v2.1.326 em diante a linha
+  dos subagents sai de um módulo do plugin, com o custo de cada um; antes dela, da forma antiga.
 - Windows: **Git Bash** (os hooks rodam em `bash`).
 - **jq** — `winget install jqlang.jq` | `sudo apt install jq`. Sem ele, os agentes que só leem
   ficam sem Bash e o hook de abertura se cala: falha fechado. O lembrete da documentação
