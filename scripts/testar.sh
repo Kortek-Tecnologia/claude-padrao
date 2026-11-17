@@ -690,6 +690,18 @@ for par in "C5|$DUP|{\"execucoes\":1,\"segundos\":60}" "C7|$SUP|{\"execucoes\":1
   [ "$tem" = "$quer" ] || { echo "divergiu: checagem $id devolveu '$tem', esperado '$quer'"; FALHAS=$((FALHAS + 1)); }
 done
 rm -f "$EXE"
+# C6: commit raiz não tem pai — sem `--root` o diff-tree vem vazio e ele contaria como "só
+# documentação" (achado na sessão real do arrumar). O comando do arquivo, num repositório de um
+# commit com código, não pode devolver o commit.
+C6=$(sed -n 's/^  `\(git diff-tree .*\) || echo <sha>`$/\1/p' "$CH")
+case "$C6" in *"--root <sha>"*) ;; *) echo "divergiu: checagem C6 sem --root no diff-tree: '$C6'"; FALHAS=$((FALHAS + 1)) ;; esac
+REPO=$(mktemp -d)
+(cd "$REPO" && git init -q . && git config user.email t@t && git config user.name t &&
+  echo x >app.php && echo y >README.md && git add . && git commit -qm um) >/dev/null 2>&1
+sha=$(cd "$REPO" && git rev-parse HEAD)
+dev=$(cd "$REPO" && eval "$(printf '%s' "$C6" | sed "s/<sha>/$sha/")" || echo so-doc)
+[ -z "$dev" ] || { echo "divergiu: checagem C6 tratou o commit raiz como so documentacao"; FALHAS=$((FALHAS + 1)); }
+rm -rf "$REPO"
 
 # Linha dos subagents como mod: o hooks.json aponta um módulo que existe, e os testes dele
 # passam onde há o Claude Code (o CI não tem: lá fica só a conferência do arquivo).

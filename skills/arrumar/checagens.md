@@ -149,7 +149,7 @@ minutos (cada job repete o setup); filtrar ou cancelar corta minutos e deixa com
 - Vale quando: nenhum passo do workflow lê a documentação (lint de markdown, validação de
   diagrama, build de site) e ele não tem `paths` nem `paths-ignore`.
 - Conferir: para cada execução de `push` de `execucoes.json`,
-  `git diff-tree --no-commit-id --name-only -r -m --first-parent <sha> | grep -qvE '(\.md|\.txt)$|^docs/|^LICENSE' || echo <sha>`
+  `git diff-tree --no-commit-id --name-only -r -m --first-parent --root <sha> | grep -qvE '(\.md|\.txt)$|^docs/|^LICENSE' || echo <sha>`
   — os commits devolvidos só tocam documentação; some o tempo das execuções deles.
 - Desvio: a contagem e o tempo somado, com um commit de exemplo.
 - Gravidade: baixa (média acima de 30 minutos somados).

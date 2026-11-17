@@ -55,6 +55,18 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 | versão instalada × `~/.claude/plugins/marketplaces/claude-padrao` | por **diferença**, não por ordem: a numeração recomeçou em 1.0.0 |
 | carimbo `modelo X` do bloco do `CLAUDE.md` e dos `docs/agente/padrao-*.md` do projeto | o da 1ª linha do arquivo em `modelos/`; só o carimbo, não o texto — quem grava no projeto é o Claude, e espaço ou CRLF dariam aviso falso. A marca vale só no começo da linha (prosa que cita o marcador não conta), e carimbo mais novo que o do plugin manda atualizar o plugin, não rodar o `aplicar` |
 
+**O teto de compactação, conferido em sessão real** (v2.1.326, Windows, `claude -p "/context"`
+com HOME falso, numa pasta só com o `modelos/settings.json`; o `/context` não chama o modelo):
+
+| Modelo da sessão | com a chave em `modelSettings` | sem a chave |
+|---|---|---|
+| `claude-opus-5-5` | 17.8k / 400k | — |
+| `claude-fable-5-2` (`--model`) | 19.2k / 400k | 19.2k / 1m |
+| `claude-mythos-5-2` (`--model`) | 19k / 400k | 19k / 1m |
+
+O Claude Code casa a chave pelo ID do modelo da sessão, também nos que o padrão não fixa como
+`model`. Não medido: a compactação disparando de fato aos 400K numa sessão longa.
+
 **Custo.** No Windows abrir um processo custa de 100 a 800 ms, e até a 2.7.1 o hook abria uns 45
 (`cat` de cada settings, `sed` de cada carimbo, `ls` de cada pasta). Desde a 2.7.2 os arquivos
 são lidos com o `read` do shell, as pastas conferidas por glob e o carimbo tirado sem `sed`:
@@ -362,10 +374,10 @@ execução superada), contada nas últimas 100 do `gh run list`.
 
 | Projeto | `C5` duplicada | `C6` só documentação | `C7` superada |
 |---|---|---|---|
-| plugin GLPI (PHP, CI de 17 s, `on: [push, pull_request]`) | 23 execuções · 417 s | 10 · 170 s | 0 |
+| plugin GLPI (PHP, CI de 17 s, `on: [push, pull_request]`) | 23 execuções · 417 s | 9 · 156 s | 0 |
 | outro plugin GLPI, mesmo workflow | 11 · 166 s | 22 · 364 s | 0 |
 | app Android (Gradle, CI de 12 min 44 s, já com `concurrency`) | 0 | 1 · 764 s | 0 |
-| app Python em runner Windows | 0 | 9 · 720 s | 7 · 436 s |
+| app Python em runner Windows | 0 | 7 · 528 s | 7 · 436 s |
 | este repositório (o CI valida os diagramas dos `.md`) | 0 | 0 | 0 |
 
   O limiar (5 execuções ou 10 minutos somados) saiu daí: pega o CI de 17 s que roda em dobro 23
@@ -379,8 +391,18 @@ execução superada), contada nas últimas 100 do `gh run list`.
   isolamento do Vitest e estreitar fixture (mudam código e teste; o `arrumar` não altera código),
   trocar de typechecker ou linter (a `C3` não propõe ferramenta que o projeto não tem) e seleção
   de testes por grafo de dependência próprio (a `C4` já cobre a seleção que o runner sabe fazer).
-- **Não medido:** `C5`–`C7` numa sessão do `arrumar` (o plano e os lotes que saem delas), `C2` e
-  `C4` com tempo de CI real e outra stack que não Node. O `revisor` não lê a
+- **`C5`–`C7` numa sessão do `arrumar`** (2.11.0, v2.1.326, Windows, `claude -p "/padrao:arrumar
+  só infra"` com HOME falso, numa cópia do primeiro plugin GLPI com o push desativado; uma
+  rodada, 195 s, US$ 0,97; para no plano). O `INFRA.md` fechou com uma linha por checagem: `C5`
+  desvio (23 execuções, 417 s), `C6` desvio (9, 156 s), `C7` sem desvio (0 superadas nas 54),
+  `C1`–`C4` `não se aplica` (mediana de 16 s) e `S6` desvio. O plano juntou tudo num lote só do
+  workflow, com as duas decisões assumidas à vista (branch sem PR deixa de rodar o CI; commit
+  só de documentação não roda) e o filtro também no `pull_request`, depois de ler na API que
+  não há check obrigatório. A sessão excluiu por conta própria o commit raiz, que o comando da
+  `C6` contava como só documentação (sem pai, o `diff-tree` vinha vazio): desde a 2.11.1 o
+  comando leva `--root`, e os números da tabela acima já são os corrigidos.
+- **Não medido:** a fase 3 com um lote de `C5`–`C7`, `C2` e `C4` com tempo de CI real e outra
+  stack que não Node. O `revisor` não lê a
   lista: entra depois de haver uma avaliação dele.
 
 **`atualizar-docs`** — `user-invocable: false`: fora do menu. Quem a dispara é o modelo: o bloco
