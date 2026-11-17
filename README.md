@@ -224,7 +224,7 @@ padrao:coletor · Haiku 5.5 · medium · ctx 4% (42k) · 1m15s · lendo app.py
 ```
 
 Modelo em vermelho fora do Opus 5.5 1M; em amarelo o que é ajuste só da sessão (effort fora de
-medium, Fable 5.2); "sem padrão" na pasta sem o plugin; nos subagents, vermelho fora dos modelos
+medium, Fable 5.2 ou Mythos 5.2); "sem padrão" na pasta sem o plugin; nos subagents, vermelho fora dos modelos
 fixados. Como cada hook decide: [docs/como-funciona.md](docs/como-funciona.md).
 
 ## Modelos e delegação
@@ -257,7 +257,8 @@ flowchart LR
   sessão (`/model`, tecla `s`), em vez de xhigh ou max no Opus. No Fable, medium para o trabalho
   interativo e high para a parte difícil; xhigh rende pouco por muito mais tokens. Custa o dobro
   do Opus em entrada e saída (o cache lido custa o mesmo) e, conforme o plano, consome créditos
-  de uso. Troque depois de `/compact`: o cache é por modelo. Em subagent o Fable é recusado.
+  de uso. Troque depois de `/compact`: o cache é por modelo. O Mythos 5.2 é o mesmo degrau, com
+  o mesmo preço, para a organização que tem acesso a ele. Em subagent os dois são recusados.
 - Os aliases `opus`, `sonnet`, `haiku` e `fable` apontam fixo para a 5.5 e o Fable 5.2
   (`ANTHROPIC_DEFAULT_*_MODEL`): não mudam sozinhos quando sai versão nova. Sem `fallbackModel`,
   indisponibilidade não troca de modelo; a única troca automática é a de segurança (mensagem

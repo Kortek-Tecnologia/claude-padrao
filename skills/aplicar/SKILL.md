@@ -239,6 +239,7 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
    global) e a próxima volta a medium. A compactação automática fica em 400K no Opus, e
    também no Fable 5.2 e no Mythos 5.2 se a sessão trocar para eles (cada
    requisição relê o contexto inteiro); a sessão que precisar de mais abre com
-   `claude --autocompact 1M`. Subir ao Fable 5.2 é o último degrau e vale só na sessão:
-   `/model`, escolher o Fable e teclar `s`, de preferência depois de `/compact` (o cache é por
+   `claude --autocompact 1M`. Subir ao Fable 5.2 (ou ao Mythos 5.2, na organização
+   que tem acesso) é o último degrau e vale só na sessão:
+   `/model`, escolher o modelo e teclar `s`, de preferência depois de `/compact` (o cache é por
    modelo).

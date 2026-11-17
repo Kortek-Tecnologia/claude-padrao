@@ -4,8 +4,8 @@
 //
 //     tipo · Modelo 5.5 · effort · ctx 12% (120k) · US$ 0.03 · 1m32s · descrição
 //
-// Modelo fora dos que o padrao fixa sai em vermelho: a família 5.5 e o Fable 5.2
-// (só o `fork` de uma sessão escalada chega nele). Haiku com mais de 100K de
+// Modelo fora dos que o padrao fixa sai em vermelho: a família 5.5, o Fable 5.2 e
+// o Mythos 5.2 (só o `fork` de uma sessão escalada chega neles). Haiku com mais de 100K de
 // contexto paga a requisição cinco vezes mais: sai o aviso em vermelho.
 import type { Register } from 'claude-code'
 
@@ -20,8 +20,8 @@ const RESET = `${ESC}0m`
 const GRAY = `${ESC}38;5;244m`
 const SEP = ` ${GRAY}·${RESET} `
 
-const FAMILIA: Record<string, string> = { opus: MAGENTA, sonnet: CYAN, haiku: GREEN, fable: YELLOW }
-const FIXADO: Record<string, string> = { opus: '5.5', sonnet: '5.5', haiku: '5.5', fable: '5.2' }
+const FAMILIA: Record<string, string> = { opus: MAGENTA, sonnet: CYAN, haiku: GREEN, fable: YELLOW, mythos: YELLOW }
+const FIXADO: Record<string, string> = { opus: '5.5', sonnet: '5.5', haiku: '5.5', fable: '5.2', mythos: '5.2' }
 const STATUS: Record<string, string> = {
   completed: `${GREEN}✓${RESET}`,
   failed: `${RED}✗${RESET}`,

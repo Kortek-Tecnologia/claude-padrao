@@ -11,9 +11,9 @@
 #   `model` rodaria no modelo da sessão, e o env não o alcança; os agentes do
 #   plugin sem `model` passam (o frontmatter já tem o modelo certo), mas o
 #   `model` da chamada venceria o frontmatter;
-# - recusa `model` fora de haiku|sonnet|opus (fable, `inherit`, ID completo): os
-#   aliases são os que o padrão fixa na família 5.5; o Fable é degrau de
-#   escalada da sessão (/model, só a sessão), não de subagent;
+# - recusa `model` fora de haiku|sonnet|opus (fable, mythos, `inherit`, ID
+#   completo): os aliases são os que o padrão fixa na família 5.5; o Fable e o
+#   Mythos são degrau de escalada da sessão (/model, só a sessão), não de subagent;
 # - deixa o `fork` passar (roda no modelo da sessão e ignora `model`).
 #
 # Sem jq não dá para reescrever a chamada: os de papel fixo fora do modelo são
@@ -61,4 +61,4 @@ if [ -n "$exigido" ]; then
 fi
 
 case "$modelo" in "" | haiku | sonnet | opus) exit 0 ;; esac
-negar "model='$modelo' fora da politica. Use opus (decidir, planejar, o dificil), sonnet (executar lote com ficha fechada, revisar diff) ou haiku (coletar: busca, leitura, log); sem model o subagent roda em sonnet. Fable so na sessao (/model, tecla s), nunca em subagent. Detalhes em docs/agente/padrao-modelos.md."
+negar "model='$modelo' fora da politica. Use opus (decidir, planejar, o dificil), sonnet (executar lote com ficha fechada, revisar diff) ou haiku (coletar: busca, leitura, log); sem model o subagent roda em sonnet. Fable e Mythos so na sessao (/model, tecla s), nunca em subagent. Detalhes em docs/agente/padrao-modelos.md."

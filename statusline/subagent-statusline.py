@@ -5,7 +5,7 @@
 
 Recebe {"columns": N, "tasks": [...]} no stdin e devolve uma linha JSON
 {"id", "content"} por task. Modelo fora dos que o padrao fixa sai em vermelho:
-a família 5.5 e o Fable 5.2 (só o `fork` de uma sessão escalada chega nele).
+a família 5.5, o Fable 5.2 e o Mythos 5.2 (só o `fork` de uma sessão escalada chega neles).
 Task sem modelo resolvido ainda: mostra "…".
 """
 import json
@@ -20,8 +20,8 @@ GREEN, YELLOW, RED, CYAN, MAGENTA, BOLD, RESET = (
     "\033[32m", "\033[33m", "\033[31m", "\033[36m", "\033[35m", "\033[1m", "\033[0m",
 )
 GRAY = "\033[38;5;244m"
-FAMILIA = {"opus": MAGENTA, "sonnet": CYAN, "haiku": GREEN, "fable": YELLOW}
-FIXADO = {"opus": ("5", "5"), "sonnet": ("5", "5"), "haiku": ("5", "5"), "fable": ("5", "2")}
+FAMILIA = {"opus": MAGENTA, "sonnet": CYAN, "haiku": GREEN, "fable": YELLOW, "mythos": YELLOW}
+FIXADO = {"opus": ("5", "5"), "sonnet": ("5", "5"), "haiku": ("5", "5"), "fable": ("5", "2"), "mythos": ("5", "2")}
 STATUS = {"completed": f"{GREEN}✓{RESET}", "failed": f"{RED}✗{RESET}", "killed": f"{GRAY}■{RESET}"}
 ANSI = re.compile(r"\033\[[0-9;]*m")
 SEP = f" {GRAY}·{RESET} "

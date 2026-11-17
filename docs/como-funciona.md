@@ -129,7 +129,7 @@ flowchart TD
   F -->|"não"| COR["corrige: allow +<br/>updatedInput"]
   M -->|"vazio"| ENV["passa: CLAUDE_CODE_<br/>SUBAGENT_MODEL = sonnet"]
   M -->|"haiku, sonnet, opus"| P2["passa"]
-  M -->|"fable, inherit, ID"| REC["recusa, explicando<br/>a política"]
+  M -->|"fable, mythos, inherit, ID"| REC["recusa, explicando<br/>a política"]
 ```
 
 | Papel fixo | Modelo |
@@ -142,8 +142,11 @@ flowchart TD
   `CLAUDE_CODE_SUBAGENT_MODEL` > modelo da sessão. Por isso os agentes do plugin sem `model` passam
   (o frontmatter já tem o certo) e o hook só age quando a chamada traz outro.
 - O `Explore` embutido roda no `opus` por padrão: daí a correção sempre.
-- `fable` segue recusado em subagent: é o último degrau de escalada da **sessão** (`/model` com
-  `s`; amarelo na status line), e o alias está fixado no Fable 5.2 só para não mudar sozinho.
+- `fable` e `mythos` seguem recusados em subagent: são o último degrau de escalada da **sessão**
+  (`/model` com `s`; amarelo na status line), e o alias `fable` está fixado no Fable 5.2 só para
+  não mudar sozinho. O Mythos 5.2 é o mesmo degrau (mesmo preço, só para organização verificada)
+  e não tem alias fixado: o Claude Code 2.1.326 não traz `ANTHROPIC_DEFAULT_MYTHOS_MODEL`; a
+  status line e o `medir` o reconhecem pelo ID `claude-mythos-5-2`.
 - A correção devolve a entrada inteira com o `model` trocado (`updatedInput` substitui a entrada).
 - **O `effort` da chamada fica de fora**, por medição: nas 304 chamadas de subagent do
   histórico local (66 transcripts, 2026-11-17) nenhuma trouxe `effort`. Em vez de regra nova

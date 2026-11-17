@@ -188,11 +188,11 @@ def truncate(text, n):
 
 # --- padrao: início do bloco do plugin padrao (o resto do arquivo é do autor) ---
 # Política na própria linha: modelo em vermelho fora do Opus 5.5 com 1M — menos
-# o Fable 5.2, degrau de escalada, em amarelo como o effort fora de medium
+# o Fable 5.2 e o Mythos 5.2, degrau de escalada, em amarelo como o effort fora de medium
 # (ajuste da sessão: a próxima abre no Opus em medium) —, "sem padrão" na pasta
 # sem o plugin.
 PADRAO_MODELO, PADRAO_JANELA, PADRAO_EFFORT = "claude-opus-5-5", 1_000_000, "medium"
-PADRAO_ESCALADA = "claude-fable-5-2"
+PADRAO_ESCALADA = ("claude-fable-5-2", "claude-mythos-5-2")
 
 
 def padrao(data):

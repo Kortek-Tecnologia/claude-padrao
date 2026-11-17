@@ -52,6 +52,7 @@ allow	{"tool_input":{"prompt":"x","subagent_type":"Explore"}}
 allow	{"tool_input":{"prompt":"x","subagent_type":"Explore","model":"sonnet"}}
 allow	{"tool_input":{"prompt":"x","subagent_type":"Plan","model":"haiku"}}
 deny	{"tool_input":{"prompt":"x","model":"fable"}}
+deny	{"tool_input":{"prompt":"x","model":"mythos"}}
 deny	{"tool_input":{"prompt":"x","model":"inherit"}}
 deny	{"tool_input":{"prompt":"x","subagent_type":"general-purpose","model":"claude-opus-5-5"}}
 CASOS
@@ -63,7 +64,7 @@ corrigida=$(printf '%s' '{"tool_input":{"prompt":"p","description":"d","subagent
   { echo "divergiu: Explore corrigido para $corrigida"; FALHAS=$((FALHAS + 1)); }
 # A recusa do fable diz onde ele vale (o medir reconhece a recusa por "fora da politica").
 printf '%s' '{"tool_input":{"prompt":"x","model":"fable"}}' | sh "$D/travar-modelo-subagent.sh" |
-  jq -r '.hookSpecificOutput.permissionDecisionReason' | grep -q 'fora da politica.*Fable so na sessao' ||
+  jq -r '.hookSpecificOutput.permissionDecisionReason' | grep -q 'fora da politica.*Fable e Mythos so na sessao' ||
   { echo "divergiu: recusa do fable sem o texto esperado"; FALHAS=$((FALHAS + 1)); }
 
 rodar trava-leitura.sh raw <<'CASOS'
@@ -434,7 +435,7 @@ while read -r arq carimbo soma; do
     { echo "divergiu: modelo $arq mudou (carimbo '$tem_c', soma $tem_s): suba o 'modelo X' da 1a linha e registre os dois em testar.sh"; FALHAS=$((FALHAS + 1)); }
 done <<'CARIMBOS'
 claude-md.md 2.2.0 2856927040
-agente/padrao-modelos.md 2.9.0 2086910817
+agente/padrao-modelos.md 2.11.0 86871819
 agente/padrao-configuracao.md 2.4.0 3993088577
 CARIMBOS
 
@@ -461,6 +462,9 @@ confere_sl "janela 200k = vermelho" "$(linha1 claude-opus-5-5 200000 medium "$PA
 # o Fable 5.2 é degrau de escalada da sessão: amarelo, como o effort fora de medium
 confere_sl "fable na principal = amarelo" "$(linha1 claude-fable-5-2 1000000 medium "$PADRAO_DIR")" "${AMAR}M" s
 confere_sl "fable 5.1 = vermelho" "$(linha1 claude-fable-5-1 1000000 medium "$PADRAO_DIR")" "${VERM}M" s
+# o Mythos 5.2 é o mesmo degrau (organização verificada): amarelo; outra versão, vermelho
+confere_sl "mythos na principal = amarelo" "$(linha1 claude-mythos-5-2 1000000 medium "$PADRAO_DIR")" "${AMAR}M" s
+confere_sl "mythos 5.1 = vermelho" "$(linha1 claude-mythos-5-1 1000000 medium "$PADRAO_DIR")" "${VERM}M" s
 # effort fora de medium é ajuste da sessão (a próxima abre em medium): amarelo
 confere_sl "effort high = amarelo" "$(linha1 claude-opus-5-5 1000000 high "$PADRAO_DIR")" "${AMAR}high" s
 confere_sl "effort high nao e vermelho" "$(linha1 claude-opus-5-5 1000000 high "$PADRAO_DIR")" "$VERM" n
@@ -470,10 +474,10 @@ jq -e '.statusLine.refreshInterval >= 1' skills/aplicar/modelos/global.json >/de
   { echo "divergiu: global.json sem statusLine.refreshInterval"; FALHAS=$((FALHAS + 1)); }
 
 # Status line dos subagents: uma linha JSON por task; os modelos que o padrão
-# fixa (5.5 e Fable 5.2) na cor da família, o resto em vermelho (\033[31m).
-saida=$(printf '%s' '{"columns":80,"tasks":[{"id":"a","agentType":"padrao:coletor","status":"running","description":"x","startTime":0,"model":"claude-haiku-5-5","contextWindowSize":1000000,"tokenCount":1000},{"id":"b","agentType":"velho","status":"running","description":"y","startTime":0,"model":"claude-sonnet-4-5","tokenCount":1},{"id":"c","agentType":"fork","status":"running","description":"z","startTime":0,"model":"claude-fable-5-2","tokenCount":1},{"id":"d","agentType":"fork","status":"running","description":"w","startTime":0,"model":"claude-fable-5-5","tokenCount":1}]}' |
+# fixa (5.5, Fable 5.2 e Mythos 5.2) na cor da família, o resto em vermelho (\033[31m).
+saida=$(printf '%s' '{"columns":80,"tasks":[{"id":"a","agentType":"padrao:coletor","status":"running","description":"x","startTime":0,"model":"claude-haiku-5-5","contextWindowSize":1000000,"tokenCount":1000},{"id":"b","agentType":"velho","status":"running","description":"y","startTime":0,"model":"claude-sonnet-4-5","tokenCount":1},{"id":"c","agentType":"fork","status":"running","description":"z","startTime":0,"model":"claude-fable-5-2","tokenCount":1},{"id":"d","agentType":"fork","status":"running","description":"w","startTime":0,"model":"claude-fable-5-5","tokenCount":1},{"id":"e","agentType":"fork","status":"running","description":"v","startTime":0,"model":"claude-mythos-5-2","tokenCount":1}]}' |
   sh "$D/py.sh" statusline/subagent-statusline.py)
-ok=$(printf '%s\n' "$saida" | jq -rs '[.[0].id == "a", (.[0].content | contains("Haiku 5.5")), (.[1].content | contains("\u001b[31mSonnet 4.5")), (.[2].content | contains("\u001b[33mFable 5.2")), (.[3].content | contains("\u001b[31mFable 5.5"))] | all')
+ok=$(printf '%s\n' "$saida" | jq -rs '[.[0].id == "a", (.[0].content | contains("Haiku 5.5")), (.[1].content | contains("\u001b[31mSonnet 4.5")), (.[2].content | contains("\u001b[33mFable 5.2")), (.[3].content | contains("\u001b[31mFable 5.5")), (.[4].content | contains("\u001b[33mMythos 5.2"))] | all')
 [ "$ok" = true ] || { echo "divergiu: subagent-statusline: $saida"; FALHAS=$((FALHAS + 1)); }
 # Quem liga essa linha é o settings.json do plugin (de plugin só valem `agent` e
 # `subagentStatusLine`); o global não a traz mais, porque venceria a do plugin. O comando roda
