@@ -128,6 +128,12 @@ flowchart TD
 | `sort`, `uniq`, `find`, `file`, `rg` | opção que grava ou executa (`-o`, dois operandos, `-exec`/`-delete`/`-fprint`, `-C`, `--pre`/`--hostname-bin`) |
 | qualquer segmento | `>` que não seja `>/dev/null` ou `2>&1` |
 
+- **Opção longa abreviada conta:** o GNU e o git aceitam `--outp`, `--in-pl`, `--pro`, `--op` no
+  lugar do nome inteiro, e o git aceita `-O` colado a outras opções curtas (`-nO./prog`). A
+  trava casa o menor prefixo que já não é ambíguo (`--o` e `--co` no sort, `--i` no sed, `--d` e
+  `--pr` no awk, `--op` e `--outp` no git, `--co` no file) e o `O` em qualquer posição do grupo.
+  Até a 2.4.1 casava o nome inteiro: `git grep --op=./prog` executava programa e
+  `sed --sandbox --in-pl` gravava no lugar. Opção nova que grave ou execute entra pelo prefixo.
 - **Por que `--sandbox`:** sed e awk são linguagens. `s|a|b|e` executa comando com qualquer
   delimitador, e o gawk chama `system()` por chamada indireta (`@f`); nenhum filtro de texto
   fecha isso. O `--sandbox` do GNU sed recusa `e/r/w`, e o do gawk, `system`, redirecionamento e

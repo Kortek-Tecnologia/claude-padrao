@@ -156,6 +156,24 @@ deny	cat x >/dev/null/../f
 deny	git --git-dir=x log
 deny	git --work-tree=x status
 deny	rg --hostname-bin=./evil x
+deny	sort --outp=saida x
+deny	sort --o saida x
+deny	sort --compress-prog=./evil x
+deny	sed --sandbox --in-pl=.bak s/a/b/ x
+deny	sed --sandbox --i s/a/b/ x
+deny	awk --sandbox --pro=saida 'BEGIN{}'
+deny	awk --sandbox --du=saida 'BEGIN{}'
+deny	awk --sandbox --debug 'BEGIN{}'
+deny	git grep --op=./evil -e x
+deny	git grep -nO./evil -e x
+deny	git grep -nO -e x
+deny	git log --outp=saida
+deny	file --comp -m magia
+PASSA	sort --numeric-sort --reverse x
+PASSA	sed --sandbox --quiet --expression=p x
+PASSA	awk --sandbox --posix '{print $1}' x
+PASSA	git grep -n --only-matching -e x
+PASSA	git grep -n -e a --or -e b
 CASOS
 
 # O --sandbox segura de verdade o que a trava deixa passar com ele (GNU sed e
