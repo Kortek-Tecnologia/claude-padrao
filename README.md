@@ -369,8 +369,8 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
   `~/.claude.json`, mas guarda o `settings.json` global como era, com os valores do `env`: fica
   fora do git, e vale apagá-lo depois de conferir a migração.
 - **Windows, caminho com mais de 260 caracteres:** o Python não enxerga (projeto em pasta muito
-  funda). O `aplicar` confere pelo Bash o que o hook acusa; o `/padrao:medir` responde "sem
-  transcripts".
+  funda). O `aplicar` confere pelo Bash o que o hook acusa; o `/padrao:medir` lê os transcripts
+  mesmo assim (da 2.13.1 em diante).
 
 ## Desenvolver
 

@@ -713,6 +713,16 @@ for re in '^  total      US\$ 0\.00 · subagents 0%$' '^  acima de 600K    0 · 
   printf '%s\n' "$med" | grep -Eq "$re" || { echo "divergiu: medir-modelos (vazio) sem /$re/: $med"; FALHAS=$((FALHAS + 1)); }
 done
 case "$med" in *"sem preço"*) echo "divergiu: medir-modelos (vazio) listou modelo sem preço"; FALHAS=$((FALHAS + 1)) ;; esac
+# Windows: caminho com mais de 260 caracteres só abre com o prefixo \\?\ (o medir o põe); sem
+# ele a pasta dos transcripts "não existe". Os mesmos transcripts num HOME de 230 caracteres:
+# o HOME fica abaixo do limite (acima dele o cygpath já devolve o caminho com o prefixo, e o
+# teste passaria sem o medir fazer nada) e a pasta dos transcripts, acima.
+base=$(nativo "$CASA"); n=$((230 - ${#base} - 1)); [ "$n" -gt 0 ] || n=1
+FUNDO="$CASA/$(awk -v n="$n" 'BEGIN { for (i = 0; i < n; i++) printf "f" }')"
+mkdir -p "$FUNDO" && cp -R "$CASA/.claude" "$FUNDO/"
+med=$(HOME="$FUNDO" USERPROFILE="$(nativo "$FUNDO")" sh "$D/py.sh" skills/medir/medir-modelos.py --projeto "$PROJ" 2>&1 | tr -d '\r')
+printf '%s\n' "$med" | grep -Eq '^  total      US\$ 0\.00 · subagents 0%$' ||
+  { echo "divergiu: medir-modelos em caminho de mais de 260 caracteres: $med"; FALHAS=$((FALHAS + 1)); }
 rm -rf "$CASA" "$PROJ"
 
 # Checagens do arrumar: todo item traz os cinco campos, e o padrão de segredo casa token nos

@@ -162,6 +162,17 @@ def chave_projeto(caminho: str) -> str:
     return re.sub(r"[^A-Za-z0-9]", "-", caminho)
 
 
+def caminho_longo(p: Path) -> Path:
+    """No Windows, caminho com mais de 260 caracteres só abre com o prefixo `\\\\?\\`
+    (o `LongPathsEnabled` vem desligado). Os transcripts moram em
+    ~/.claude/projects/<caminho do projeto>/<sessão>/subagents/: projeto em pasta
+    funda passa do limite, e sem o prefixo a pasta "não existe"."""
+    texto = str(p)
+    if sys.platform != "win32" or texto.startswith("\\\\"):
+        return p
+    return Path("\\\\?\\" + texto)
+
+
 def modelo_efetivo(tipo: str, pedido: str) -> tuple[str, bool]:
     """(modelo em que o subagent rodou, se o hook corrigiu a chamada)."""
     exigido = FIXO.get(tipo)
@@ -307,9 +318,10 @@ def main() -> None:
     dias = args.dias
     raiz = (args.projeto or Path.cwd()).resolve()
     desde = (datetime.now(timezone.utc) - timedelta(days=dias)).strftime("%Y-%m-%dT%H:%M:%S")
-    pasta = Path.home() / ".claude" / "projects" / chave_projeto(str(raiz))
+    curta = Path.home() / ".claude" / "projects" / chave_projeto(str(raiz))
+    pasta = caminho_longo(curta)
     if not pasta.is_dir():
-        raise SystemExit(f"sem transcripts em {pasta}")
+        raise SystemExit(f"sem transcripts em {curta}")
 
     chamadas: dict[str, Counter[str]] = defaultdict(Counter)
     corrigidas: Counter[str] = Counter()

@@ -40,7 +40,7 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 ### Caminho acima de 260 caracteres no Windows (2026-11-03)
 - Erro: no sandbox (HOME falso no scratchpad), `inventariar.py`, `medir-modelos.py` e o `jq` não acharam `~/.claude/projects/<chave>/...`; o Bash achava.
 - Evitar: concluir "não existe" pela saída de Python ou jq nativos em caminho fundo.
-- Fazer: para testar `medir`/`inventariar`, copie os transcripts para um HOME curto e use `--projeto` curto; ler arquivo fundo, `cat arquivo | jq`.
+- Fazer: ler arquivo fundo, `cat arquivo | jq`; o `medir` já abre a pasta com o prefixo `\\?\` (2.13.1), o `inventariar` não. Teste de caminho longo: rode-o sem a correção para ver reprovar — o primeiro passou à toa, porque o `cygpath -m` de um HOME acima de 260 já devolve `//?/C:/...`; o HOME tem de ficar abaixo do limite e só a pasta final acima.
 
 ### Política de modelos mudada só por artigo (2026-11-10)
 - Erro: troquei a regra de delegação e o lema com base num post ("o Opus edita por padrão") e tive de voltar atrás em ~10 arquivos quando o histórico das sessões mostrou o contrário.

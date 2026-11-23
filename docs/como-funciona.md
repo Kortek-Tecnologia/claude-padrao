@@ -729,8 +729,11 @@ do subagent; o texto do hook não entra). Vale rever quando o time tiver máquin
 quando o sandbox do Windows sair de trás do `feature gate` que a recusa cita.
 
 No Windows, o caminho do HOME falso no scratchpad passa de 260 caracteres dentro de
-`.claude/projects/`: Python e o `jq` nativo não abrem — leia com `cat arquivo | jq` e, para o
-`medir`, copie os transcripts para um HOME curto.
+`.claude/projects/`: Python e o `jq` nativo não abrem — leia com `cat arquivo | jq`. O
+`medir-modelos.py` abre a pasta dos transcripts com o prefixo `\\?\` (2.13.1), porque o mesmo
+acontece em projeto real de pasta funda; o `testar.sh` tem o caso, com o HOME abaixo de 260 e
+a pasta acima (com o HOME já acima, o `cygpath -m` devolve o caminho com o prefixo e o teste
+passaria sem a correção).
 
 ## Publicar
 
