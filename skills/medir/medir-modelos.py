@@ -16,6 +16,8 @@ projeto e conta:
   quantos saíram sem nenhuma — só mede, não há hook cobrando;
 - commits da sessão principal: quantos tiveram a `padrao:atualizar-docs` antes e
   quantas vezes o hook da documentação precisou lembrar;
+- lembretes do hook das pendências (fim de turno) e quantos tiveram um
+  `AskUserQuestion` em seguida, no mesmo turno;
 - custo estimado a preço de lista por modelo, o contexto por requisição da
   sessão principal (o que mais pesa) e as requisições do Haiku acima de 100K;
 - consultas ao advisor (/padrao:advisor) e o custo do modelo consultado, que
@@ -48,6 +50,11 @@ RECUSA = ("fora da politica", "roda em model=", "Subagent sem modelo", "e travad
 
 # Recusa do hook da documentação (cobrar-docs.sh): o commit tentado sem a skill.
 LEMBRETE = "antes deste commit, rode a skill"
+
+# Cobrança do hook das pendências (cobrar-pergunta.sh): o Claude Code a grava como mensagem
+# do usuário que começa por "Stop hook feedback". O texto também aparece em leitura do
+# script (resultado de ferramenta), que não conta.
+PENDENCIA = "a resposta termina com oferta ou item em aberto"
 
 # Comando que faz commit, pela regra do cobrar-docs.sh (lá em sh, por segmento; aqui
 # aproximada): somem os heredocs fechados e o conteúdo das aspas (mensagem que cita o
@@ -334,6 +341,7 @@ def main() -> None:
     uso_advisor: dict = {}
     recusas = sessoes = sem_delegar = 0
     commits = com_docs = lembretes = 0
+    pendencias = com_pergunta = 0
     # verificação antes do commit: [teste ou build, revisor, executor] e os sem nenhuma
     com_verif = [0, 0, 0]
     sem_verif = 0
@@ -348,10 +356,20 @@ def main() -> None:
         ids_commit: dict[str, tuple[bool, tuple[bool, bool, bool]]] = {}
         docs_antes = False
         verif = [False, False, False]
+        # o hook das pendências cobrou e o turno ainda não teve AskUserQuestion
+        aguarda_pergunta = False
         for o, _ in linhas(arq, desde):
             ativa = True
             msg = o.get("message")
             if o.get("type") == "user" and isinstance(msg, dict):
+                texto = msg.get("content")
+                if isinstance(texto, str):
+                    if "Stop hook feedback" in texto and PENDENCIA in texto:
+                        pendencias += 1
+                        aguarda_pergunta = True
+                    elif not o.get("isMeta"):
+                        # prompt novo do usuário: o turno da cobrança fechou sem pergunta
+                        aguarda_pergunta = False
                 # Recusa = resultado de uma chamada Agent com o texto do hook. Só o
                 # resultado do Agent: o texto também aparece em leitura do script.
                 for c in msg.get("content") or []:
@@ -391,6 +409,9 @@ def main() -> None:
                 if not isinstance(c, dict) or c.get("type") != "tool_use":
                     continue
                 i = c.get("input") or {}
+                if c.get("name") == "AskUserQuestion" and aguarda_pergunta:
+                    com_pergunta += 1
+                    aguarda_pergunta = False
                 nome_skill = str(i.get("skill") or "") if c.get("name") == "Skill" else ""
                 if "review" in nome_skill or "verify" in nome_skill:
                     verif[1] = True
@@ -443,6 +464,7 @@ def main() -> None:
           + (f" ({correcoes})" if correcoes else "") + f" · {recusas} recusa(s)")
     print(f"documentação antes do commit: {commits} commit(s) · {com_docs} com a atualizar-docs antes"
           f" · {lembretes} lembrete(s) do hook")
+    print(f"pendências ao encerrar: {pendencias} lembrete(s) do hook · {com_pergunta} com pergunta em seguida")
     print(f"verificação antes do commit: {commits} commit(s) · {com_verif[0]} com teste ou build"
           f" · {com_verif[1]} com revisor · {com_verif[2]} com executor · {sem_verif} sem nenhuma")
     if com_effort:

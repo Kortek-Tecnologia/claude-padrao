@@ -706,6 +706,15 @@ agora=$(date -u +%Y-%m-%dT%H:%M:%S)
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m6","model":"claude-opus-5-5[1m]","usage":{"cache_read_input_tokens":500000,"output_tokens":5000},"content":[]}}\n' "$agora"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m7","model":"claude-opus-5-5[1m]","usage":{"input_tokens":1000,"cache_read_input_tokens":700000},"content":[]}}\n' "$agora"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"m8","model":"claude-opus-4-8","usage":{"input_tokens":1000},"content":[]}}\n' "$agora"
+  # pendências ao encerrar: a cobrança do hook Stop vem como mensagem do usuário ("Stop hook
+  # feedback"). A 1ª teve AskUserQuestion em seguida; a 2ª fechou sem pergunta (veio prompt novo,
+  # e o AskUserQuestion de depois é de outro turno); o texto lido de um arquivo não é cobrança.
+  printf '{"type":"user","isMeta":true,"timestamp":"%s","message":{"role":"user","content":"Stop hook feedback:\\npadrao: lembrete de rotina: a resposta termina com oferta ou item em aberto em frase solta"}}\n' "$agora"
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"p1","content":[{"type":"tool_use","id":"q1","name":"AskUserQuestion","input":{"questions":[]}}]}}\n' "$agora"
+  printf '{"type":"user","isMeta":true,"timestamp":"%s","message":{"role":"user","content":"Stop hook feedback:\\npadrao: lembrete de rotina: a resposta termina com oferta ou item em aberto em frase solta"}}\n' "$agora"
+  printf '{"type":"user","timestamp":"%s","message":{"role":"user","content":"outra coisa"}}\n' "$agora"
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"p2","content":[{"type":"tool_use","id":"q2","name":"AskUserQuestion","input":{"questions":[]}}]}}\n' "$agora"
+  printf '{"type":"user","timestamp":"%s","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"q9","content":"a resposta termina com oferta ou item em aberto"}]}}\n' "$agora"
 } >"$CASA/.claude/projects/$chave/s.jsonl"
 # subagents: sonnet 10k·2 + 10k escrita 5 min·2,5 + 100k lidos·0,1 + 2,5k·10 = 0,08; haiku com
 # 100.000 exatos = faixa baixa (100k·0,1 + 1k·0,5 = 0,0105); com 100.001 = alta (1·0,5 + 100k·0,05
@@ -732,7 +741,7 @@ done
 case "$med" in *"<synthetic>"*) echo "divergiu: medir-modelos listou <synthetic> como modelo"; FALHAS=$((FALHAS + 1)) ;; esac
 # effort pedido na chamada do subagent (o hook de modelo não olha), a data da tabela de preços e
 # a verificação antes do commit: dos 3 commits, só a repetição que veio depois do pytest conta
-for re in '^verificação antes do commit: 3 commit\(s\) · 1 com teste ou build · 0 com revisor · 0 com executor · 2 sem nenhuma$' '^effort na chamada do subagent: 1 chamada\(s\) · max=1$' '^custo estimado a preço de lista de 20[0-9]{2}-[0-9]{2}-[0-9]{2} '; do
+for re in '^verificação antes do commit: 3 commit\(s\) · 1 com teste ou build · 0 com revisor · 0 com executor · 2 sem nenhuma$' '^effort na chamada do subagent: 1 chamada\(s\) · max=1$' '^pendências ao encerrar: 2 lembrete\(s\) do hook · 1 com pergunta em seguida$' '^custo estimado a preço de lista de 20[0-9]{2}-[0-9]{2}-[0-9]{2} '; do
   printf '%s\n' "$med" | grep -Eq "$re" || { echo "divergiu: medir-modelos sem /$re/: $med"; FALHAS=$((FALHAS + 1)); }
 done
 # período sem requisição: as seções saem com zeros, sem quebrar

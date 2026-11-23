@@ -26,6 +26,10 @@ Leitura:
   quantos tiveram a `padrao:atualizar-docs` desde o commit anterior. Lembrete = o hook recusou a
   primeira tentativa. Commit sem a skill = o Claude repetiu depois do lembrete sem rodá-la (às
   vezes com razão: dois commits do mesmo diff), ou o hook não rodou naquela sessão.
+- Pendências ao encerrar: quantas vezes o hook de fim de turno cobrou (a resposta fechava com
+  oferta ou item em aberto) e em quantas o Claude abriu o `AskUserQuestion` em seguida. Muito
+  lembrete sem pergunta = a detecção por frases está disparando à toa, ou o Claude encerrou de
+  novo sem perguntar; em `claude -p` nunca há pergunta (a ferramenta não existe lá).
 - Verificação antes do commit: dos mesmos commits, quantos tiveram desde o commit anterior um
   teste, build, checagem de tipos ou lint rodado na sessão, uma chamada ao `padrao:revisor` (ou
   skill de revisão) ou um lote pelo `padrao:executor` — um commit pode contar em mais de uma — e

@@ -348,9 +348,12 @@ Sondagem da versão final, uma sessão por caso:
 | "só analise, sem mudar nada" | listou as melhorias sem oferecer nada; o hook não disparou |
 | "veja se tem algo a melhorar" | aplicou a melhoria direto (reversível, pela regra do bloco); não houve pendência a cobrar |
 
-Não medido: `claude -p` (lá não existe `AskUserQuestion`; a cobrança manda listar as opções com
-a recomendada marcada), Code Mode, a taxa de disparo à toa em uso real e quantas vezes o Claude
-encerra de novo sem perguntar. O `/padrao:medir` ainda não conta esses lembretes.
+Em `claude -p` não existe `AskUserQuestion`. Medido no fim da execução do `arrumar` acima: o hook
+cobrou uma vez e o Claude listou as três decisões em aberto, cada uma com as opções e a
+recomendada marcada. Não medido: Code Mode, a taxa de disparo à toa em uso real e quantas vezes
+o Claude encerra de novo sem perguntar. O `/padrao:medir` conta os lembretes e quantos tiveram pergunta
+em seguida (reconhece a cobrança pelo texto — mudou a frase, mude o `PENDENCIA` do
+`medir-modelos.py`), que é como essa taxa aparece em uso real.
 
 ## As skills
 
@@ -422,8 +425,15 @@ of the file", na página da janela de contexto). O `SKILL.md` tinha 20,8 KB e te
 de documentação, no bloqueio e na checagem de segredos — o que a fase 3, a mais longa, precisa.
 Agora ele tem 13 KB (o `testar.sh` cobra o teto de 15 KB): a checagem de segredos subiu para as
 regras do começo, a fase 1 foi para `levantar.md` e as regras de documentação para
-`regras-docs.md`, lidos na hora em que servem. Só texto movido; não medido em sessão real do
-`arrumar` depois da repartição.
+`regras-docs.md`, lidos na hora em que servem. Medido em sessão real depois da repartição
+(v2.1.330, Windows, `claude -p "/padrao:arrumar"` com HOME falso e depois `--resume <id>
+"Aprovar e executar"`, uma rodada; US$ 0,80 no plano e US$ 1,49 na execução), num projeto de um
+arquivo com o README errado em três pontos, uma regra em maiúsculas no `CLAUDE.md` e uma skill
+`deploy` sem a trava: o `levantar.md` foi lido duas vezes na fase 1, o `checagens.md` uma e o
+`regras-docs.md` uma no plano e de novo na ficha de cada lote; os seis artefatos fecharam com
+`COMPLETO`; saíram as três divergências do README, a ênfase e a `S7`; três lotes, cada um com
+executor, revisor e commit no branch `padrao/arrumar-<data>`. Não medido: a skill voltando de
+uma compactação de verdade (a sessão não chegou perto do teto).
 
 **Ênfase** (2.15.0) é achado Excesso na carga fixa: `levantar.md` traz o padrão `ENF` (palavras
 como IMPORTANTE, NUNCA, MUST em maiúsculas; o `testar.sh` confere que não casa minúscula nem nome

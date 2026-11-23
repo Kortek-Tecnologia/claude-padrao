@@ -150,6 +150,7 @@ Lê os transcripts locais do projeto (últimos 14 dias) e mostra quem fez o quê
 ```
 hook de modelo: 1 correção(ões) de papel fixo (Explore=1) · 1 recusa(s)
 documentação antes do commit: 3 commit(s) · 3 com a atualizar-docs antes · 1 lembrete(s) do hook
+pendências ao encerrar: 4 lembrete(s) do hook · 3 com pergunta em seguida
 verificação antes do commit: 3 commit(s) · 2 com teste ou build · 1 com revisor · 0 com executor · 1 sem nenhuma
 subagents (tipo: modelo em que rodou × chamadas):
   Explore              haiku=1
