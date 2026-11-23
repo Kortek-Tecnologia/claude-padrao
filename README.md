@@ -227,7 +227,7 @@ modelos, e cada comando só grava ou tira uma chave. Sem argumento, mostra o est
 | Trava de leitura | Bash, MCP e ferramentas que gravam, nos agentes que só leem | deixa `Explore`, coletor, leitor e revisor só lerem: grava, redireciona ou executa → recusa, dizendo o motivo |
 | `atualizar-docs` | antes de cada commit | corrige só a documentação que o diff deixou falsa (porta, comando, variável, caminho) |
 | Lembrete da documentação | todo `git commit` que o Claude roda | se a `atualizar-docs` não rodou desde o commit anterior, recusa uma vez e manda rodá-la; a repetição passa |
-| Lembrete das pendências | todo fim de turno da sessão principal | se a resposta termina com oferta ou pendência em aberto ("quer que eu…?", "não fiz commit", "sugiro…"), recusa uma vez e manda fazer o que é reversível e perguntar o resto com opções, a recomendada primeiro |
+| Lembrete das pendências | todo fim de turno da sessão principal | se a resposta termina com oferta ou pendência em aberto ("quer que eu…?", "não fiz commit", "sugiro…"), recusa uma vez e manda só perguntar, com opções, a recomendada primeiro (nada além disso por conta própria) |
 | Status lines | sempre; a dos subagents, onde o plugin está ligado | modelo, effort, contexto, limites e cache na linha; uma linha por subagent, que vem de um mod do próprio plugin (2.1.326+), com o custo e o aviso de Haiku acima de 100K |
 
 ```

@@ -105,7 +105,7 @@ com subagent visível, ~0,6 s no Windows). O Claude Code marcou a chave como obs
 linha é a do Claude Code. Medido em 2026-11-17, v2.1.326, em sessão interativa num
 pseudo-terminal (ver [Testes](#testes)), ainda com a reserva:
 
-- **Mod e hooks de comando convivem.** O `hooks.json` leva `modules` ao lado dos quatro hooks de
+- **Mod e hooks de comando convivem.** O `hooks.json` leva `modules` ao lado dos cinco hooks de
   comando; numa sessão real o módulo carregou (`hooks module padrao loaded … events: ui.render`)
   e os hooks em sh agiram (abertura e modelo do `Explore`).
 - **O mod sozinho desenha a linha.** Com a reserva ativa ele já vencia: em 98 de 98 desenhos da
@@ -730,7 +730,7 @@ que é a raiz do plugin, o validador o acusa: é contexto do repositório, não 
 na 2.1.330 que ele carrega dali — `claude -p "/context"` o lista em "Memory Files"), a reserva
 `subagentStatusLine` foi removida e o plugin ganhou ícone (`.claude-plugin/icon.png`). Ele fecha
 com
-"Hosts: api.github.com (declared), github.com (declared)" e "Hosts not read for: hooks (2),
+"Hosts: api.github.com (declared), github.com (declared)" e "Hosts not read for: hooks (3),
 skills (6)". A segunda é nota, não aviso, e não some: hooks e skills rodam processos, e o
 validador não lê que hosts eles alcançam. O campo `network.hosts` do `plugin.json` (v2.1.328+)
 é só declaração — a documentação diz que ele não libera nem bloqueia host. O plugin declara o
