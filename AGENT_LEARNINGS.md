@@ -47,6 +47,11 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 - Evitar: mudar regra de modelo, delegação ou custo apoiado só em documentação ou artigo.
 - Fazer: antes de mexer, medir no histórico local (`/padrao:medir` mostra custo e contexto por requisição) e, se a dúvida for de qualidade, rodar o mesmo lote nos dois modelos com o teste de aceite escrito antes. Texto novo de regra no bloco do `CLAUDE.md`: sondar em sessão real (`claude -p` no sandbox) com um caso de cada lado da regra — "pequena" sem critério foi lida de um jeito que só a sondagem mostrou.
 
+### Comportamento novo só como texto no bloco (2026-11-23)
+- Erro: pus a regra "pendência vira pergunta com opções" no bloco do `CLAUDE.md` e sondei três redações: em 6 de 6 sessões o Claude não abriu o `AskUserQuestion`. No hook, a primeira cobrança mandava também "fazer o reversível", e o Claude rodou script e aplicou sugestão sem pedido.
+- Evitar: esperar que texto no bloco mude o que o modelo faz num momento fixo (fim de turno, antes do commit), ou pôr duas ordens na mesma cobrança de hook.
+- Fazer: o que tem hora certa vai em hook que lembra uma vez e falha aberto; a cobrança pede uma ação só; sondar em sessão interativa (pseudo-terminal: no `claude -p` não há `AskUserQuestion`) um caso que deve disparar e um que não deve.
+
 ### Marcador de bloco casado sem âncora (2026-11-10)
 - Erro: o hook de abertura achava o carimbo pela primeira linha que continha `padrao:inicio`; prosa do projeto citando o marcador dava aviso falso em toda sessão, e o teste não pegava.
 - Evitar: casar por substring um marcador em arquivo que o usuário edita (`CLAUDE.md`, docs).

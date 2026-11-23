@@ -427,6 +427,37 @@ espera "sem CLAUDE_PLUGIN_DATA" PASSA "$(cmd_de sd 'git commit -m a' | env -u CL
 espera "pasta de dados invalida" PASSA "$(cmd_de sd 'git commit -m a' | CLAUDE_PLUGIN_DATA="$DADOS/arquivo/x" sh "$D/cobrar-docs.sh")"
 espera "sem jq" PASSA "$(CLAUDE_PLUGIN_DATA="$DADOS" semjq cobrar-docs.sh "$(cmd_de semjq 'git commit -m a')")"
 rm -rf "$DADOS"
+# Pendência em aberto no fim do turno (cobrar-pergunta.sh, evento Stop): recusa uma vez a
+# resposta que termina com oferta ou pendência; passam a continuação, a resposta sem
+# pendência, a frase só dentro de código, a entrada inválida e a falta do jq (falha ABERTA).
+para() { jq -cn --arg m "$1" --argjson a "${2:-false}" '{session_id: "s", hook_event_name: "Stop", stop_hook_active: $a, last_assistant_message: $m}'; }
+perg() { printf '%s' "$1" | sh "$D/cobrar-pergunta.sh" | jq -r '.decision // empty' 2>/dev/null | tr -d '\r'; }
+while IFS= read -r m; do
+  [ "$(perg "$(para "$m")")" = block ] || { echo "divergiu: cobrar-pergunta deixou passar: $m"; FALHAS=$((FALHAS + 1)); }
+done <<'COBRA'
+Troquei a mensagem. Não fiz commit.
+Falta o shebang. Quer que eu adicione?
+Feito. Se quiser, posso rodar os testes.
+Próximos passos: publicar a versão.
+Sugiro separar o módulo em dois.
+Done. Want me to commit this?
+All set. Let me know if you want the tests too.
+COBRA
+while IFS= read -r m; do
+  [ -z "$(perg "$(para "$m")")" ] || { echo "divergiu: cobrar-pergunta recusou: $m"; FALHAS=$((FALHAS + 1)); }
+done <<'SEGUE'
+O app.sh imprime loja.
+Os testes passaram e o commit foi feito.
+Falta o shebang no script.
+O app.sh imprime loja. Não executei o script, só li o conteúdo.
+O comando `echo "quer que eu rode"` imprime a frase.
+SEGUE
+[ -z "$(perg "$(para 'Não fiz commit.' true)")" ] || { echo "divergiu: cobrar-pergunta recusou a continuacao (stop_hook_active)"; FALHAS=$((FALHAS + 1)); }
+[ -z "$(perg 'nao e json: quer que eu rode')" ] || { echo "divergiu: cobrar-pergunta recusou entrada invalida"; FALHAS=$((FALHAS + 1)); }
+[ -z "$(para 'Não fiz commit.' | PATH="$SEMJQ_PATH" sh "$D/cobrar-pergunta.sh")" ] || { echo "divergiu: cobrar-pergunta recusou sem jq"; FALHAS=$((FALHAS + 1)); }
+case "$(para 'Não fiz commit.' | sh "$D/cobrar-pergunta.sh" | jq -r .reason)" in *AskUserQuestion*"nao e erro"* | *"nao e erro"*AskUserQuestion*) ;; *) echo "divergiu: cobrar-pergunta: motivo sem a instrucao"; FALHAS=$((FALHAS + 1)) ;; esac
+[ "$(jq -c '[.hooks.Stop[].hooks[] | select(.command | contains("cobrar-pergunta.sh")) | .onFailure]' hooks/hooks.json | tr -d '\r')" = '["continue"]' ] ||
+  { echo "divergiu: hooks.json: Stop sem o cobrar-pergunta.sh com onFailure continue"; FALHAS=$((FALHAS + 1)); }
 [ -z "$SEMJQ" ] || rm -rf "$SEMJQ"
 # onFailure no hooks.json: as travas bloqueiam se o hook falhar; o lembrete da documentação
 # deixa seguir, e por extenso — no Code Mode, hook que falha sem a chave recusa a chamada.
@@ -515,7 +546,7 @@ while read -r arq carimbo soma; do
   [ "$tem_c $tem_s" = "$carimbo $soma" ] ||
     { echo "divergiu: modelo $arq mudou (carimbo '$tem_c', soma $tem_s): suba o 'modelo X' da 1a linha e registre os dois em testar.sh"; FALHAS=$((FALHAS + 1)); }
 done <<'CARIMBOS'
-claude-md.md 2.14.0 3165708629
+claude-md.md 2.15.0 2011460674
 agente/padrao-modelos.md 2.14.0 729659925
 agente/padrao-configuracao.md 2.14.0 2664263774
 CARIMBOS
@@ -729,7 +760,7 @@ rm -rf "$CASA" "$PROJ"
 # formatos conhecidos, na árvore e no histórico, sem imprimir o valor; prosa não casa.
 CH=skills/arrumar/checagens.md
 itens=$(grep -c '^### [SC][0-9]' "$CH")
-[ "$itens" -ge 13 ] || { echo "divergiu: checagens com $itens itens"; FALHAS=$((FALHAS + 1)); }
+[ "$itens" -ge 14 ] || { echo "divergiu: checagens com $itens itens"; FALHAS=$((FALHAS + 1)); }
 for campo in 'Vale quando' 'Conferir' 'Desvio' 'Gravidade' 'Correção'; do
   n=$(grep -c "^- $campo: " "$CH")
   [ "$n" = "$itens" ] || { echo "divergiu: checagens: campo '$campo' em $n de $itens itens"; FALHAS=$((FALHAS + 1)); }
@@ -758,6 +789,38 @@ case "$his" in *ghp_*) echo "divergiu: checagem S2 imprimiu o valor"; FALHAS=$((
 arv=$(cd "$REPO" && git grep -nIE "$P" | cut -d: -f1,2)
 [ "$arv" = "conf.txt:3" ] || { echo "divergiu: checagem S1 devolveu '$arv'"; FALHAS=$((FALHAS + 1)); }
 rm -rf "$REPO"
+# S7: a skill com efeito colateral sem disable-model-invocation é a que o comando devolve
+REPO=$(mktemp -d); mkdir -p "$REPO/.claude/skills/deploy" "$REPO/.claude/skills/release"
+printf -- '---\nname: deploy\n---\nRode o deploy.\n' >"$REPO/.claude/skills/deploy/SKILL.md"
+printf -- '---\nname: release\ndisable-model-invocation: true\n---\nCorte a release.\n' >"$REPO/.claude/skills/release/SKILL.md"
+s7=$(cd "$REPO" && grep -L '^disable-model-invocation: *true' .claude/skills/*/SKILL.md .claude/commands/*.md 2>/dev/null | tr -d '\r')
+[ "$s7" = ".claude/skills/deploy/SKILL.md" ] || { echo "divergiu: checagem S7 devolveu '$s7'"; FALHAS=$((FALHAS + 1)); }
+rm -rf "$REPO"
+# Ênfase na carga fixa (trilha C): o padrão casa a instrução em maiúsculas e não casa a mesma
+# palavra em minúsculas, nome de variável nem palavra maior que a contém.
+ENF=$(sed -n "s/^    ENF='\(.*\)'\$/\1/p" skills/arrumar/levantar.md)
+[ -n "$ENF" ] || { echo "divergiu: levantar.md sem o padrao de enfase"; FALHAS=$((FALHAS + 1)); }
+for t in 'IMPORTANTE: rode os testes' 'NUNCA faça push' 'YOU MUST run lint' 'Rode SEMPRE o lint.'; do
+  printf '%s\n' "$t" | grep -Eq "$ENF" || { echo "divergiu: padrao de enfase nao casou '$t'"; FALHAS=$((FALHAS + 1)); }
+done
+for t in 'importante: rode os testes' 'export ALWAYS_ON=1' 'nunca faça push' 'templates MUSTACHE' 'MUST_RUN=1'; do
+  printf '%s\n' "$t" | grep -Eq "$ENF" && { echo "divergiu: padrao de enfase casou '$t'"; FALHAS=$((FALHAS + 1)); }
+done
+# O SKILL.md do arrumar cabe no que volta depois da compactação (5.000 tokens por skill, o
+# corte é pelo fim): o teto em bytes é folgado (3 bytes por token); o que passar vai para
+# arquivo de apoio (levantar.md, regras-docs.md), que o SKILL.md tem de citar.
+tam=$(wc -c <skills/arrumar/SKILL.md)
+[ "$tam" -le 15000 ] || { echo "divergiu: skills/arrumar/SKILL.md com $tam bytes (teto 15000): mova texto para arquivo de apoio"; FALHAS=$((FALHAS + 1)); }
+for apoio in levantar.md regras-docs.md checagens.md; do
+  [ -s "skills/arrumar/$apoio" ] && grep -q "$apoio" skills/arrumar/SKILL.md skills/arrumar/levantar.md ||
+    { echo "divergiu: arrumar: $apoio ausente ou sem citacao"; FALHAS=$((FALHAS + 1)); }
+done
+# medir: `timeout N` na frente do teste conta como verificação; citado ou na frente de outro comando, não
+v=$(sh scripts/py.sh -c 'import importlib.util, sys
+s = importlib.util.spec_from_file_location("m", sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+print(*(int(m.verifica(c)) for c in sys.argv[2:]))' skills/medir/medir-modelos.py \
+  'cd x && timeout 540 bash scripts/testar.sh >f 2>&1' 'timeout 60 pytest -q' 'echo timeout 5 pytest' 'timeout 5 cat testar.sh' | tr -d '\r')
+[ "$v" = "1 1 0 0" ] || { echo "divergiu: medir: verifica com timeout devolveu '$v'"; FALHAS=$((FALHAS + 1)); }
 # C5 e C7: os filtros de execução desperdiçada, tirados do arquivo como o padrão de segredo.
 # s1 rodou por push e por pull_request (C5 conta a de push); a 1ª de main terminou com a 2ª já
 # aberta (C7); a cancelada não conta; outro workflow no mesmo commit não é duplicata.

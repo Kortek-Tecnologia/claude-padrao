@@ -34,6 +34,7 @@ flowchart LR
   S --- H2["Hook de modelo<br/>cada subagent no seu modelo"]
   S --- H3["Trava de leitura<br/>quem só lê, só lê"]
   S --- D["Lembrete da doc<br/>atualizar-docs antes do commit"]
+  S --- P["Lembrete das pendências<br/>pergunta com opções ao encerrar"]
   S -.->|"a doc envelheceu"| R["/padrao:arrumar<br/>levanta, um OK, executa"]
   S -.->|"de tempos em tempos"| M["/padrao:medir<br/>a delegação pegou?"]
   H1 -.->|"global sujo"| A
@@ -81,6 +82,9 @@ flowchart TD
 
 O bloco que entra no `CLAUDE.md` é curto: o detalhe fica em arquivos lidos **sob demanda**,
 listados num índice "arquivo → quando ler" (sem `@import`, que carregaria tudo em toda sessão).
+Ele também diz como o Claude decide: segue no que é reversível, para no irreversível e, ao
+fechar o trabalho, não deixa pendência em lista aberta — o que depende de você vira pergunta
+com opções, a recomendada primeiro.
 
 Projeto com servidor de linguagem instalado (Pyright, `typescript-language-server`…): o plano
 oferece o plugin oficial de LSP no escopo do projeto, em vez de deixá-lo ir para o global pelo
@@ -122,11 +126,13 @@ flowchart TD
 - **Uma pergunta só.** O levantamento só lê e não pergunta nada; cada dúvida chega ao OK já com
   a resposta recomendada, e você aprova tudo, escolhe alguns lotes ou pede só o diagnóstico.
 - **O que muda:** documentação, `CLAUDE.md` (o que não vale em toda sessão vai para
-  `docs/agente/<tema>.md`, apontado por um índice) e infraestrutura. Código, só comentário e
+  `docs/agente/<tema>.md`, apontado por um índice; instrução reforçada com maiúsculas ou
+  "IMPORTANTE" volta a texto simples) e infraestrutura. Código, só comentário e
   docstring; regra documentada que o código contraria fica, e o código vai para o relatório.
 - **Segurança e CI, só com evidência:** a trilha de infraestrutura confere uma lista fechada
   (`skills/arrumar/checagens.md`): segredo versionado ou no histórico do git, `.env` fora do
-  `.gitignore`, debug em produção, dependência vulnerável, permissão do CI, tempo de CI e execução
+  `.gitignore`, debug em produção, dependência vulnerável, permissão do CI, skill do projeto com
+  efeito colateral que o Claude pode disparar sozinho, tempo de CI e execução
   de CI desperdiçada (o mesmo commit rodando duas vezes, CI inteiro em commit só de documentação,
   execução superada que segue até o fim). Cada item só vale para o projeto em que faz sentido, e
   os de CI só com medição: CI rápido não ganha sugestão de tempo, e desperdício só conta a partir
@@ -219,6 +225,7 @@ modelos, e cada comando só grava ou tira uma chave. Sem argumento, mostra o est
 | Trava de leitura | Bash, MCP e ferramentas que gravam, nos agentes que só leem | deixa `Explore`, coletor, leitor e revisor só lerem: grava, redireciona ou executa → recusa, dizendo o motivo |
 | `atualizar-docs` | antes de cada commit | corrige só a documentação que o diff deixou falsa (porta, comando, variável, caminho) |
 | Lembrete da documentação | todo `git commit` que o Claude roda | se a `atualizar-docs` não rodou desde o commit anterior, recusa uma vez e manda rodá-la; a repetição passa |
+| Lembrete das pendências | todo fim de turno da sessão principal | se a resposta termina com oferta ou pendência em aberto ("quer que eu…?", "não fiz commit", "sugiro…"), recusa uma vez e manda fazer o que é reversível e perguntar o resto com opções, a recomendada primeiro |
 | Status lines | sempre; a dos subagents, onde o plugin está ligado | modelo, effort, contexto, limites e cache na linha; uma linha por subagent, que vem de um mod do próprio plugin (2.1.326+), com o custo e o aviso de Haiku acima de 100K |
 
 ```
@@ -369,6 +376,11 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
   documentado, e commit preso é pior que doc velha. Vê só o commit que o Claude roda pelo Bash ou
   pelo PowerShell (o seu, no terminal, não passa por ele) e não cobra os lotes do
   `/padrao:arrumar`. Se o hook falhar, o commit segue.
+- **Lembrete das pendências, aberto por padrão.** Reconhece a pendência por frases, em português
+  e inglês, e erra para os dois lados: resposta com outra redação passa, e frase citada pode
+  disparar. Por isso recusa uma vez por turno e deixa o Claude encerrar de novo se não houver
+  pendência. Quando dispara, custa um turno a mais. Em `claude -p` não há como perguntar: o
+  Claude lista as opções com a recomendada marcada. Se o hook falhar, o turno fecha normalmente.
 - **Segredos:** o inventário e o `arrumar` nunca imprimem valor de variável; o backup não leva o
   `~/.claude.json`, mas guarda o `settings.json` global como era, com os valores do `env`: fica
   fora do git, e vale apagá-lo depois de conferir a migração.
@@ -380,10 +392,10 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 
 ```
 .claude-plugin/   manifesto do plugin e do marketplace (version: semver) e o ícone
-hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc; register.ts: a linha dos subagents (mod)
+hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc, lembrete das pendências; register.ts: a linha dos subagents (mod)
 scripts/          os hooks em sh (a regra da trava de leitura em awk), py.sh, opcional.py e testar.sh
 agents/           coletor, leitor, revisor, executor
-skills/           aplicar (+ inventário e modelos), arrumar (+ checagens), medir, code-mode, advisor, atualizar-docs
+skills/           aplicar (+ inventário e modelos), arrumar (+ levantamento, regras de documentação e checagens), medir, code-mode, advisor, atualizar-docs
 statusline/       status line principal
 .claude/          CLAUDE.md deste repositório (contexto de quem mantém, não do plugin)
 docs/             como funciona por dentro

@@ -78,6 +78,18 @@ Não é scanner de entropia: senha em texto puro e token de formato próprio esc
 - Gravidade: alta (`pull_request_target` com código do PR), média (o resto).
 - Correção: `infra` — `permissions: contents: read` no topo e o que cada job precisar a mais.
 
+### S7 — Skill com efeito colateral que o modelo dispara sozinho
+- Vale quando: o projeto tem skill ou comando próprio (`.claude/skills/*/SKILL.md`,
+  `.claude/commands/*.md`).
+- Conferir: `grep -L '^disable-model-invocation: *true' .claude/skills/*/SKILL.md .claude/commands/*.md 2>/dev/null`
+  e, em cada arquivo devolvido, o que ele manda fazer: deploy, release, publicação, push, envio
+  de mensagem, migração ou remoção de dado.
+- Desvio: a skill que faz uma dessas coisas sem a chave, com `arquivo:linha` do passo. Skill que
+  só lê, explica ou edita arquivo do projeto não conta.
+- Gravidade: média (alta se o passo alcança produção).
+- Correção: `infra` — `disable-model-invocation: true` no frontmatter: a skill passa a rodar só
+  quando o usuário a chama.
+
 ## CI
 
 Tempo vem de medição: `gh run list --workflow <arquivo> --limit 10 --json createdAt,updatedAt` e,

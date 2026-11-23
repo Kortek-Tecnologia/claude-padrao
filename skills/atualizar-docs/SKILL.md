@@ -43,7 +43,7 @@ repositório grande → delegue a busca ao `padrao:coletor`, pedindo `arquivo:li
 
 Para cada ocorrência, a edição mínima que deixa o trecho verdadeiro de novo: trocar o valor,
 ou remover a frase se o que ela descreve deixou de existir. Regras de documentação do
-`/padrao:arrumar`:
+`/padrao:arrumar` (`skills/arrumar/regras-docs.md` do plugin):
 - não acrescente documentação do que o código já responde;
 - não crie CHANGELOG nem nota de "mudou em";
 - texto novo só se o diff criou o porquê de uma decisão, um jeito de rodar/configurar ou uma

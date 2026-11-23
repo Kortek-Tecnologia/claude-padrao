@@ -1,4 +1,4 @@
-<!-- padrao:inicio — gerado pelo plugin padrao (/padrao:aplicar), modelo 2.14.0; edite no plugin, não aqui -->
+<!-- padrao:inicio — gerado pelo plugin padrao (/padrao:aplicar), modelo 2.15.0; edite no plugin, não aqui -->
 ## Claude Code: padrão do projeto
 
 Configuração só no projeto (`.claude/settings.json` time, `.claude/settings.local.json`
@@ -28,9 +28,19 @@ grava no global), peça ao usuário para rodar `/padrao:aplicar`: só ele chama 
   volte só se o risco for maior do que o usuário aprovou.
 - **Dúvida que um comando responde, rode o comando.** Pergunta cuja resposta só pode ser "sim",
   siga sem perguntar.
-- **Pergunte só gosto ou produto que só o usuário decide:** uma pergunta por vez, no
-  `AskUserQuestion`, com a recomendada primeiro. Enquanto espera, adiante o que não depende dela.
+- **No meio do trabalho, pergunte só gosto ou produto que só o usuário decide:** uma pergunta
+  por vez, no `AskUserQuestion`, com a recomendada primeiro. Enquanto espera, adiante o que não
+  depende dela.
 - **No relatório final, liste as decisões tomadas sozinho** que o usuário pode querer desfazer.
+
+### Ao encerrar: pergunta com opções, não pendência em aberto
+
+A resposta que terminaria com "não fiz commit", "quer que eu…?", "posso…", "falta…" ou
+"sugiro…" termina com uma chamada `AskUserQuestion` no lugar da frase: uma pergunta por
+pendência, a opção recomendada primeiro, com "(Recomendado)" no rótulo, e "deixar como está"
+entre elas. O que é reversível e
+do pedido, faça antes, sem perguntar. Sem a ferramenta (`claude -p`), liste as opções com a
+recomendada marcada. Um hook do plugin lembra disso uma vez por turno.
 
 ### Contexto sob demanda
 

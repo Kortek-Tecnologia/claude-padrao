@@ -1,6 +1,6 @@
 {
   "name": "padrao",
-  "version": "2.14.0",
+  "version": "2.15.0",
   "license": "MIT",
   "description": "Padrão de Claude Code igual em todos os projetos: Opus decide, Sonnet executa lote com ficha, Haiku coleta; tudo no projeto, global limpo; documentação que não mente e checagens de segurança e de CI.",
   "author": {

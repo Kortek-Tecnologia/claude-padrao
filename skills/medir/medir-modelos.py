@@ -72,7 +72,8 @@ VERIFICA = re.compile(
     # no começo de um segmento do comando (como no COMMIT): `echo npm test`, `cat testar.sh`
     # e `grep pytest` não contam. Na frente podem vir atribuições, um lançador e um caminho.
     r"(?:^|[;&|(){}\n`]|\$\()\s*"
-    r"(?:(?:time|env|sudo|npx|bunx|uvx|bash|sh|uv\s+run|poetry\s+run|pipenv\s+run|py(?:thon[\d.]*)?\s+-m)\s+"
+    r"(?:(?:time|env|sudo|npx|bunx|uvx|bash|sh|uv\s+run|poetry\s+run|pipenv\s+run|py(?:thon[\d.]*)?\s+-m"
+    r"|timeout(?:\s+-\S+)*\s+\S+)\s+"
     r"|[A-Za-z_]\w*=\S*\s+)*"
     r"(?:[^\s\"']*[/\\])?(?:"
     r"pytest|unittest|tox|nox|ruff|mypy|pyright|"

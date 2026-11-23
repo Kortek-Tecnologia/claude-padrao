@@ -17,6 +17,7 @@ flowchart LR
   AG --> TM["travar-modelo-subagent.sh"]
   BT --> TL["trava-leitura.sh"] --> SL["so-le.awk"] --> SG["segmentos.awk"]
   GC --> CD["cobrar-docs.sh"] --> SH["segmentos.sh"] --> SG
+  ST0["Stop"] --> CPG["cobrar-pergunta.sh"]
   AP["skill aplicar"] -->|"grava a partir de"| MOD["skills/aplicar/modelos/"]
   CP -->|"compara com"| MOD
   AP -->|"copia para ~/.claude/"| ST["statusline/statusline.py"]
@@ -26,7 +27,7 @@ flowchart LR
 
 | Caminho | Papel |
 |---|---|
-| `hooks/hooks.json` | liga os quatro hooks; todos com `shell: bash` e timeout de 10 s (a trava de leitura e o hook de abertura, 30 s); as duas travas com `onFailure: "block"` (falhou, bloqueia), o lembrete da documentação com `onFailure: "continue"` (falhou, o commit segue — por extenso, porque no Code Mode o hook que falha sem a chave recusa a chamada) |
+| `hooks/hooks.json` | liga os cinco hooks; todos com `shell: bash` e timeout de 10 s (a trava de leitura e o hook de abertura, 30 s); as duas travas com `onFailure: "block"` (falhou, bloqueia), os dois lembretes — o da documentação e o das pendências — com `onFailure: "continue"` (falhou, o commit ou o fim do turno segue — por extenso, porque no Code Mode o hook que falha sem a chave recusa a chamada) |
 | `skills/aplicar/modelos/` | **fonte única** do padrão: o `aplicar` grava a partir dela e o hook de abertura compara com ela |
 | `scripts/py.sh` | acha `python3`, `python` ou `py` 3.9+ (no Windows o `python3` costuma ser o atalho quebrado da Store) e roda com `-I` |
 | `agents/*.md` | os quatro agentes; os que só leem têm `tools` fechado e `disallowedTools` |
@@ -310,6 +311,47 @@ flowchart TD
   Code a mostra como `hook error`, e sem isso o modelo a registrava como erro. O `medir` conta os
   lembretes por esse texto — mudou a frase, mude o `LEMBRETE` do `medir-modelos.py`.
 
+## Lembrete das pendências — `cobrar-pergunta.sh`
+
+A regra "ao encerrar, pendência vira pergunta com opções, a recomendada primeiro" entrou primeiro
+só como texto no bloco do `CLAUDE.md`. Sondada em sessão interativa (v2.1.330, Windows,
+pseudo-terminal com HOME falso, Opus 5.5, 2026-11-23), em três redações: em 6 de 6 sessões o
+Claude encerrou com "não fiz commit" ou "quer que eu…?" em frase solta, sem abrir o
+`AskUserQuestion` — a descrição da própria ferramenta diz para usá-la só quando há bloqueio. É o
+mesmo caso do lembrete da documentação: o que tem hora certa vai em hook.
+
+- **Evento `Stop`**, sem matcher: roda quando a sessão principal fecha o turno (subagent tem o
+  `SubagentStop`; interrupção do usuário não dispara). A entrada traz `last_assistant_message` e
+  `stop_hook_active`; a recusa é `{"decision": "block", "reason": …}`, e o Claude continua com o
+  `reason` como instrução.
+- **Lembrete, não trava.** Recusa uma vez por turno: com `stop_hook_active` verdadeiro (o turno
+  já continua por causa de um hook `Stop`), passa. Falha aberto: sem `jq`, entrada inválida ou
+  erro, o turno fecha. O Claude Code ainda corta em 8 continuações seguidas.
+- **Detecção por frases**, em português e inglês, sobre a resposta sem os trechos de código:
+  oferta ("quer que eu", "se quiser", "posso rodar", "want me to") e item em aberto ("não fiz
+  commit", "próximos passos", "sugiro", "falta decidir"). Erra para os dois lados; frase nova
+  entra no `re` do script e no `testar.sh`, com um caso que casa e um que não casa.
+- **A cobrança manda só perguntar.** A primeira versão dizia também "o que é reversível, faça
+  agora": na sondagem o Claude rodou o script sem pedido, e "não executei o script" numa resposta
+  que só lia um arquivo disparou o hook e o fez executá-lo. Por isso o texto diz "não faça mais
+  nada por conta própria", e "não executei", "não rodei" e "não testei" saíram da lista.
+- **Custo:** um `sh` por fim de turno; o `jq` só abre quando alguma das palavras aparece. Medido
+  cinco vezes cada, na mesma hora (régua `sh -c true`: 85 a 95 ms): 105 a 124 ms sem pendência,
+  226 a 246 ms com. Quando dispara, custa um turno a mais.
+
+Sondagem da versão final, uma sessão por caso:
+
+| Pedido | O que aconteceu |
+|---|---|
+| "troque a mensagem do `app.sh`" | editou, encerrou com "não rodei o script nem fiz commit"; o hook cobrou e o Claude abriu duas perguntas (rodar o script; commit), cada uma com a recomendada primeiro e marcada, e "deixar como está" entre as opções |
+| "qual mensagem o `app.sh` imprime?" | respondeu; o hook não disparou |
+| "só analise, sem mudar nada" | listou as melhorias sem oferecer nada; o hook não disparou |
+| "veja se tem algo a melhorar" | aplicou a melhoria direto (reversível, pela regra do bloco); não houve pendência a cobrar |
+
+Não medido: `claude -p` (lá não existe `AskUserQuestion`; a cobrança manda listar as opções com
+a recomendada marcada), Code Mode, a taxa de disparo à toa em uso real e quantas vezes o Claude
+encerra de novo sem perguntar. O `/padrao:medir` ainda não conta esses lembretes.
+
 ## As skills
 
 **`aplicar`** — `disable-model-invocation` desde a 2.14.0, como as outras quatro do menu: grava
@@ -321,7 +363,13 @@ uma rodada por caso, US$ 0,40 as três): com `model` no global e o pedido "tem a
 resolva", o Claude apontou a chave e pediu o `/padrao:aplicar` ao usuário, sem tentar a skill nem
 editar o global; com "aplica o padrão pra mim", respondeu sem chamar ferramenta que só o usuário
 roda o comando, e ofereceu fazer à mão só com confirmação; com o global limpo, disse que não era
-preciso rodá-lo. O `inventariar.py` só lê e imprime JSON com o destino de cada item (`DESTINO`,
+preciso rodá-lo.
+
+A seção `### Compact instructions` do bloco fica como está: a documentação mostra o exemplo com
+`# Compact instructions` e não exige nível nem texto de título — é texto comum do `CLAUDE.md`,
+que volta do disco depois da compactação. Não medido: o efeito dela num `/compact`.
+
+O `inventariar.py` só lê e imprime JSON com o destino de cada item (`DESTINO`,
 `PERMISSOES` e `SEGREDO` no topo do script): `padrao` (o modelo define), `time`, `local`,
 `global`, `avaliar` (pergunte) ou `descartar`. Do `env` e dos MCP saem só os nomes. Os arquivos
 que vão para o projeto saem de `modelos/`; o bloco do `CLAUDE.md` fica entre
@@ -368,7 +416,22 @@ stateDiagram-v2
 | `PLANO.md` | lotes com verificação checável, decisões assumidas, `<!-- APROVADO … -->` e a situação de cada lote |
 | `raw/` | saída bruta dos subagentes |
 
-As **checagens** da trilha B moram em `skills/arrumar/checagens.md`: seis de segurança (`S1`–`S6`)
+**Três arquivos de apoio, por causa da compactação** (2.15.0). Depois de compactar, o Claude Code
+devolve o corpo da skill com teto de 5.000 tokens e corta pelo fim ("Truncation keeps the start
+of the file", na página da janela de contexto). O `SKILL.md` tinha 20,8 KB e terminava nas regras
+de documentação, no bloqueio e na checagem de segredos — o que a fase 3, a mais longa, precisa.
+Agora ele tem 13 KB (o `testar.sh` cobra o teto de 15 KB): a checagem de segredos subiu para as
+regras do começo, a fase 1 foi para `levantar.md` e as regras de documentação para
+`regras-docs.md`, lidos na hora em que servem. Só texto movido; não medido em sessão real do
+`arrumar` depois da repartição.
+
+**Ênfase** (2.15.0) é achado Excesso na carga fixa: `levantar.md` traz o padrão `ENF` (palavras
+como IMPORTANTE, NUNCA, MUST em maiúsculas; o `testar.sh` confere que não casa minúscula nem nome
+de variável). A correção é a frase em texto simples; regra que não pode falhar vai para o
+relatório como caso de hook ou `deny`.
+
+As **checagens** da trilha B moram em `skills/arrumar/checagens.md`: sete de segurança (`S1`–`S7`;
+a `S7`, da 2.15.0, é a skill do projeto com efeito colateral sem `disable-model-invocation`)
 e sete de CI (`C1`–`C7`), cada uma com "Vale quando", o comando que confere, o desvio, a
 gravidade e o destino da correção. `C1`–`C4` olham o tempo; `C5`–`C7`, a execução que não
 precisava ter rodado (o mesmo commit por `push` e por `pull_request`, commit só de documentação,
@@ -454,10 +517,14 @@ do `CLAUDE.md` manda chamá-la antes de todo commit, e o `cobrar-docs.sh` cobra 
 `cobrar-docs.sh` (sem os do `arrumar`), refeita em regex — em forma rara os dois podem divergir, com a `atualizar-docs` chamada desde o commit anterior
 ou não; tentativa que o hook recusou conta como lembrete, não como commit. Dos mesmos commits sai a
 linha de verificação: teste, build ou lint rodado na sessão desde o commit anterior (`VERIFICA`,
-pelos nomes comuns, no começo de um segmento do comando), chamada ao `padrao:revisor` ou lote
+pelos nomes comuns, no começo de um segmento do comando; desde a 2.15.0 com `timeout N` na
+frente, a forma que o `AGENT_LEARNINGS.md` deste repositório pede), chamada ao `padrao:revisor` ou lote
 pelo `padrao:executor`; a verificação vista antes de uma tentativa recusada vale para a
 repetição. É o modo de observação de um gate que não existe: neste repositório, em 14 dias,
-21 de 26 commits tiveram teste ou build antes, e os 5 sem nenhuma decidem se o gate vale. Cada `message.id` é uma requisição: o custo estimado
+21 de 26 commits tiveram teste ou build antes, e os 5 sem nenhuma decidem se o gate vale.
+Conferidos um a um em 2026-11-23 (11 sem nenhuma em 38): nenhum dos identificados era commit só
+de documentação, e pelo menos 5 eram commits em repositório de sandbox do scratchpad, que a
+conta não separa dos do projeto — o número de "sem nenhuma" sai para mais. Cada `message.id` é uma requisição: o custo estimado
 sai da tabela `PRECO` (preço de lista por milhão, com a data da fonte em `PRECO_EM`, que sai no
 cabeçalho; modelo casado por prefixo, escrita de cache de
 1 h à parte da de 5 min); contexto = entrada + cache lido + escrita, distribuído em faixas na
@@ -601,7 +668,7 @@ modelos não mudou e o Code Mode segue opcional.
 
 `bash scripts/testar.sh` (e o CI, no Ubuntu) confere:
 
-- as decisões dos quatro hooks, inclusive sem `jq` e as brechas já fechadas da trava (opção
+- as decisões dos cinco hooks, inclusive sem `jq` e as brechas já fechadas da trava (opção
   entre aspas, com barra, com variável e vinda de `$(…)`; comentário, heredoc e várias linhas),
   e o matcher do `hooks.json` que chama a trava;
 - o lembrete da documentação: as formas de commit do histórico, o que não é commit, a sequência
