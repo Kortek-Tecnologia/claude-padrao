@@ -1,9 +1,9 @@
-<!-- padrao:inicio — gerado pelo plugin padrao (/padrao:aplicar), modelo 2.2.0; edite no plugin, não aqui -->
+<!-- padrao:inicio — gerado pelo plugin padrao (/padrao:aplicar), modelo 2.14.0; edite no plugin, não aqui -->
 ## Claude Code: padrão do projeto
 
 Configuração só no projeto (`.claude/settings.json` time, `.claude/settings.local.json`
 pessoal); global limpo. Se o hook do plugin `padrao` avisar que algo saiu do lugar (o `/model`
-grava no global), rode `/padrao:aplicar`.
+grava no global), peça ao usuário para rodar `/padrao:aplicar`: só ele chama esse comando.
 
 **Opus decide, Sonnet executa lote com ficha, Haiku coleta** — subagent sem `model` roda em sonnet; coleta pede `haiku`.
 
@@ -34,7 +34,7 @@ grava no global), rode `/padrao:aplicar`.
 
 ### Contexto sob demanda
 
-Estes arquivos NÃO carregam sozinhos: leia o que a tarefa pedir, quando pedir.
+Estes arquivos não carregam sozinhos: leia o que a tarefa pedir, quando pedir.
 
 | Arquivo | Leia quando |
 |---|---|

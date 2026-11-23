@@ -156,7 +156,7 @@ Julgue cada seção fora do
 bloco do padrão: **uma tarefa qualquer neste projeto sairia errada sem isto no contexto?** Não →
 Fora do lugar (ou Excesso). Mesmo com a carga abaixo de 200 linhas, é candidato: seção com mais
 de ~15 linhas, tabela ou lista de consulta, passo a passo, exemplo longo, detalhe de um módulo
-só. Acima de 200, o plano TEM de trazê-la abaixo disso. Proibição ("não faça X") sem a forma
+só. Acima de 200, o plano tem de trazê-la abaixo disso. Proibição ("não faça X") sem a forma
 positiva também é achado: reduzir para o que fazer.
 
 ### PENDENCIAS.md
@@ -207,7 +207,7 @@ todo lote tem verificação checável; e a checagem de segredos (no fim deste ar
 
 Mostre no chat, curto: a leitura de fundo em 2–3 linhas; a tabela de lotes (n · título · o que
 muda · ids · risco); as decisões assumidas (pergunta → resposta recomendada); o que fica de
-fora; o branch. Depois, UMA chamada `AskUserQuestion`:
+fora; o branch. Depois, uma só chamada `AskUserQuestion`:
 - "Aprovar o plano e executar tudo?": **Aprovar e executar (Recomendado)** · **Só alguns
   lotes** (o usuário diz quais) · **Só o diagnóstico**. Mudança numa decisão vem nas notas ou
   no "Other": aplique ao plano e siga, sem perguntar de novo.
@@ -237,7 +237,7 @@ usuário viaja junto e não entra em commit nenhum.
    repositório — e registre para o relatório.
 3. **Revisor** (`padrao:revisor`), em todo lote, grande ou pequeno — aqui a execução corre sem
    o usuário olhando: o `git diff` do lote, a ficha e a verificação; peça achados
-   com `arquivo:linha` — o que fugiu da ficha, quebrou ou faltou. Achado real → devolva ao MESMO
+   com `arquivo:linha` — o que fugiu da ficha, quebrou ou faltou. Achado real → devolva ao mesmo
    executor com `SendMessage`, só aquele ponto (parou no teto de turnos: retome-o igual). No
    máximo duas voltas; o que sobrar fica aberto.
 4. **Verificação — você**: rode cada comando da ficha e guarde a saída real, só com o que o
@@ -288,7 +288,7 @@ de segredos. Algo quebrado → um lote final de correção, pelo mesmo ciclo.
   objeto. Regra presa a caminhos → `.claude/rules/<tema>.md` com `paths:`. Procedimento de vários
   passos → skill em `.claude/skills/`. `@import` não enxuga: carrega sempre.
 - Arquivo apontado: um tema por arquivo, nome que diga o tema; tema com menos de ~5 linhas não
-  vira arquivo; índice com até ~15 linhas; o conteúdo SAI do `CLAUDE.md`.
+  vira arquivo; índice com até ~15 linhas; o conteúdo sai do `CLAUDE.md`.
 - Rules atômicas, sem sobreposição, com nome que diga quando valem.
 - Em código, só comentários e docstrings. Docstring consumida por ferramenta (OpenAPI do
   FastAPI/Pydantic, gerador de docs) no máximo se reduz.

@@ -257,5 +257,5 @@ fi
 [ -n "$achados" ] || exit 0
 texto="Padrao fora do lugar:
 ${achados}
-Rode /padrao:aplicar para levar ao projeto e limpar o global."
+Rode /padrao:aplicar para levar ao projeto e limpar o global (so o usuario chama esse comando)."
 jq -cn --arg t "$texto" '{systemMessage: $t, hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $t}}'

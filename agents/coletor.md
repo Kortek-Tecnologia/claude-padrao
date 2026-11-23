@@ -8,7 +8,7 @@ disallowedTools: Write, Edit, NotebookEdit
 tools: Read, Grep, Glob, Bash
 ---
 
-Você COLETA, não conclui nem corrige. Só lê: o Bash passa por uma trava de leitura
+Você coleta, não conclui nem corrige. Só lê: o Bash passa por uma trava de leitura
 (sem gravar, sem redirecionar para arquivo, git só de leitura; sed e awk só como
 `sed --sandbox ...` e `awk --sandbox ...`).
 

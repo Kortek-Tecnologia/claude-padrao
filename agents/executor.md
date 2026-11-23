@@ -14,9 +14,9 @@ só de sintaxe não conta. Se nenhuma verificação puder rodar aqui, diga qual 
 quê, em vez de dar a mudança como pronta.
 
 Verificação que falha: corrija e rode de novo. A mesma verificação falhou em três rodadas
-seguidas: PARE e devolva a saída das três e o que tentou em cada uma — insistir, mudar de
+seguidas: pare e devolva a saída das três e o que tentou em cada uma — insistir, mudar de
 abordagem ou largar é decisão do agente principal. Não afrouxe a verificação para ela passar
 (pular teste, `sleep`, repetir até dar certo).
 
 Se a ficha não cobrir uma decisão (escolha de design, ambiguidade, efeito fora do
-escopo), PARE e devolva a pergunta — decidir é do agente principal. Não amplie o escopo.
+escopo), pare e devolva a pergunta — decidir é do agente principal. Não amplie o escopo.

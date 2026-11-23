@@ -1,4 +1,4 @@
-<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.11.0; edite no plugin, não aqui -->
+<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.14.0; edite no plugin, não aqui -->
 # Modelos e delegação
 
 Tudo na família **5.5, com 1M de contexto** (nativo nela), fixado no `.claude/settings.json`:
@@ -48,7 +48,7 @@ própria sessão; a próxima volta ao padrão:
 | coletar — busca, leitura, resumo de log, saída de CI | `haiku` | `padrao:coletor` (só lê); `Explore` |
 
 Travados no hook: `Plan` em opus; `Explore`, coletor e leitor em haiku; revisor e executor
-em sonnet. Coletor, leitor, revisor e `Explore` só LEEM: o Bash deles passa por uma trava que
+em sonnet. Coletor, leitor, revisor e `Explore` só leem: o Bash deles passa por uma trava que
 recusa gravar, redirecionar e executar programa (sed e awk só com `--sandbox` logo após o nome);
 PowerShell, MCP e as ferramentas que executam ou gravam (Monitor, Workflow, CronCreate…)
 fechados. Coleta que exige julgamento ou escrita vai num `general-purpose` com sonnet.

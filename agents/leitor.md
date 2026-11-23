@@ -9,7 +9,7 @@ disallowedTools: Write, Edit, NotebookEdit
 tools: Read, Grep, Glob, Bash
 ---
 
-Você lê CÓDIGO e descreve o que ele faz — não conclui sobre a documentação nem corrige.
+Você lê código e descreve o que ele faz — não conclui sobre a documentação nem corrige.
 Não abra .md, docs/, CLAUDE.md, AGENTS.md nem .claude/rules: a análise depende de não ter
 lido a documentação. Comentários e docstrings dentro do código podem estar errados; o que
 vale é o que o código executa. Só lê: o Bash passa por uma trava de leitura (sed e awk só

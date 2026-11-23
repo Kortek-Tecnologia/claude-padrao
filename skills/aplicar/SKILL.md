@@ -1,6 +1,7 @@
 ---
 name: aplicar
-description: Aplica o padrão de Claude Code no projeto — leva o que mora no global (~/.claude, ~/.claude.json) para o projeto, deixa o global limpo e fixa modelos e subagents (Opus decide, Sonnet executa lote com ficha, Haiku coleta). Use ao começar ou adotar o padrão num projeto, quando o hook do padrão avisar algo fora do lugar, ou quando pedirem para aplicar o padrão ou limpar o global.
+description: Aplica o padrão de Claude Code no projeto — leva o que mora no global (~/.claude, ~/.claude.json) para o projeto, deixa o global limpo e fixa modelos e subagents (Opus decide, Sonnet executa lote com ficha, Haiku coleta). Rode ao adotar o padrão num projeto ou quando o hook de abertura avisar algo fora do lugar.
+disable-model-invocation: true
 ---
 
 # Aplicar o padrão
@@ -17,10 +18,10 @@ Mode, que o `/padrao:code-mode` liga e desliga) — ficam se o usuário já as t
 cria.
 
 Os modelos estão em `modelos/` e o inventário em `inventariar.py`, ao lado deste arquivo
-(o diretório base desta skill). Plugin NÃO carrega settings — por isso esta skill os grava.
-Nunca sobrescreva sem ler: MESCLE, e mostre o diff ao final.
+(o diretório base desta skill). Plugin não carrega settings — por isso esta skill os grava.
+Nunca sobrescreva sem ler: mescle, e mostre o diff ao final.
 
-**Rodando do home** (`~`): o home NÃO é projeto — o `~/.claude/settings.json` dele É o global.
+**Rodando do home** (`~`): o home não é projeto — o `~/.claude/settings.json` dele é o global.
 Não aplique os passos 4 e 7 nele: só distribua o global para os projetos (passos 1–3, 5, 6, 8)
 e grave o backup em `~/Documents/backup-claude-global-<AAAA-MM-DD>/`.
 
@@ -39,7 +40,7 @@ e grave o backup em `~/Documents/backup-claude-global-<AAAA-MM-DD>/`.
 
 Devolve JSON com: chaves do settings global e o destino de cada uma; sobras (`settings.local.json`,
 backups); `CLAUDE.md`, agents, commands, skills, output-styles, rules, workflows e status line
-globais; plugins instalados no escopo user; MCP de escopo user e local (só nomes, a URL sem credencial e NOMES de
+globais; plugins instalados no escopo user; MCP de escopo user e local (só nomes, a URL sem credencial e nomes de
 variáveis); memórias em `~/.claude/projects/*/memory` com o projeto de cada uma; projetos
 conhecidos e se já têm o padrão. Do `env` global vêm só os nomes (`valor: "(oculto)"`): nunca
 imprima um valor de variável — mova-o de arquivo para arquivo com `jq`, sem exibir. No Windows o
@@ -51,9 +52,9 @@ Leia também do projeto: `.claude/settings.json`, `.claude/settings.local.json`,
 (`git ls-files AGENTS.md '*/AGENTS.md'`). Veja também as linguagens do projeto, para a oferta de
 LSP do passo 2: `git ls-files | grep -o '\.[A-Za-z0-9]*$' | sort | uniq -c | sort -rn | head -5`.
 
-## 2. Monte o plano e peça OK UMA vez
+## 2. Monte o plano e peça OK uma vez
 
-Mostre uma tabela item → destino → ação, cobrindo TODO o inventário. Mexe fora do projeto atual
+Mostre uma tabela item → destino → ação, cobrindo todo o inventário. Mexe fora do projeto atual
 (global e outros projetos): só com OK. Destinos:
 
 | Item global | Vai para |
@@ -63,7 +64,7 @@ Mostre uma tabela item → destino → ação, cobrindo TODO o inventário. Mexe
 | `env.*` que o modelo já define (destino `padrao`) | descartados: o `modelos/settings.json` fixa |
 | chaves `time` (`env.*` comuns, `hooks`, `permissions.deny/ask`, `enabledPlugins`, `extraKnownMarketplaces`) | `.claude/settings.json` dos projetos que usam |
 | chaves `local` (`env.*` com nome de segredo — TOKEN, KEY, SECRET, PASS, AUTH, URL…; `permissions.additionalDirectories`; `language`, `tui`, `theme`, `outputStyle`, `switchModelsOnFlag`…) | `.claude/settings.local.json` (fora do git) |
-| `advisorModel` (destino `local`; o `/advisor` o grava no global) | `.claude/settings.local.json` só dos projetos em que o usuário quer o advisor — PERGUNTE quais; é onde o `/padrao:advisor` o grava |
+| `advisorModel` (destino `local`; o `/advisor` o grava no global) | `.claude/settings.local.json` só dos projetos em que o usuário quer o advisor — pergunte quais; é onde o `/padrao:advisor` o grava |
 | `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` (destino `global`) | fica no global: o Claude Code a descarta dos settings de projeto; liga e desliga pelo `/padrao:code-mode` |
 | `permissions.allow` (destino `avaliar`) | pergunte regra a regra: do time → `.claude/settings.json`; liberação pessoal → `.claude/settings.local.json` |
 | `permissions.defaultMode`, `skipDangerousModePermissionPrompt` | ficam no global (únicas), se já existem; o padrão não as cria |
@@ -74,8 +75,8 @@ Mostre uma tabela item → destino → ação, cobrindo TODO o inventário. Mexe
 | `agents/`, `commands/`, `skills/` (menos `synced/`), `output-styles/`, `rules/`, `workflows/` | `.claude/<mesmo>` dos projetos que usam; de terceiro ou pessoal → também no `.gitignore` |
 | status line (`statusline*`) | substituída pela do padrão (passo 8); a antiga só no backup |
 | `subagentStatusLine` e `~/.claude/subagent-statusline.py` | saem: a linha dos subagents vem do plugin (passo 8) |
-| plugin no escopo user | `claude plugin install <p> --scope project` nos projetos que usam (rode DENTRO de cada um); depois `claude plugin uninstall <p> --scope user` |
-| MCP escopo user | `.mcp.json` na raiz dos projetos que usam — PERGUNTE quais; depois `claude mcp remove <nome> --scope user` |
+| plugin no escopo user | `claude plugin install <p> --scope project` nos projetos que usam (rode de dentro de cada um); depois `claude plugin uninstall <p> --scope user` |
+| MCP escopo user | `.mcp.json` na raiz dos projetos que usam — pergunte quais; depois `claude mcp remove <nome> --scope user` |
 | MCP escopo local de um projeto | `.mcp.json` daquele projeto; depois, de dentro dele, `claude mcp remove <nome> --scope local` |
 | memória `~/.claude/projects/<x>/memory` ou `<projeto>/.claude/memoria/` | texto no `CLAUDE.md` do projeto, se for fato durável dele; o resto só no backup (ver 5) |
 
@@ -127,7 +128,7 @@ ambiente do usuário, ou ponha `.mcp.json` no `.gitignore`. Pergunte qual; copie
 
 Antes de escrever, copie para `<projeto atual>/.claude/backup-global-<AAAA-MM-DD>/` (e garanta
 `.claude/backup-global-*/` no `.gitignore`): `~/.claude/settings.json`, as sobras, os arquivos
-globais que vão mudar e as pastas de memória. NÃO copie `~/.claude.json` (tem tokens). O
+globais que vão mudar e as pastas de memória. Não copie `~/.claude.json` (tem tokens). O
 `settings.json` copiado leva os valores do `env` global, que podem ser segredo: o backup fica
 fora do git, e o resumo final (passo 8) diz ao usuário para apagá-lo depois de conferir a
 migração.
@@ -135,7 +136,7 @@ migração.
 ## 4. Projeto — time e pessoal
 
 - `.claude/settings.json` (time, git): mescle `modelos/settings.json`. As chaves do modelo
-  VENCEM — `model` é sempre `claude-opus-5-5[1m]`, `effortLevel` `medium`, `modelSettings` com
+  vencem — `model` é sempre `claude-opus-5-5[1m]`, `effortLevel` `medium`, `modelSettings` com
   effort `medium` para Opus, Sonnet e Haiku 5.5 e o teto de compactação automática em 400K no
   Opus, no Fable 5.2 e no Mythos 5.2 (`modelSettings["<modelo>"].autoCompactWindow: 400000`; nos
   dois últimos só o teto, sem effort: não são do padrão, mas a sessão pode escolhê-los), os aliases
@@ -144,9 +145,9 @@ migração.
   desligada (`env.CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1"`, que vence `autoMemoryEnabled` nos dois
   sentidos — tire `autoMemoryEnabled` e `autoDreamEnabled` do projeto, se houver), subagent sem
   `model` em sonnet (`env.CLAUDE_CODE_SUBAGENT_MODEL`) e subagent sem abrir subagent
-  (`env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "1"`) —, SEM
+  (`env.CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: "1"`) —, sem
   `env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` (versões antigas do padrão o punham: tire, para o
-  `/rewind` voltar), SEM
+  `/rewind` voltar), sem
   `fallbackModel` (tire se houver: sem a chave, indisponibilidade não troca de modelo; o `[]`
   não é documentado),
   e `extraKnownMarketplaces.claude-padrao` com `autoUpdate: true` (marketplace de terceiro vem sem
@@ -176,19 +177,19 @@ migração.
 
 Memória não é mais recurso: o contexto do projeto mora só no `CLAUDE.md` da pasta. Cada memória
 existente — global (`~/.claude/projects/<x>/memory/`) ou do projeto (`<projeto>/.claude/memoria/`)
-— vira texto conciso no `CLAUDE.md` do projeto SE for fato durável dele (decisão, convenção,
-armadilha, endereço) e NÃO for pessoal nem sigilosa (credencial, dado de pessoa, preferência
+— vira texto conciso no `CLAUDE.md` do projeto se for fato durável dele (decisão, convenção,
+armadilha, endereço) e não for pessoal nem sigilosa (credencial, dado de pessoa, preferência
 do usuário): pergunte item a item na dúvida. O que não entrar no `CLAUDE.md` fica só no backup.
 
 - `projeto_existe: false` (pasta movida ou apagada): procure o projeto pelo nome (ex.:
   `Desktop/ANCC` → `Desktop/Projetos/ANCC`) e confirme com o usuário; sem destino, só no backup.
 - `projeto: null`: deduza pelo conteúdo e confirme.
-- `eh_home: true` (sessões abertas no home): o home NÃO é projeto. Distribua cada fato para o
+- `eh_home: true` (sessões abertas no home): o home não é projeto. Distribua cada fato para o
   projeto de que fala; o genérico (perfil do usuário, feedback de trabalho) é pessoal: só no backup.
 - Links `[[nome]]` e caminhos dentro das memórias: ajuste ao que mudou de lugar.
 
 Depois de passar ao `CLAUDE.md` e conferir, apague a pasta de memória (`memory/` do global — só
-ela, os `.jsonl` ficam — e `<projeto>/.claude/memoria/`), COM OK do usuário.
+ela, os `.jsonl` ficam — e `<projeto>/.claude/memoria/`), com OK do usuário.
 
 ## 6. Outros projetos
 
@@ -199,7 +200,7 @@ usuário rodar `/padrao:aplicar` lá quando abrir.
 ## 7. Regras no `CLAUDE.md`
 
 Insira `modelos/claude-md.md` no fim do `CLAUDE.md` da raiz (o texto do projeto vem antes). Se
-já houver o bloco entre `<!-- padrao:inicio` e `<!-- padrao:fim -->`, SUBSTITUA só ele, onde
+já houver o bloco entre `<!-- padrao:inicio` e `<!-- padrao:fim -->`, substitua só ele, onde
 estiver. Se o projeto já tiver seção
 própria de modelos/subagents, mostre a sobreposição e pergunte qual fica. A primeira linha do
 bloco e a dos `padrao-*.md` trazem o carimbo `modelo X`: copie-a como está — o hook de abertura
@@ -220,7 +221,7 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
 ## 8. Limpe o global e feche
 
 1. Grave `~/.claude/settings.json` como `modelos/global.json`, mais `permissions.defaultMode`,
-   `skipDangerousModePermissionPrompt` e `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` SÓ se o
+   `skipDangerousModePermissionPrompt` e `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` só se o
    usuário já os tinha (com o mesmo valor; não os crie), `<PYTHON>` = o interpretador que o `py.sh` acha nesta máquina (`python3`,
    `python` ou `py`) e `<HOME>` = o home com `/` (no Git Bash, `cygpath -m "$HOME"`; trocar as
    barras do caminho do Windows à mão come as barras). Copie `<plugin>/statusline/statusline.py`
@@ -233,7 +234,7 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
 4. Resuma o que mudou em cada arquivo/projeto, o que ficou no global e por quê. Diga onde está o
    backup e que ele guarda o `settings.json` global como era (com os valores do `env`): apagar
    depois de conferir.
-5. Diga que vale a partir da PRÓXIMA sessão (confira com `/status` → "Setting sources"), que na
+5. Diga que vale a partir da próxima sessão (confira com `/status` → "Setting sources"), que na
    primeira sessão o Claude Code pede confiança na pasta para instalar o plugin, que o `/model`
    grava no global — o projeto reaplica o Opus 5.5 1M ao abrir, e o hook do padrão avisa — e que
    toda sessão abre em effort medium: o `/effort` muda a sessão (com `s` no seletor, sem gravar no

@@ -312,7 +312,16 @@ flowchart TD
 
 ## As skills
 
-**`aplicar`** — o `inventariar.py` só lê e imprime JSON com o destino de cada item (`DESTINO`,
+**`aplicar`** — `disable-model-invocation` desde a 2.14.0, como as outras quatro do menu: grava
+no global e em outros projetos, e a documentação do Claude Code recomenda a chave para fluxo com
+efeito colateral. Por isso o bloco do `CLAUDE.md`, o `padrao-configuracao.md` e o aviso do hook de
+abertura mandam pedir ao usuário que rode o comando, em vez de "rode". Sondado em sessão real
+(v2.1.330, Windows, `claude -p --plugin-dir` com HOME falso e sem pular permissões, Opus 5.5,
+uma rodada por caso, US$ 0,40 as três): com `model` no global e o pedido "tem algo pendente?
+resolva", o Claude apontou a chave e pediu o `/padrao:aplicar` ao usuário, sem tentar a skill nem
+editar o global; com "aplica o padrão pra mim", respondeu sem chamar ferramenta que só o usuário
+roda o comando, e ofereceu fazer à mão só com confirmação; com o global limpo, disse que não era
+preciso rodá-lo. O `inventariar.py` só lê e imprime JSON com o destino de cada item (`DESTINO`,
 `PERMISSOES` e `SEGREDO` no topo do script): `padrao` (o modelo define), `time`, `local`,
 `global`, `avaliar` (pergunte) ou `descartar`. Do `env` e dos MCP saem só os nomes. Os arquivos
 que vão para o projeto saem de `modelos/`; o bloco do `CLAUDE.md` fica entre

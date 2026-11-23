@@ -49,6 +49,10 @@ flowchart LR
 | `/padrao:code-mode ligar` (ou `desligar`) | opcional: o Code Mode do Claude Code, nesta máquina | nenhuma |
 | `/padrao:advisor ligar` (ou `desligar`) | opcional: o Fable 5.2 como advisor, neste projeto | nenhuma |
 
+Os cinco só rodam quando você os chama: o Claude não dispara nenhum sozinho
+(`disable-model-invocation`). Quando o hook de abertura avisa, ele pede que você rode o
+`/padrao:aplicar`.
+
 ### `/padrao:aplicar` — o global vai para o projeto
 
 ```mermaid
