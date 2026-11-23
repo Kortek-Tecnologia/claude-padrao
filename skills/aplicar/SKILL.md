@@ -9,8 +9,8 @@ Regra: **tudo no projeto, global limpo.** No `~/.claude/settings.json` ficam só
 `autoMemoryEnabled: false`, para pasta sem o padrão não criar memória no global (nos projetos o
 auto memory também fica desligado: contexto vai no `CLAUDE.md` da pasta), e `statusLine`: é
 interface do terminal e tem de aparecer em qualquer pasta, inclusive no home — script em
-`~/.claude/statusline.py`. A linha dos subagents (`subagentStatusLine`) vem do `settings.json`
-do próprio plugin, onde ele está ligado: no global ela venceria a do plugin, então sai. As chaves
+`~/.claude/statusline.py`. A linha dos subagents vem de um mod do próprio plugin
+(`hooks/register.ts`), onde ele está ligado: `subagentStatusLine` no global é obsoleta e sai. As chaves
 que o Claude Code recusa de projeto — `permissions.defaultMode` (bypass/auto só valem do escopo
 user), `skipDangerousModePermissionPrompt` e `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` (o Code
 Mode, que o `/padrao:code-mode` liga e desliga) — ficam se o usuário já as tem; o padrão não as

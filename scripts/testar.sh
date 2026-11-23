@@ -465,8 +465,8 @@ jq '.fallbackModel = [] | .modelSettings["claude-sonnet-5-5"].effortLevel = "hig
 jq '. + {model: "opus", fallbackModel: [], subagentStatusLine: {type: "command", command: "x"}, advisorModel: "fable"} | .modelSettings["claude-opus-5-5"].autoCompactWindow = 100000 | .env.OUTRA = "x"' "$CASA/.claude/settings.json" >"$CASA/s" && mv "$CASA/s" "$CASA/.claude/settings.json"
 mkdir -p "$CASA/.claude/projects/$(printf '%s' "$PROJ" | sed 's/[^A-Za-z0-9]/-/g')/memory" && touch "$CASA/.claude/projects/$(printf '%s' "$PROJ" | sed 's/[^A-Za-z0-9]/-/g')/memory/MEMORY.md"
 printf '# velha\n' >"$CASA/.claude/statusline.py"
-# a linha dos subagents vem do plugin: a chave no global (venceria a dele) e a cópia antiga são sobra
-cp statusline/subagent-statusline.py "$CASA/.claude/"
+# a linha dos subagents vem do mod do plugin: a chave no global (obsoleta) e a cópia antiga do script são sobra
+: >"$CASA/.claude/subagent-statusline.py"
 mkdir -p "$CASA/.claude/skills/minha"
 # marketplace com versão mais nova que a instalada
 mkdir -p "$CASA/.claude/plugins/marketplaces/claude-padrao/.claude-plugin"
@@ -554,28 +554,10 @@ rm -rf "$PADRAO_DIR" "$SOLTA"
 jq -e '.statusLine.refreshInterval >= 1' skills/aplicar/modelos/global.json >/dev/null ||
   { echo "divergiu: global.json sem statusLine.refreshInterval"; FALHAS=$((FALHAS + 1)); }
 
-# Status line dos subagents: uma linha JSON por task; os modelos que o padrão
-# fixa (5.5, Fable 5.2 e Mythos 5.2) na cor da família, o resto em vermelho (\033[31m).
-saida=$(printf '%s' '{"columns":80,"tasks":[{"id":"a","agentType":"padrao:coletor","status":"running","description":"x","startTime":0,"model":"claude-haiku-5-5","contextWindowSize":1000000,"tokenCount":1000},{"id":"b","agentType":"velho","status":"running","description":"y","startTime":0,"model":"claude-sonnet-4-5","tokenCount":1},{"id":"c","agentType":"fork","status":"running","description":"z","startTime":0,"model":"claude-fable-5-2","tokenCount":1},{"id":"d","agentType":"fork","status":"running","description":"w","startTime":0,"model":"claude-fable-5-5","tokenCount":1},{"id":"e","agentType":"fork","status":"running","description":"v","startTime":0,"model":"claude-mythos-5-2","tokenCount":1}]}' |
-  sh "$D/py.sh" statusline/subagent-statusline.py)
-ok=$(printf '%s\n' "$saida" | jq -rs '[.[0].id == "a", (.[0].content | contains("Haiku 5.5")), (.[1].content | contains("\u001b[31mSonnet 4.5")), (.[2].content | contains("\u001b[33mFable 5.2")), (.[3].content | contains("\u001b[31mFable 5.5")), (.[4].content | contains("\u001b[33mMythos 5.2"))] | all')
-[ "$ok" = true ] || { echo "divergiu: subagent-statusline: $saida"; FALHAS=$((FALHAS + 1)); }
-# os tokens arredondam o meio para cima, como no mod (hooks/register.test.tsx tem os mesmos números)
-ok=$(printf '%s' '{"columns":120,"tasks":[{"id":"a","model":"claude-haiku-5-5","contextWindowSize":1000000,"tokenCount":2500},{"id":"b","model":"claude-haiku-5-5","contextWindowSize":1000000,"tokenCount":1150000},{"id":"c","model":"claude-haiku-5-5","tokenCount":2000000}]}' |
-  sh "$D/py.sh" statusline/subagent-statusline.py |
-  jq -rs '[(.[0].content | contains("(3k)")), (.[1].content | contains("(1.2M)")), (.[2].content | contains("2M tok"))] | all')
-[ "$ok" = true ] || { echo "divergiu: subagent-statusline: arredondamento dos tokens"; FALHAS=$((FALHAS + 1)); }
-# Quem liga essa linha é o settings.json do plugin (de plugin só valem `agent` e
-# `subagentStatusLine`); o global não a traz mais, porque venceria a do plugin. O comando roda
-# como o Claude Code o entrega: com o ${CLAUDE_PLUGIN_ROOT} trocado pela pasta do plugin.
-[ "$(jq -c 'keys' settings.json)" = '["subagentStatusLine"]' ] ||
-  { echo "divergiu: settings.json do plugin com chave que o Claude Code descarta"; FALHAS=$((FALHAS + 1)); }
+# A linha dos subagents é o mod (hooks/register.ts; testes em hooks/register.test.tsx). A
+# reserva `subagentStatusLine` saiu do plugin na 2.13.0 e o global não traz a chave.
 jq -e 'has("subagentStatusLine") | not' skills/aplicar/modelos/global.json >/dev/null ||
   { echo "divergiu: global.json ainda traz subagentStatusLine"; FALHAS=$((FALHAS + 1)); }
-cmd_sl=$(jq -r '.subagentStatusLine.command' settings.json | tr -d '\r' | sed "s|\${CLAUDE_PLUGIN_ROOT}|$(nativo "$PWD")|g")
-printf '%s' '{"columns":80,"tasks":[{"id":"a","agentType":"padrao:coletor","status":"running","description":"x","startTime":0,"model":"claude-haiku-5-5","contextWindowSize":1000000,"tokenCount":1000}]}' |
-  sh -c "$cmd_sl" | jq -e '.id == "a" and (.content | contains("Haiku 5.5"))' >/dev/null ||
-  { echo "divergiu: o comando do settings.json do plugin nao devolveu a linha: $cmd_sl"; FALHAS=$((FALHAS + 1)); }
 
 # Inventário: do env global saem só os nomes (o JSON vai para o transcript); nome
 # de segredo vai para o local, o que o modelo define é descartado, allow pergunta.

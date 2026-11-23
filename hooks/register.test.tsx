@@ -77,7 +77,7 @@ test('custo aparece a partir de um centavo; terminado leva a marca', async ($, o
   expect(semCor(await corpo($, { cost: { usd: 0.001 } }))).not.toContain('US$')
 })
 
-test('tokens arredondam o meio para cima, como no subagent-statusline.py; effort nulo não aparece', async ($, on) => {
+test('tokens arredondam o meio para cima; effort nulo não aparece', async ($, on) => {
   motor(on)
   expect(semCor(await corpo($, { tokenCount: 2_500 }))).toContain('(3k)')
   expect(semCor(await corpo($, { tokenCount: 1_150_000 }))).toContain('(1.2M)')

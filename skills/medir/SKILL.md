@@ -1,6 +1,6 @@
 ---
 name: medir
-description: Mede se a política de modelos pegou — chamadas de subagent por tipo × modelo em que rodou, correções e recusas do hook, commits com a documentação conferida antes, tokens, turnos e custo estimado por modelo, contexto por requisição, dos transcripts locais deste projeto.
+description: Mede se a política de modelos pegou, pelos transcripts locais deste projeto — chamadas de subagent por tipo × modelo em que rodou, correções e recusas do hook, commits com a documentação conferida antes, tokens, turnos e custo estimado por modelo e contexto por requisição.
 disable-model-invocation: true
 ---
 

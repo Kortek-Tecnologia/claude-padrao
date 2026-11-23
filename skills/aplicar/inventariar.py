@@ -42,7 +42,7 @@ DESTINO = {
     "extraKnownMarketplaces": "time",
     "disableClaudeAiConnectors": "padrao",
     "statusLine": "global",
-    "subagentStatusLine": "padrao",  # vem do settings.json do plugin; no global venceria a dele
+    "subagentStatusLine": "padrao",  # obsoleta: a linha dos subagents vem do mod do plugin
     "language": "local",
     "tui": "local",
     "theme": "local",

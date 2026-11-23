@@ -1,6 +1,6 @@
 // Linha de cada subagent no painel de agentes do padrao, como mod (hook
-// `ui.render` no componente `AgentRow`). Substitui o `subagentStatusLine` do
-// settings.json do plugin, que o Claude Code marcou como obsoleto.
+// `ui.render` no componente `AgentRow`). Substituiu o `subagentStatusLine` do
+// settings.json do plugin, obsoleto no Claude Code (saiu na 2.13.0).
 //
 //     tipo · Modelo 5.5 · effort · ctx 12% (120k) · US$ 0.03 · 1m32s · descrição
 //
@@ -58,7 +58,7 @@ function modelo(m: string | undefined): string {
   return `${BOLD}${cor}${nome}${RESET}`
 }
 
-// Conta em inteiros, meio para cima, igual ao subagent-statusline.py: `toFixed` e o
+// Conta em inteiros, meio para cima, como fazia a reserva em Python: `toFixed` e o
 // arredondamento do Python divergem no meio exato (2.500 saía 3k aqui e 2k lá).
 function tokens(n: number): string {
   if (n >= 1_000_000) {

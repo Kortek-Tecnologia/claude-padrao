@@ -22,7 +22,6 @@ flowchart LR
   AP -->|"copia para ~/.claude/"| ST["statusline/statusline.py"]
   CP -->|"confere a cópia"| ST
   UI["ui.render: AgentRow"] --> RT["hooks/register.ts<br/>(mod)"]
-  PS["settings.json do plugin:<br/>subagentStatusLine (reserva)"] --> SU["py.sh →<br/>subagent-statusline.py"]
 ```
 
 | Caminho | Papel |
@@ -34,7 +33,7 @@ flowchart LR
 | `statusline/` | `statusline.py` é de terceiro (Jhonatan de Souza); nossas linhas ficam entre `padrao: início` e `padrao: fim` ou marcadas `# padrao` |
 | `scripts/opcional.py` | liga, desliga e mostra os dois opcionais (Code Mode e Fable como advisor); as skills `code-mode` e `advisor` só o chamam — ver [Os opcionais](#os-opcionais--opcionalpy) |
 | `hooks/register.ts` | o mod da linha dos subagents: hook `ui.render` em `AgentRow`, declarado em `modules` no `hooks.json`; testes em `hooks/register.test.tsx` |
-| `settings.json` | a única setting que o plugin traz: `subagentStatusLine`, reserva da linha dos subagents para versão sem o mod (de plugin só valem ela e `agent`) |
+| `.claude/CLAUDE.md` | contexto deste repositório para quem o mantém; fica em `.claude/` porque a raiz é a raiz do plugin, e `CLAUDE.md` ali o validador acusa |
 
 ## Hook de abertura — `conferir-padrao.sh`
 
@@ -49,7 +48,7 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 | as mesmas chaves no `.claude/settings.local.json` | o local vence o projeto: chave do padrão lá com outro valor é acusada (ausente ou igual, passa) |
 | `fallbackModel` em `settings.json` ou `settings.local.json`; `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` | têm de estar ausentes |
 | `disableClaudeAiConnectors` (projeto) e `syncClaudeAiPlugins: false` (local, único lugar em que vale) | `true` / `false` |
-| `~/.claude/settings.json` | só `permissions.defaultMode`, `skipDangerousModePermissionPrompt`, `autoMemoryEnabled`, a status line principal, o effort que o `/effort` salva (o projeto vence) e, de `env`, só `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` (o Code Mode só liga do escopo user); outra variável sai no aviso como `env.NOME`. `subagentStatusLine` ali é chave fora do padrão, porque o global vence o plugin, e `advisorModel` também (o `/advisor` grava lá; o lugar dele é o `settings.local.json` do projeto) |
+| `~/.claude/settings.json` | só `permissions.defaultMode`, `skipDangerousModePermissionPrompt`, `autoMemoryEnabled`, a status line principal, o effort que o `/effort` salva (o projeto vence) e, de `env`, só `CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` (o Code Mode só liga do escopo user); outra variável sai no aviso como `env.NOME`. `subagentStatusLine` ali é chave fora do padrão (obsoleta: a linha dos subagents vem do mod), e `advisorModel` também (o `/advisor` grava lá; o lugar dele é o `settings.local.json` do projeto) |
 | `~/.claude/` | sem `CLAUDE.md`, agents, commands, rules, workflows, skills pessoais (menos `synced/` e ocultas), `statusline.py` diferente da do plugin, `subagent-statusline.py` sobrando |
 | `~/.claude.json` e `~/.claude/projects/<chave>/memory` | sem MCP de escopo user nem local deste projeto; sem memória deste projeto |
 | versão instalada × `~/.claude/plugins/marketplaces/claude-padrao` | por **diferença**, não por ordem: a numeração recomeçou em 1.0.0 |
@@ -89,42 +88,44 @@ cinco vezes cada, em 2026-11-17, neste repositório (20 avisos):
   argumento do comando anterior e nunca fica vazia: o laço não termina), e o `jq` do Windows
   termina cada linha em CRLF — o CR sai do fim de cada aviso, sem abrir `tr`.
 
-## Linha dos subagents — `hooks/register.ts` (mod) e `settings.json` (reserva)
+## Linha dos subagents — `hooks/register.ts` (mod)
 
-A linha de cada subagent no painel de agentes vem do plugin, sem cópia em `~/.claude`, por dois
-caminhos que desenham o mesmo texto:
+A linha de cada subagent no painel de agentes vem do plugin, sem cópia em `~/.claude`: um módulo
+TypeScript que o `hooks.json` declara em `modules`, com hook `ui.render` no componente
+`AgentRow`. Roda dentro do Claude Code, sem abrir processo, e mostra o custo do subagent (a
+partir de US$ 0,01) e o aviso de Haiku acima de 100K (paga 5×). Vale no Claude Code 2.1.326+,
+onde os módulos de plugin estão liberados para a conta.
 
-| | Mod: `hooks/register.ts` | Reserva: `subagentStatusLine` do `settings.json` |
-|---|---|---|
-| O que é | módulo TypeScript que o `hooks.json` declara em `modules`; hook `ui.render` no componente `AgentRow` | comando: `py.sh` → `subagent-statusline.py` |
-| Vale em | Claude Code 2.1.326+, onde os módulos de plugin estão liberados para a conta | qualquer versão desde a 2.1.319 |
-| Custo | roda dentro do Claude Code, sem processo | um Python a cada 5 s com subagent visível (~0,6 s no Windows) |
-| Mostra a mais | custo do subagent (a partir de US$ 0,01) e aviso de Haiku acima de 100K (paga 5×) | — |
+Até a 2.12 o plugin trazia também uma reserva para versão sem o mod: `subagentStatusLine` no
+`settings.json` da raiz, que rodava `statusline/subagent-statusline.py` (um Python a cada 5 s
+com subagent visível, ~0,6 s no Windows). O Claude Code marcou a chave como obsoleta — o
+`claude plugin validate` avisava que ela vai parar numa versão futura, sem data — e ela saiu na
+2.13.0, com o script. Onde o mod não roda (versão anterior à 2.1.326, conta sem a liberação), a
+linha é a do Claude Code. Medido em 2026-11-17, v2.1.326, em sessão interativa num
+pseudo-terminal (ver [Testes](#testes)), ainda com a reserva:
 
-O `claude plugin validate` avisa que o `subagentStatusLine` está obsoleto e vai parar numa versão
-futura, sem data: por isso o mod. A reserva fica enquanto houver versão sem o `AgentRow`. Medido
-em 2026-11-17, v2.1.326, em sessão interativa num pseudo-terminal (ver [Testes](#testes)):
-
-- **Os dois convivem.** O `hooks.json` leva `modules` ao lado dos quatro hooks de comando; numa
-  sessão real o módulo carregou (`hooks module padrao loaded … events: ui.render`) e os hooks em
-  sh agiram (abertura e modelo do `Explore`).
-- **Com os dois ativos, o mod vence:** em 98 de 98 desenhos da linha saiu a marca que só o mod
-  punha. Sem o `subagentStatusLine`, o mod sozinho desenha a linha.
+- **Mod e hooks de comando convivem.** O `hooks.json` leva `modules` ao lado dos quatro hooks de
+  comando; numa sessão real o módulo carregou (`hooks module padrao loaded … events: ui.render`)
+  e os hooks em sh agiram (abertura e modelo do `Explore`).
+- **O mod sozinho desenha a linha.** Com a reserva ativa ele já vencia: em 98 de 98 desenhos da
+  linha saiu a marca que só o mod punha.
 - **Versão antiga ignora o mod, não quebra.** Nas 2.1.319, 2.1.323, 2.1.324 e 2.1.325 o
   `plugin validate` aceita o `hooks.json` e diz que o `AgentRow` não existe ali ("it never
-  runs"): quem desenha é a reserva. O `AgentRow` existe a partir da 2.1.326.
+  runs"). O `AgentRow` existe a partir da 2.1.326.
 - **Liberação por conta.** O log da sessão mostra os módulos de plugin instalado atrás de uma
-  chave de liberação (`tengu_plugin_hooks_modules`): conta sem ela fica na reserva.
+  chave de liberação (`tengu_plugin_hooks_modules`): conta sem ela fica com a linha do Claude
+  Code.
 - **A API de mods é de acesso antecipado e muda entre versões.** Hook de mod que falha é
-  pulado sozinho, e a linha volta a ser a da reserva (ou a do Claude Code). O que o módulo usa
-  está em `claude plugin validate .` ("hooks: ui.render{component=AgentRow}; calls:
-  $.clock.now").
-- **O global ainda vence a reserva:** `subagentStatusLine` em `~/.claude/settings.json` (o
-  padrão a punha lá até a 2.2.1) esconde a do plugin. O hook de abertura acusa a chave e a
-  cópia antiga do script, e o `aplicar` tira as duas.
-- **Mexeu numa, mexa na outra:** as duas linhas têm de dizer o mesmo. Os testes do mod estão em
-  `hooks/register.test.tsx` (`claude plugin test .`; o `testar.sh` os roda onde há o `claude`) e
-  os da reserva, no `testar.sh`.
+  pulado sozinho, e a linha volta a ser a do Claude Code. O que o módulo usa está em
+  `claude plugin validate .` ("hooks: ui.render{component=AgentRow}; calls: $.clock.now").
+- **`subagentStatusLine` no global é sobra:** o padrão a punha em `~/.claude/settings.json` até
+  a 2.2.1. O hook de abertura acusa a chave e a cópia antiga do script, e o `aplicar` tira as
+  duas.
+- **Testes:** `hooks/register.test.tsx` (`claude plugin test .`; o `testar.sh` os roda onde há o
+  `claude`).
+- **Sem a reserva, conferido na 2.1.330** (2026-11-23, `claude -p --plugin-dir`, HOME falso): o
+  log da sessão traz `hooks module padrao@inline loaded … events: ui.render`. Plugin carregado
+  de pasta não passa pela chave de liberação; o instalado em conta sem ela não foi medido.
 - **Arquivos que o Claude Code gera** ao carregar o plugin de uma pasta (`--plugin-dir`):
   `.claude-plugin/types/` (com `.gitignore` próprio) e o `tsconfig.json` da raiz, versionado,
   que só aponta para ela.
@@ -599,8 +600,7 @@ modelos não mudou e o Code Mode segue opcional.
 - que o `--sandbox` do sed e do gawk segura de verdade o que a trava deixa passar;
 - o hook de abertura com HOME e projeto falsos, limpo e sujo;
 - que nenhum modelo de `skills/aplicar/modelos/` mudou sem subir o carimbo (soma do texto);
-- as duas status lines, o comando do `settings.json` do plugin (com o `${CLAUDE_PLUGIN_ROOT}`
-  trocado), o arredondamento dos tokens igual nas duas linhas dos subagents, o inventário (não
+- a status line principal (a dos subagents é o mod, testado pelo `claude plugin test .`), o inventário (não
   imprime valor do `env` nem credencial da URL de MCP; lê settings com BOM) e as contas do `medir`
   (inclusive custo, faixas de contexto, Haiku acima de 100K, consulta ao advisor e período sem
   requisição);
@@ -612,8 +612,12 @@ modelos não mudou e o Code Mode segue opcional.
   settings, a indentação e o CRLF preservados; JSON inválido intocado; o home recusado), a
   variável do Code Mode calada no hook de abertura e o `onFailure` de cada hook no `hooks.json`.
 
-Depois, `claude plugin validate .`. Além dos dois avisos conhecidos (`CLAUDE.md` na raiz, que é
-contexto deste repositório e não do plugin, e o `subagentStatusLine` obsoleto), ele fecha com
+Depois, `claude plugin validate --strict .`, que tem de passar sem aviso nenhum. Três avisos
+antigos saíram na 2.13.0: o `CLAUDE.md` deste repositório foi para `.claude/CLAUDE.md` (na raiz,
+que é a raiz do plugin, o validador o acusa: é contexto do repositório, não do plugin; conferido
+na 2.1.330 que ele carrega dali — `claude -p "/context"` o lista em "Memory Files"), a reserva
+`subagentStatusLine` foi removida e o plugin ganhou ícone (`.claude-plugin/icon.png`). Ele fecha
+com
 "Hosts: api.github.com (declared), github.com (declared)" e "Hosts not read for: hooks (2),
 skills (6)". A segunda é nota, não aviso, e não some: hooks e skills rodam processos, e o
 validador não lê que hosts eles alcançam. O campo `network.hosts` do `plugin.json` (v2.1.328+)
@@ -624,8 +628,9 @@ rede; auditoria de dependência e instalação de `jq` ou de servidor de linguag
 projeto e da máquina, e ficam fora da lista. Conferido na 2.1.330: sem o campo o validador pede
 a declaração ("Hosts not declared"), e a lista vazia também é aceita. Skill nova que alcance
 outro host entra na lista. No fim vêm as checagens do diretório de plugins (o catálogo a que se
-submete plugin), que não mudam o resultado: acusam a falta de ícone (`ICON_MISSING`), que só
-importa para quem for submeter o plugin lá.
+submete plugin), que não mudam o resultado. O ícone é o `.claude-plugin/icon.png` (PNG quadrado
+de 512 px; sem ele o validador acusa `ICON_MISSING`). O validador avisa que o diretório fixa o
+ícone na primeira submissão: quem quiser outra arte troca o arquivo antes de submeter.
 
 O CI roda o mesmo `testar.sh` num job `testar-windows` (Git Bash da imagem do GitHub). Entrou em
 observação (`continue-on-error`) e passou a reprovar depois de três execuções verdes seguidas:
@@ -683,6 +688,10 @@ Não cobre o texto das skills. Para elas, o **teste de ponta a ponta**:
 3. Etapa que pede OK: `--resume <session_id> "<resposta>"` (no `-p` não há `AskUserQuestion`).
 4. Confira o resultado com scripts (arquivos, commits, `conferir-padrao.sh` calado) e que o
    `~/.claude` real não mudou. Uma rodada completa (`aplicar`, hooks, `arrumar`) custa ~US$ 4.
+   Rodada da 2.13.0 (v2.1.330, Windows, projeto de um arquivo com o README errado em quatro
+   pontos): US$ 2,25 com o `medir`. O `aplicar` tirou do global a `subagentStatusLine` e a
+   cópia antiga do script e o hook de abertura calou; o `arrumar` fechou dois lotes, com
+   `executor` e `revisor` em Sonnet e `leitor` em Haiku, sem correção do hook de modelo.
 5. Lembrete da documentação: peça uma mudança com commit autorizado num projeto com o padrão
    aplicado e confira no transcript a ordem das chamadas. Com o bloco inteiro, `Skill` antes do
    `git commit` e nenhuma recusa; com o bloco sem a linha "Antes de todo commit", recusa →

@@ -21,7 +21,7 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 | `scripts/opcional.py` | os dois opcionais, fora da política de modelos e desligados por padrão: Code Mode (`env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` no settings global, o único em que vale) e Fable como advisor (`advisorModel` no `.claude/settings.local.json` do projeto); liga, desliga e mostra o estado |
 | `agents/` | `coletor` (haiku), `leitor` (haiku, sem CLAUDE.md), `revisor` (sonnet), `executor` (sonnet) |
 | `skills/` | os comandos — `aplicar` (+ `inventariar.py`, `modelos/`), `arrumar` (levanta, um OK, executa tudo; + `checagens.md`, os desvios de segurança e de CI da trilha B), `medir` (+ `medir-modelos.py`) e os opcionais `code-mode` e `advisor` (só chamam o `opcional.py`) — e `atualizar-docs`, fora do menu: o Claude a chama antes de commitar (o `cobrar-docs.sh` cobra) |
-| `statusline/`, `settings.json` | `statusline.py` (principal; a skill `aplicar` a instala em `~/.claude/`) e `subagent-statusline.py` (linha dos subagents de reserva, para versão sem o mod; roda direto do plugin, pelo `subagentStatusLine` do `settings.json` da raiz — obsoleto no Claude Code, sai quando a versão mínima tiver o mod) |
+| `statusline/` | `statusline.py` (principal; a skill `aplicar` a instala em `~/.claude/`). A linha dos subagents é só o mod (`hooks/register.ts`): a reserva `subagentStatusLine` saiu na 2.13.0 |
 | `avaliacao/revisor/` | avaliação do `padrao:revisor` com defeitos plantados (18 casos): projeto de exemplo (`base/`), os casos (`casos.py`) e o `avaliar.py` (`--conferir` não custa; a rodada de verdade abre uma sessão por caso) |
 | `docs/como-funciona.md` | para quem mantém: peças, decisões dos hooks, skills, testes e publicação (o README é para quem usa) |
 | `AGENT_LEARNINGS.md` | erros do agente neste repositório e a abordagem certa; lido sob demanda (modelo e `docs/agente/padrao-*.md` em `skills/aplicar/modelos/`) |
@@ -36,16 +36,18 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
   entrada com o `read` do shell e não abra `cat`, `sed` ou `ls` onde um `case` ou um glob resolve.
 - Python só biblioteca padrão, 3.9+, sempre via `scripts/py.sh`.
 - TypeScript só no mod (`hooks/register.ts`): sem dependência, sem Node nem DOM — tudo de fora vem pelo `$`. A API é de acesso antecipado: confira com `claude plugin validate .` e `claude plugin test .` a cada versão do Claude Code.
-  A linha do mod e a do `subagent-statusline.py` têm de dizer o mesmo.
 - `version` no `.claude-plugin/plugin.json`: o aviso de versão nova compara com ela.
   Toda mudança publicada sobe a `version` (semver). O `marketplace.json` da raiz
   publica este mesmo diretório (`source: "./"`).
 - Repositório público, licença MIT (`LICENSE`). `statusline/statusline.py` é código de
   terceiro (Jhonatan de Souza), usado com permissão e fora da MIT: mantenha o crédito.
 - Settings de plugin descartam `model` e `effortLevel`; por isso a skill `aplicar`
-  grava no `.claude/settings.json` do projeto. Do `settings.json` da raiz só valem `agent` e
-  `subagentStatusLine`, e o global vence o plugin: `subagentStatusLine` no global é chave fora
-  do padrão.
+  grava no `.claude/settings.json` do projeto. O plugin não traz `settings.json` na raiz
+  (dele só valeriam `agent` e o `subagentStatusLine`, obsoleto); `subagentStatusLine` no global
+  é chave fora do padrão.
+- Este arquivo mora em `.claude/` porque a raiz do repositório é a raiz do plugin: `CLAUDE.md`
+  ali o `claude plugin validate` acusa (não é contexto do plugin). O validador tem de passar
+  sem aviso nenhum (`claude plugin validate --strict .`).
 - Mudou `claude-md.md` ou `agente/padrao-*.md` em `skills/aplicar/modelos/`: suba o carimbo
   `modelo X` da 1ª linha para a versão nova e registre-o com a soma em `scripts/testar.sh` (o
   teste cobra). O hook de abertura compara só o carimbo: sem subir, projeto antigo não é avisado.
@@ -56,11 +58,11 @@ commit (o CI valida os diagramas Mermaid; `.github/scripts/validar-mermaid.mjs`)
 ## Testes
 
 `bash scripts/testar.sh`: confere as decisões dos
-quatro hooks (inclusive sem `jq`; o `conferir-padrao.sh` com HOME falso), as duas status
-lines, que nenhum modelo mudou sem subir o carimbo, que o inventário não imprime valor do `env`,
+quatro hooks (inclusive sem `jq`; o `conferir-padrao.sh` com HOME falso), a status
+line principal, que nenhum modelo mudou sem subir o carimbo, que o inventário não imprime valor do `env`,
 as contas do `medir-modelos.py` (tokens, custo a preço de lista, faixas de contexto, advisor), o
 `opcional.py` (liga, desliga, não toca em JSON inválido) e que os casos da avaliação do revisor
 estão de pé (`avaliar.py --conferir`). Não cobre
-o texto das skills. Depois: `claude plugin validate .`. O CI (`.github/workflows/testes.yml`)
+o texto das skills. Depois: `claude plugin validate --strict .`. O CI (`.github/workflows/testes.yml`)
 roda o `testar.sh` no Ubuntu (lá o sh é dash e o awk pode ser mawk) e no Windows. As skills se testam de ponta
 a ponta num sandbox: roteiro em `docs/como-funciona.md#testes`.

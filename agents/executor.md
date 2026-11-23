@@ -1,6 +1,6 @@
 ---
 name: executor
-description: Executa um lote com ficha fechada pelo Opus — arquivos, o que muda, critério de aceite e comandos de verificação definidos. Não decide arquitetura.
+description: Executa um lote com ficha fechada pelo agente principal — arquivos, o que muda, critério de aceite e comandos de verificação definidos. Altera arquivos e roda a verificação; não decide arquitetura. Use quando o lote já tem a ficha completa.
 model: sonnet
 effort: medium
 maxTurns: 100

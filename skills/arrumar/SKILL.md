@@ -1,6 +1,6 @@
 ---
 name: arrumar
-description: Levanta a documentação, a infraestrutura e o CLAUDE.md do projeto, volta com o plano completo de correção para um único OK e, aprovado, executa todos os lotes — o padrao:executor aplica, o padrao:revisor confere, a verificação roda de verdade e cada lote vira um commit num branch novo, sem push.
+description: Audita e corrige a documentação, a infraestrutura e o CLAUDE.md do projeto — levanta tudo, volta com o plano completo para um único OK e, aprovado, executa todos os lotes, um commit por lote num branch novo, sem push. O padrao:executor aplica, o padrao:revisor confere e a verificação roda de verdade.
 argument-hint: "[foco opcional — ex.: só docs, só infra, só o CLAUDE.md]"
 disable-model-invocation: true
 ---

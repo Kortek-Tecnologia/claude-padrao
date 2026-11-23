@@ -1,6 +1,6 @@
 ---
 name: leitor
-description: Lê só código (não .md nem docs) e devolve o que ele faz, sem o CLAUDE.md do projeto no contexto — para análise que não pode se contaminar pela documentação (ex.: /padrao:arrumar). Só lê.
+description: Sem o CLAUDE.md do projeto no contexto — lê só código (não .md nem docs) e devolve o que ele faz, para análise que não pode se contaminar pela documentação (ex.: /padrao:arrumar). Só lê.
 model: haiku
 effort: medium
 maxTurns: 30

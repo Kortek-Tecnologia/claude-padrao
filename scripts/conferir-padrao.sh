@@ -18,7 +18,7 @@
 #    skipDangerousModePermissionPrompt, autoMemoryEnabled e statusLine
 #    (interface do terminal: vale em qualquer pasta, inclusive no home), com o
 #    script em ~/.claude igual ao do plugin. A linha dos subagents vem do
-#    settings.json do plugin: `subagentStatusLine` no global venceria a dele
+#    mod do plugin (hooks/register.ts): `subagentStatusLine` no global é obsoleta
 #    (por isso é chave fora do padrão) e a cópia antiga do script é sobra. Nada
 #    de CLAUDE.md, agents, commands, skills, output-styles, rules ou workflows
 #    em ~/.claude; nenhum MCP de escopo user nem local deste projeto no

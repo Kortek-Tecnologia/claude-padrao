@@ -215,7 +215,7 @@ modelos, e cada comando só grava ou tira uma chave. Sem argumento, mostra o est
 | Trava de leitura | Bash, MCP e ferramentas que gravam, nos agentes que só leem | deixa `Explore`, coletor, leitor e revisor só lerem: grava, redireciona ou executa → recusa, dizendo o motivo |
 | `atualizar-docs` | antes de cada commit | corrige só a documentação que o diff deixou falsa (porta, comando, variável, caminho) |
 | Lembrete da documentação | todo `git commit` que o Claude roda | se a `atualizar-docs` não rodou desde o commit anterior, recusa uma vez e manda rodá-la; a repetição passa |
-| Status lines | sempre; a dos subagents, onde o plugin está ligado | modelo, effort, contexto, limites e cache na linha; uma linha por subagent, que vem do próprio plugin (na 2.1.326+, com o custo e o aviso de Haiku acima de 100K) |
+| Status lines | sempre; a dos subagents, onde o plugin está ligado | modelo, effort, contexto, limites e cache na linha; uma linha por subagent, que vem de um mod do próprio plugin (2.1.326+), com o custo e o aviso de Haiku acima de 100K |
 
 ```
 Opus 5.5 · loja · main · medium
@@ -293,8 +293,8 @@ flowchart LR
 ```
 
 O plugin não traz essas settings prontas porque o Claude Code descarta `model`, `effortLevel` e
-afins quando vêm de plugin (só `agent` e `subagentStatusLine` valem — e a linha dos subagents
-vem assim, do `settings.json` do plugin, sem cópia no global). Por isso o `aplicar` as
+afins quando vêm de plugin (só valem `agent` e o `subagentStatusLine`, obsoleto — a linha dos
+subagents vem de um mod do plugin, sem cópia no global). Por isso o `aplicar` as
 grava no `.claude/settings.json` do projeto, que vence o global a cada abertura — mesmo depois
 de um `/model`. O padrão não liga bypass de permissões nem desliga os checkpoints (`/rewind`);
 auto memory fica desligado e o contexto do projeto vive no `CLAUDE.md`.
@@ -303,10 +303,10 @@ auto memory fica desligado e o contexto do projeto vive no `CLAUDE.md`.
 
 Requisitos:
 
-- Claude Code **v2.1.319+** (antes da 2.1.317, subagent herda o effort da sessão em vez do
-  effort do próprio modelo; antes da 2.1.319, a linha dos subagents que o plugin traz não
-  roda); o Fable 5.2 pede a v2.1.321 e o Code Mode, a v2.1.323. Da v2.1.326 em diante a linha
-  dos subagents sai de um módulo do plugin, com o custo de cada um; antes dela, da forma antiga.
+- Claude Code **v2.1.326+**: a linha dos subagents é um módulo (mod) do plugin e só existe daí
+  em diante, em conta com os mods de plugin liberados; sem isso o resto funciona e a linha fica
+  a do Claude Code. Antes da 2.1.317, subagent herda o effort da sessão em vez do effort do
+  próprio modelo; o Fable 5.2 pede a v2.1.321 e o Code Mode, a v2.1.323.
 - Windows: **Git Bash** (os hooks rodam em `bash`).
 - **jq** — `winget install jqlang.jq` | `sudo apt install jq`. Sem ele, os agentes que só leem
   ficam sem Bash e o hook de abertura se cala: falha fechado. O lembrete da documentação
@@ -375,13 +375,13 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 ## Desenvolver
 
 ```
-.claude-plugin/   manifesto do plugin e do marketplace (version: semver)
+.claude-plugin/   manifesto do plugin e do marketplace (version: semver) e o ícone
 hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc; register.ts: a linha dos subagents (mod)
 scripts/          os hooks em sh (a regra da trava de leitura em awk), py.sh, opcional.py e testar.sh
 agents/           coletor, leitor, revisor, executor
 skills/           aplicar (+ inventário e modelos), arrumar (+ checagens), medir, code-mode, advisor, atualizar-docs
-statusline/       status line principal e dos subagents
-settings.json     a única setting que o plugin traz: a linha dos subagents de reserva (versão sem o mod)
+statusline/       status line principal
+.claude/          CLAUDE.md deste repositório (contexto de quem mantém, não do plugin)
 docs/             como funciona por dentro
 avaliacao/        avaliação do revisor com defeitos plantados (roda à parte: custa)
 .github/          CI: testes e validação dos diagramas
@@ -389,7 +389,7 @@ avaliacao/        avaliação do revisor com defeitos plantados (roda à parte: 
 
 ```
 bash scripts/testar.sh
-claude plugin validate .
+claude plugin validate --strict .
 ```
 
 O CI roda o `testar.sh` no Ubuntu e no Windows e
