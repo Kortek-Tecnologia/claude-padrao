@@ -251,6 +251,10 @@ flowchart TD
   mudou a ordem em `x=$(git commit -m x)` (o de dentro sai antes); 75 ataques, todos recusados
   (os que passavam antes foram rodados num sandbox para confirmar que gravavam); tempo igual ao
   da 2.11.1, cinco vezes cada (0,17 a 0,21 s no `git diff HEAD`, 0,18 a 0,32 s em 5 segmentos).
+  Em sessão real (`claude -p --agent padrao:coletor`, HOME falso, 14 comandos pedidos ao pé da
+  letra, 20 s, US$ 0,004): os 5 de leitura rodaram, inclusive `grep -n '=>'` e
+  `cat "$(git rev-parse --show-toplevel)/a.txt"`; os 9 que gravam foram recusados com o motivo
+  certo, e o repositório ficou igual.
 - **awk POSIX.** Os dois `.awk` rodam em gawk, mawk e busybox: sem `gensub`, sem classes
   `[[:space:]]` e sem intervalo `{n}`. O `--sandbox` que a trava exige do sed e do awk do
   AGENTE é outra coisa: é do comando analisado, não do awk que analisa.
@@ -610,12 +614,18 @@ modelos não mudou e o Code Mode segue opcional.
 
 Depois, `claude plugin validate .`. Além dos dois avisos conhecidos (`CLAUDE.md` na raiz, que é
 contexto deste repositório e não do plugin, e o `subagentStatusLine` obsoleto), ele fecha com
-"Hosts not read for: hooks (2), skills (6)" e "Hosts not declared". É nota, não aviso: hooks e
-skills rodam processos, e o validador não sabe que hosts eles alcançam. O campo
-`network.hosts` do `plugin.json` (v2.1.328+) é só declaração — a documentação diz que ele não
-libera nem bloqueia host — e o plugin não o traz: os hooks não usam rede, e o que as skills
-mandam o Claude rodar (`gh`, `claude plugin install`) passa pelas permissões da sessão. A lista
-vazia não é documentada; declarar ou não é decisão de quem publica.
+"Hosts: api.github.com (declared), github.com (declared)" e "Hosts not read for: hooks (2),
+skills (6)". A segunda é nota, não aviso, e não some: hooks e skills rodam processos, e o
+validador não lê que hosts eles alcançam. O campo `network.hosts` do `plugin.json` (v2.1.328+)
+é só declaração — a documentação diz que ele não libera nem bloqueia host. O plugin declara o
+que as skills fazem o Claude alcançar em todo projeto: `gh run` e `gh api` no `arrumar`,
+`claude plugin install` no `aplicar`. O código do plugin (hooks, scripts, status lines) não usa
+rede; auditoria de dependência e instalação de `jq` ou de servidor de linguagem dependem do
+projeto e da máquina, e ficam fora da lista. Conferido na 2.1.330: sem o campo o validador pede
+a declaração ("Hosts not declared"), e a lista vazia também é aceita. Skill nova que alcance
+outro host entra na lista. No fim vêm as checagens do diretório de plugins (o catálogo a que se
+submete plugin), que não mudam o resultado: acusam a falta de ícone (`ICON_MISSING`), que só
+importa para quem for submeter o plugin lá.
 
 O CI roda o mesmo `testar.sh` num job `testar-windows` (Git Bash da imagem do GitHub). Entrou em
 observação (`continue-on-error`) e passou a reprovar depois de três execuções verdes seguidas:
