@@ -77,6 +77,11 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 - Evitar: regra de bloqueio que casa a opção longa inteira, ou a curta só no começo do grupo, em comando que usa getopt.
 - Fazer: casar o menor prefixo que já não é ambíguo e a letra em qualquer posição do grupo de opções curtas; cada regra nova entra no `testar.sh` com a forma abreviada e com a colada, e rode o comando de verdade num sandbox para ver se grava.
 
+### Trava decidida sobre o texto do comando, não sobre o que o shell roda (2026-11-23)
+- Erro: a trava de leitura casava opção no texto cru e cortava sem acompanhar o shell; `sort "-o" f`, `$(echo touch f)`, `echo "$(cat "a b"; touch f)"`, um `'` em comentário e `cat a \2>&1; touch f` passavam e gravavam. Na revisão só as aspas apareceram; o resto veio ao desenhar o conserto.
+- Evitar: regra de bloqueio sobre o texto escrito, ou corte que simplifica o shell (tirar trecho do texto antes de cortar, tratar `$(` dentro de aspas como texto).
+- Fazer: decidir sobre as palavras como o shell as entrega e negar o comando inteiro na forma que o corte não acompanha; para cada regra, tentar no sandbox as formas com aspas, barra, variável, `$(…)`, comentário e várias linhas, rodando de verdade o que a trava deixar passar (`estado` antes e depois).
+
 ### Edição por script inline no Bash (2026-11-17)
 - Erro: três vezes um `python - <<'EOF'` com texto em português e aspas não aplicou a edição: erro de sintaxe do shell, stdin fora de UTF-8 e um caractere ESC cru gravado no arquivo.
 - Evitar: editar vários arquivos por script passado em heredoc ou em `-c` pelo Git Bash.

@@ -355,7 +355,9 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 ## Segurança e limites
 
 - **Trava de leitura, fechada por padrão.** Cada segmento do comando precisa começar por um
-  leitor conhecido e não gravar; sed e awk só com `--sandbox`. Se o próprio hook falhar, a
+  leitor conhecido e não gravar; sed e awk só com `--sandbox`. A regra olha o comando como o
+  shell o entrega (sem aspas, com `$(…)` e comentário acompanhados); crase e heredoc são
+  recusados, e `git`, `sort`, `find` e afins não levam `$(…)`. Se o próprio hook falhar, a
   chamada é bloqueada. Fica um caso: entrar (`cd`, `git -C`) num repositório bare versionado com
   config hostil — `git config --global safe.bareRepository explicit` fecha.
 - **Lembrete da documentação, aberto por padrão.** É lembrete na hora certa, não trava: recusa o

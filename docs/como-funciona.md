@@ -176,16 +176,18 @@ flowchart TD
   Q -->|"não"| S1["segue"]
   Q -->|"sim"| B{"Bash?"}
   B -->|"não: PowerShell, MCP, Workflow…"| N1["recusa"]
-  B -->|"sim"| SG["corta em segmentos<br/>(fora de aspas; $( e crase também dentro de aspas duplas)"]
-  SG --> K{"cada segmento"}
+  B -->|"sim"| R{"crase, heredoc ou outra forma<br/>que o corte não acompanha?"}
+  R -->|"sim"| N3["recusa o comando inteiro"]
+  R -->|"não"| SG["corta nos comandos simples<br/>(acompanha aspas, substituição de comando e comentário)"]
+  SG --> K{"cada segmento,<br/>com as palavras já sem aspas"}
   K -->|"leitor conhecido, sem opção que grava"| S2["segue"]
   K -->|"grava, redireciona, executa"| N2["recusa dizendo o motivo"]
 ```
 
 - **Matcher** (`hooks.json`): Bash, PowerShell, `mcp__*` e as embutidas que executam, gravam ou
   falam com fora (Monitor, Workflow, CronCreate/Delete, RemoteTrigger, Enter/ExitWorktree,
-  SendMessage, SendToProject*, PushNotification, TaskStop). Ferramenta nova desse tipo entra
-  ali. Não é `*` de propósito: cada chamada abre um `sh`, e no Windows isso custa de 100 a 800 ms.
+  SendMessage, SendToProject*, PushNotification, TaskStop, DesignSync — esta grava e apaga em
+  projeto do claude.ai/design, e o `Explore` a recebe). Ferramenta nova desse tipo entra ali. Não é `*` de propósito: cada chamada abre um `sh`, e no Windows isso custa de 100 a 800 ms.
 - **Lista de leitura** (`so-le.awk`): `cat grep head tail wc ls stat diff cmp echo printf jq test
   readlink realpath basename dirname cd pwd cut tr column nl`, mais estes com checagem:
 
@@ -194,8 +196,27 @@ flowchart TD
 | `sed`, `awk` | sem `--sandbox` logo após o nome; com `-i` (sed) ou `-d/-p/-o/-D` (gawk), que o sandbox não impede |
 | `git` | subcomando fora de `log show diff blame grep status ls-files ls-tree rev-parse rev-list cat-file shortlog merge-base name-rev describe`; `-c`, `--config-env`, `--output`, `--ext-diff`, `--exec-path`, `--git-dir`, `--work-tree`, `-O` |
 | `sort`, `uniq`, `find`, `file`, `rg` | opção que grava ou executa (`-o`, dois operandos, `-exec`/`-delete`/`-fprint`, `-C`, `--pre`/`--hostname-bin`) |
-| qualquer segmento | `>` que não seja `>/dev/null` ou `2>&1` |
+| `sort`, `uniq`, `file`, `rg`, `sed`, `awk`, `find`, `git` | substituição de comando em qualquer ponto (`sort a $(echo -o f)`); variável onde possa virar opção (`-$X`, `$1-o`); curinga no `uniq` |
+| qualquer segmento | `>` fora de aspas que não seja `>/dev/null`, `2>&1` ou `>&2` (o alvo tem de terminar a palavra: `>&1x` grava); primeira palavra que vem de substituição (`$(echo touch) f`) |
+| o comando inteiro | crase, heredoc (`<<`), `${…}` com operador, `$'…'`, barra invertida no fim da linha |
 
+- **A regra olha o que o shell entrega, não o que foi escrito.** Até a 2.11.1 as opções eram
+  casadas no texto cru e o corte não acompanhava o shell; rodados num sandbox, passavam e
+  gravavam ou executavam: `sort "-o" f`, `sed --sandbox "-i"`, `git grep "-O./prog"` (aspas e
+  barra invertida somem antes de o comando rodar); `$(echo touch f)` e `sort a $(echo -o f)` (o
+  texto que a substituição gera não é visto); `echo "$(cat "a b"; touch f)"`, um `'` em
+  comentário e heredoc com delimitador `true` (o corte perdia as aspas e o `;` de depois não
+  partia); `cat a >&1f` e `cat a \2>&1; touch f` (o redirecionamento inofensivo era tirado do
+  texto antes do corte). Desde a 2.12.0 o `segmentos.awk` acompanha o shell caractere a caractere
+  — aspas, `$(…)` aninhado com o comando de fora inteiro e uma marca no lugar da substituição,
+  comentário, redirecionamento inofensivo só fora de aspas — e o `so-le.awk` decide sobre as
+  palavras sem aspas. O que o corte não acompanha nega o comando inteiro, em vez de adivinhar.
+  De quebra, `>` dentro de aspas deixou de ser recusa (`grep '=>'`, `--format='%an <%ae>'`) e
+  `cat "$(git rev-parse --show-toplevel)/x"` passa. Custo: `git diff $(git merge-base A B)` é
+  recusado (a mensagem aponta `A...B`). Regra nova entra no `testar.sh` com a forma entre
+  aspas, com barra, com variável e com `$(…)`.
+- **A recusa é JSON válido.** Tab ou quebra de linha no trecho citado deixavam a saída do hook
+  inválida (`touch<TAB>a`); o motivo sai sem caractere de controle.
 - **Opção longa abreviada conta:** o GNU e o git aceitam `--outp`, `--in-pl`, `--pro`, `--op` no
   lugar do nome inteiro, e o git aceita `-O` colado a outras opções curtas (`-nO./prog`). A
   trava casa o menor prefixo que já não é ambíguo (`--o` e `--co` no sort, `--i` no sed, `--d` e
@@ -225,7 +246,11 @@ flowchart TD
   `testar.sh` e formas difíceis: aspas abertas, heredoc, crase, `$(…)`, várias linhas) passaram
   pelas duas e deram os mesmos segmentos, a mesma decisão e o mesmo motivo; sete tipos de agente
   × quatro ferramentas no `trava-leitura.sh`, idem. Mexeu na regra: repita a comparação com a
-  versão do commit anterior (`git show <commit>:scripts/so-le.awk`).
+  versão do commit anterior (`git show <commit>:scripts/so-le.awk`). Na 2.12.0 (2026-11-23): os
+  85 comandos da lista anterior deram a mesma decisão; dos 62 do `cobrar-docs.sh`, o corte só
+  mudou a ordem em `x=$(git commit -m x)` (o de dentro sai antes); 75 ataques, todos recusados
+  (os que passavam antes foram rodados num sandbox para confirmar que gravavam); tempo igual ao
+  da 2.11.1, cinco vezes cada (0,17 a 0,21 s no `git diff HEAD`, 0,18 a 0,32 s em 5 segmentos).
 - **awk POSIX.** Os dois `.awk` rodam em gawk, mawk e busybox: sem `gensub`, sem classes
   `[[:space:]]` e sem intervalo `{n}`. O `--sandbox` que a trava exige do sed e do awk do
   AGENTE é outra coisa: é do comando analisado, não do awk que analisa.
@@ -562,14 +587,17 @@ modelos não mudou e o Code Mode segue opcional.
 
 `bash scripts/testar.sh` (e o CI, no Ubuntu) confere:
 
-- as decisões dos quatro hooks, inclusive sem `jq` e as brechas já fechadas da trava;
+- as decisões dos quatro hooks, inclusive sem `jq` e as brechas já fechadas da trava (opção
+  entre aspas, com barra, com variável e vinda de `$(…)`; comentário, heredoc e várias linhas),
+  e o matcher do `hooks.json` que chama a trava;
 - o lembrete da documentação: as formas de commit do histórico, o que não é commit, a sequência
   recusa → repetição → commit seguinte, a skill liberando só a própria sessão e a falha aberta;
 - que o `--sandbox` do sed e do gawk segura de verdade o que a trava deixa passar;
 - o hook de abertura com HOME e projeto falsos, limpo e sujo;
 - que nenhum modelo de `skills/aplicar/modelos/` mudou sem subir o carimbo (soma do texto);
 - as duas status lines, o comando do `settings.json` do plugin (com o `${CLAUDE_PLUGIN_ROOT}`
-  trocado), o inventário (não imprime valor do `env`) e as contas do `medir`
+  trocado), o arredondamento dos tokens igual nas duas linhas dos subagents, o inventário (não
+  imprime valor do `env` nem credencial da URL de MCP; lê settings com BOM) e as contas do `medir`
   (inclusive custo, faixas de contexto, Haiku acima de 100K, consulta ao advisor e período sem
   requisição);
 - as checagens do `arrumar`: todo item com os cinco campos, e o padrão de segredo casando token
@@ -579,6 +607,15 @@ modelos não mudou e o Code Mode segue opcional.
 - os opcionais: ligar, desligar e estado do `opcional.py` com HOME e projeto falsos (o resto do
   settings, a indentação e o CRLF preservados; JSON inválido intocado; o home recusado), a
   variável do Code Mode calada no hook de abertura e o `onFailure` de cada hook no `hooks.json`.
+
+Depois, `claude plugin validate .`. Além dos dois avisos conhecidos (`CLAUDE.md` na raiz, que é
+contexto deste repositório e não do plugin, e o `subagentStatusLine` obsoleto), ele fecha com
+"Hosts not read for: hooks (2), skills (6)" e "Hosts not declared". É nota, não aviso: hooks e
+skills rodam processos, e o validador não sabe que hosts eles alcançam. O campo
+`network.hosts` do `plugin.json` (v2.1.328+) é só declaração — a documentação diz que ele não
+libera nem bloqueia host — e o plugin não o traz: os hooks não usam rede, e o que as skills
+mandam o Claude rodar (`gh`, `claude plugin install`) passa pelas permissões da sessão. A lista
+vazia não é documentada; declarar ou não é decisão de quem publica.
 
 O CI roda o mesmo `testar.sh` num job `testar-windows` (Git Bash da imagem do GitHub). Entrou em
 observação (`continue-on-error`) e passou a reprovar depois de três execuções verdes seguidas:

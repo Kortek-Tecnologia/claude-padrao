@@ -39,7 +39,7 @@ e grave o backup em `~/Documents/backup-claude-global-<AAAA-MM-DD>/`.
 
 Devolve JSON com: chaves do settings global e o destino de cada uma; sobras (`settings.local.json`,
 backups); `CLAUDE.md`, agents, commands, skills, output-styles, rules, workflows e status line
-globais; plugins instalados no escopo user; MCP de escopo user e local (só nomes e NOMES de
+globais; plugins instalados no escopo user; MCP de escopo user e local (só nomes, a URL sem credencial e NOMES de
 variáveis); memórias em `~/.claude/projects/*/memory` com o projeto de cada uma; projetos
 conhecidos e se já têm o padrão. Do `env` global vêm só os nomes (`valor: "(oculto)"`): nunca
 imprima um valor de variável — mova-o de arquivo para arquivo com `jq`, sem exibir. No Windows o
@@ -117,7 +117,8 @@ depende), `plugins/` (só via `claude plugin`), `skills/synced/`, `skills/.trash
 `file-history/`, `sessions/`, `session-env/`, `shell-snapshots/`, `cache/`, `ide/`, `chrome/`,
 `state/`, `backups/`, `~/.claude.json` (só via `claude mcp`).
 
-**MCP com segredo** (variável com TOKEN/KEY/SECRET/PASSWORD, cabeçalho `Authorization`): o
+**MCP com segredo** (variável com TOKEN/KEY/SECRET/PASSWORD, cabeçalho `Authorization`, URL que
+o inventário mostra com `?(oculto)` — a query ou o usuário dela levam credencial): o
 `.mcp.json` não pode ir ao git com o valor. Ou use `${VAR}` no `.mcp.json` e a variável no
 ambiente do usuário, ou ponha `.mcp.json` no `.gitignore`. Pergunte qual; copie o valor do
 `~/.claude.json` sem mostrá-lo.

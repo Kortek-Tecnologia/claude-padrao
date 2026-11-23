@@ -85,9 +85,20 @@ deny	{"agent_type":"Explore","tool_input":{"command":"git commit -m x"}}
 deny	{"agent_type":"Explore","tool_name":"mcp__github__create_issue","tool_input":{"title":"x"}}
 deny	{"agent_type":"padrao:coletor","tool_name":"Monitor","tool_input":{"command":"touch f"}}
 deny	{"agent_type":"Explore","tool_name":"Workflow","tool_input":{"script":"x"}}
+deny	{"agent_type":"Explore","tool_name":"DesignSync","tool_input":{"method":"write_files"}}
 PASSA	{"agent_type":"general-purpose","tool_name":"mcp__github__create_issue","tool_input":{"title":"x"}}
 PASSA	{"tool_name":"mcp__github__create_issue","tool_input":{"title":"x"}}
 CASOS
+
+# O matcher do hooks.json é quem chama a trava: ferramenta que executa, grava ou fala com fora
+# tem de casar (fora dele a trava nem roda); as de leitura ficam de fora, para não abrir processo.
+m_trava=$(jq -r '.hooks.PreToolUse[] | select(.hooks[0].command | contains("trava-leitura.sh")) | .matcher' hooks/hooks.json | tr -d '\r')
+for f in Bash PowerShell Monitor Workflow CronCreate CronDelete RemoteTrigger EnterWorktree ExitWorktree SendMessage SendToProject SendToProjectContext PushNotification TaskStop DesignSync mcp__x__y; do
+  printf '%s\n' "$f" | grep -qE "$m_trava" || { echo "divergiu: matcher da trava nao casa $f"; FALHAS=$((FALHAS + 1)); }
+done
+for f in Read Grep Glob Skill BashOutput; do
+  printf '%s\n' "$f" | grep -qE "$m_trava" && { echo "divergiu: matcher da trava casa $f"; FALHAS=$((FALHAS + 1)); }
+done
 
 rodar so-le.sh cmd <<'CASOS'
 PASSA	git diff HEAD
@@ -175,7 +186,77 @@ PASSA	sed --sandbox --quiet --expression=p x
 PASSA	awk --sandbox --posix '{print $1}' x
 PASSA	git grep -n --only-matching -e x
 PASSA	git grep -n -e a --or -e b
+deny	sort "-o" saida x
+deny	sort '-o' saida x
+deny	sort -\o saida x
+deny	sort $1-o saida x
+deny	sort $IFS-o saida x
+deny	sort "$1"-o saida x
+deny	sort -$1o saida x
+deny	sort --out$1put=saida x
+deny	sort x -${true}sort
+deny	sort x $(echo -o saida)
+deny	sed --sandbox "-i" s/a/b/ x
+deny	sed --sandbox -n\i s/a/b/ x
+deny	sed --sandbox s/a/b/ x $(echo -i)
+deny	git grep "-O./evil" x
+deny	git grep "--op=./evil" x
+deny	git grep x $(echo -O./evil)
+deny	git diff $(git merge-base HEAD main)
+deny	git "-c" core.pager=./evil -p log
+deny	find . -name x -\delete
+deny	find . -name x "-delete"
+deny	uniq [ab].txt
+deny	file "-C" -m magia
+deny	awk --sandbox "-o" 'BEGIN{}'
+deny	rg --p\re ./evil x
+deny	$(echo touch f)
+deny	"$(echo touch)" f
+deny	cat x | $(echo sh)
+deny	tr$(echo "uncate -s 0 x")
+deny	`echo touch f`
+deny	echo `true`#x; touch f
+deny	echo "$(cat "a b"; touch f)"
+deny	echo "$(echo ")"; touch f)"
+deny	echo $(true)#x; touch f
+deny	{#x; touch f
+deny	echo ${x:-$(touch f)}
+deny	cat x >&1saida
+deny	cat x &>saida
+deny	cat x \2>&1; touch f
+deny	cat x >/dev/null\; y; touch f
+deny	echo "a > b" > f
+deny	echo 'a' > f 'b'
+deny	cat <<EOF
+PASSA	grep -n '=>' x
+PASSA	grep -c "<div>" x
+PASSA	git log --format='%an <%ae>' -3
+PASSA	awk --sandbox '$3 > 100' x
+PASSA	git -C "$PWD" log --oneline
+PASSA	git -C "${PWD}" status --short
+PASSA	find "$HOME/a-b" -name x
+PASSA	cat "$(git rev-parse --show-toplevel)/x"
+PASSA	cd "$(git rev-parse --show-toplevel)" && ls
+PASSA	wc -l $(git ls-files)
+PASSA	[ -f x ] && cat x # confere
+PASSA	cat x 2>&1 | grep -c a; echo fim >&2
+PASSA	git log -1 &>/dev/null; echo ok
+PASSA	jq . <<< "{}"
 CASOS
+
+# Comando de várias linhas: a trava acompanha o shell (comentário, heredoc, barra no fim da
+# linha), senão o comando da linha de baixo passa sem ser visto.
+trava() { printf '%s' "$1" | jq -Rs '{tool_input:{command:.}}' | sh "$D/so-le.sh" | jq -r '.hookSpecificOutput.permissionDecision' 2>/dev/null; }
+varias() { [ "$(trava "$2")" = "${1#PASSA}" ] || { echo "divergiu: so-le.sh (varias linhas): esperado $1 - $(printf '%s' "$2" | tr '\n' '~')"; FALHAS=$((FALHAS + 1)); }; }
+varias deny $'echo a # it\'s\ncat a; touch f'
+varias deny $'cat <<true\necho \'\ntrue\ncat a; touch f #\''
+varias deny $'cat <<\'true\'\necho "\ntrue\ntouch f'
+varias deny $'sort a \\\n-o saida'
+varias deny $'echo \'x\ncat a\' > f'
+# tab e quebra de linha no comando recusado: a recusa segue JSON válido (senão não recusa)
+varias deny $'touch\ta'
+varias PASSA $'# lista\nls -la\ncat a 2>/dev/null | head'
+varias PASSA $'grep -n \'a\nb\' x'
 
 # O --sandbox segura de verdade o que a trava deixa passar com ele (GNU sed e
 # gawk; o mawk recusa a opção, e também não grava).
@@ -479,6 +560,11 @@ saida=$(printf '%s' '{"columns":80,"tasks":[{"id":"a","agentType":"padrao:coleto
   sh "$D/py.sh" statusline/subagent-statusline.py)
 ok=$(printf '%s\n' "$saida" | jq -rs '[.[0].id == "a", (.[0].content | contains("Haiku 5.5")), (.[1].content | contains("\u001b[31mSonnet 4.5")), (.[2].content | contains("\u001b[33mFable 5.2")), (.[3].content | contains("\u001b[31mFable 5.5")), (.[4].content | contains("\u001b[33mMythos 5.2"))] | all')
 [ "$ok" = true ] || { echo "divergiu: subagent-statusline: $saida"; FALHAS=$((FALHAS + 1)); }
+# os tokens arredondam o meio para cima, como no mod (hooks/register.test.tsx tem os mesmos números)
+ok=$(printf '%s' '{"columns":120,"tasks":[{"id":"a","model":"claude-haiku-5-5","contextWindowSize":1000000,"tokenCount":2500},{"id":"b","model":"claude-haiku-5-5","contextWindowSize":1000000,"tokenCount":1150000},{"id":"c","model":"claude-haiku-5-5","tokenCount":2000000}]}' |
+  sh "$D/py.sh" statusline/subagent-statusline.py |
+  jq -rs '[(.[0].content | contains("(3k)")), (.[1].content | contains("(1.2M)")), (.[2].content | contains("2M tok"))] | all')
+[ "$ok" = true ] || { echo "divergiu: subagent-statusline: arredondamento dos tokens"; FALHAS=$((FALHAS + 1)); }
 # Quem liga essa linha é o settings.json do plugin (de plugin só valem `agent` e
 # `subagentStatusLine`); o global não a traz mais, porque venceria a do plugin. O comando roda
 # como o Claude Code o entrega: com o ${CLAUDE_PLUGIN_ROOT} trocado pela pasta do plugin.
@@ -505,6 +591,14 @@ ok=$(printf '%s' "$inv" | jq -r '[.settings_global[] | {(.chave): .destino}] | a
      ."permissions.allow" == "avaliar", ."permissions.defaultMode" == "global",
      ."env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE" == "global", .advisorModel == "local"] | all')
 [ "$ok" = true ] || { echo "divergiu: inventariar: $(printf '%s' "$inv" | jq -c .settings_global)"; FALHAS=$((FALHAS + 1)); }
+# settings.json com BOM (editor do Windows) não pode contar como global vazio; a URL de MCP sai
+# sem usuário, senha nem query
+printf '\357\273\277{"model":"x"}' >"$CASA/.claude/settings.json"
+printf '%s' '{"mcpServers":{"a":{"type":"http","url":"https://u:SENHA_DE_TESTE@mcp.exemplo.dev/sse?api_key=CHAVE_DE_TESTE"}}}' >"$CASA/.claude.json"
+inv=$(HOME="$CASA" USERPROFILE="$(nativo "$CASA")" sh "$D/py.sh" skills/aplicar/inventariar.py --projeto "$(nativo "$CASA")")
+case "$inv" in *SENHA_DE_TESTE* | *CHAVE_DE_TESTE*) echo "divergiu: inventariar imprimiu credencial da URL do MCP"; FALHAS=$((FALHAS + 1)) ;; esac
+ok=$(printf '%s' "$inv" | jq -r '[(.settings_global | map(.chave)) == ["model"], .mcp_user[0].url == "https://mcp.exemplo.dev/sse?(oculto)"] | all')
+[ "$ok" = true ] || { echo "divergiu: inventariar (BOM ou URL do MCP): $(printf '%s' "$inv" | jq -c '[.settings_global, .mcp_user]')"; FALHAS=$((FALHAS + 1)); }
 rm -rf "$CASA"
 
 # Opcionais (scripts/opcional.py). Code Mode: a variável mora no settings global, o único em

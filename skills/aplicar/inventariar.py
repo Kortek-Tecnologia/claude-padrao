@@ -5,8 +5,9 @@ destino sugerido de cada item pelo padrão. Só LÊ; imprime JSON.
     sh <plugin>/scripts/py.sh <dir da skill>/inventariar.py [--projeto P]
 
 Segredos não saem: do `env` do settings global e de MCP vêm só os NOMES das
-variáveis/cabeçalhos, nunca os valores (o JSON vai para o transcript). O projeto
-é o diretório corrente, ou o dado em --projeto.
+variáveis/cabeçalhos, nunca os valores, e a URL de MCP sai sem usuário, senha
+nem query (o JSON vai para o transcript). O projeto é o diretório corrente, ou
+o dado em --projeto.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 G = Path.home() / ".claude"
 
@@ -73,10 +75,24 @@ def chave_projeto(caminho: str) -> str:
 
 
 def ler_json(arq: Path):
+    # utf-8-sig: editor do Windows grava BOM, e com ele o arquivo contaria como vazio
     try:
-        return json.loads(arq.read_text(encoding="utf-8"))
+        return json.loads(arq.read_text(encoding="utf-8-sig"))
     except (OSError, ValueError):
         return None
+
+
+def url_sem_segredo(url):
+    """A URL do servidor sem o que costuma levar credencial: usuário e senha, query
+    e fragmento (`?api_key=...`). Fica o bastante para reconhecer o servidor."""
+    if not isinstance(url, str):
+        return None
+    try:
+        p = urlsplit(url)
+    except ValueError:
+        return "(oculto)"
+    limpa = urlunsplit((p.scheme, p.netloc.rsplit("@", 1)[-1], p.path, "", ""))
+    return limpa + ("?(oculto)" if p.query or p.fragment else "")
 
 
 def destino_settings(cfg: dict) -> list[dict]:
@@ -110,7 +126,7 @@ def resumo_mcp(servidores: dict) -> list[dict]:
                 "nome": nome,
                 "tipo": s.get("type") or ("stdio" if "command" in s else "?"),
                 "command": s.get("command"),
-                "url": s.get("url"),
+                "url": url_sem_segredo(s.get("url")),
                 "env": sorted((s.get("env") or {}).keys()),
                 "headers": sorted((s.get("headers") or {}).keys()),
             }

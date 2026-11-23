@@ -41,9 +41,12 @@ def modelo(m):
 
 
 def tokens(n):
+    """Conta em inteiros, meio para cima, igual ao mod (hooks/register.ts): o `:.0f`
+    arredonda o meio exato para o par (2.500 saía 2k aqui e 3k lá)."""
     if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}M".replace(".0M", "M")
-    return f"{n / 1000:.0f}k" if n >= 1000 else str(n)
+        d = (n + 50_000) // 100_000
+        return f"{d // 10}.{d % 10}M".replace(".0M", "M")
+    return f"{(n + 500) // 1000}k" if n >= 1000 else str(n)
 
 
 def contexto(t):

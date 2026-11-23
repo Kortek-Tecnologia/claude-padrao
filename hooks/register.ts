@@ -33,7 +33,7 @@ type Linha = {
   type: string
   name?: string
   model?: string
-  effort?: string | number
+  effort?: string | number | null
   tokenCount: number
   contextWindowSize?: number
   startTime: number
@@ -58,9 +58,16 @@ function modelo(m: string | undefined): string {
   return `${BOLD}${cor}${nome}${RESET}`
 }
 
+// Conta em inteiros, meio para cima, igual ao subagent-statusline.py: `toFixed` e o
+// arredondamento do Python divergem no meio exato (2.500 saía 3k aqui e 2k lá).
 function tokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`.replace('.0M', 'M')
-  return n >= 1000 ? `${Math.round(n / 1000)}k` : String(n)
+  if (n >= 1_000_000) {
+    const d = Math.floor((n + 50_000) / 100_000)
+
+    return `${Math.floor(d / 10)}.${d % 10}M`.replace('.0M', 'M')
+  }
+
+  return n >= 1000 ? `${Math.floor((n + 500) / 1000)}k` : String(n)
 }
 
 function contexto(t: Linha): string {
@@ -83,7 +90,7 @@ function duracao(inicio: number, agora: number): string {
 export function linha(t: Linha, agora: number): string {
   const marca = STATUS[t.taskStatus]
   const partes = [`${marca ? `${marca} ` : ''}${BOLD}${t.name || t.type || 'agente'}${RESET}`, modelo(t.model)]
-  if (t.effort !== undefined) partes.push(`${GRAY}${t.effort}${RESET}`)
+  if (t.effort != null) partes.push(`${GRAY}${t.effort}${RESET}`)
   partes.push(contexto(t))
   if (t.cost && t.cost.usd >= 0.005) partes.push(`${GRAY}US$ ${t.cost.usd.toFixed(2)}${RESET}`)
   partes.push(duracao(t.startTime, agora))

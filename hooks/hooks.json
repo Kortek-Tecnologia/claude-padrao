@@ -29,7 +29,7 @@
         ]
       },
       {
-        "matcher": "^(Bash|PowerShell|Monitor|Workflow|Cron(Create|Delete)|RemoteTrigger|(Enter|Exit)Worktree|SendMessage|SendToProject.*|PushNotification|TaskStop)$|^mcp__",
+        "matcher": "^(Bash|PowerShell|Monitor|Workflow|Cron(Create|Delete)|RemoteTrigger|(Enter|Exit)Worktree|SendMessage|SendToProject.*|PushNotification|TaskStop|DesignSync)$|^mcp__",
         "hooks": [
           {
             "type": "command",

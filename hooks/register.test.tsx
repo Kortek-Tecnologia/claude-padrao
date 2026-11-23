@@ -77,6 +77,14 @@ test('custo aparece a partir de um centavo; terminado leva a marca', async ($, o
   expect(semCor(await corpo($, { cost: { usd: 0.001 } }))).not.toContain('US$')
 })
 
+test('tokens arredondam o meio para cima, como no subagent-statusline.py; effort nulo não aparece', async ($, on) => {
+  motor(on)
+  expect(semCor(await corpo($, { tokenCount: 2_500 }))).toContain('(3k)')
+  expect(semCor(await corpo($, { tokenCount: 1_150_000 }))).toContain('(1.2M)')
+  expect(semCor(await corpo($, { tokenCount: 2_000_000 }))).toContain('(2M)')
+  expect(semCor(await corpo($, { effort: null }))).toBe('[padrao:coletor · Haiku 5.5 · ctx 4% (42k) · 1m15s · lendo app.py]')
+})
+
 test('sem modelo resolvido ainda e sem janela: reticências e só os tokens', async ($, on) => {
   motor(on)
   const texto = semCor(await corpo($, { model: undefined, contextWindowSize: undefined, effort: undefined }))
