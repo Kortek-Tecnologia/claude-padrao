@@ -715,6 +715,9 @@ agora=$(date -u +%Y-%m-%dT%H:%M:%S)
   printf '{"type":"user","timestamp":"%s","message":{"role":"user","content":"outra coisa"}}\n' "$agora"
   printf '{"type":"assistant","timestamp":"%s","message":{"id":"p2","content":[{"type":"tool_use","id":"q2","name":"AskUserQuestion","input":{"questions":[]}}]}}\n' "$agora"
   printf '{"type":"user","timestamp":"%s","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"q9","content":"a resposta termina com oferta ou item em aberto"}]}}\n' "$agora"
+  # commits em sandbox (entra numa pasta temporária antes de commitar): fora das contas de
+  # documentação e de verificação, que seguem em 3 commits
+  printf '{"type":"assistant","timestamp":"%s","message":{"id":"x1","content":[{"type":"tool_use","id":"x1a","name":"Bash","input":{"command":"S=\\"C:/Users/u/AppData/Local/Temp/claude/a/scratchpad/s\\"; cd \\"$S/proj\\" && git commit -qm a"}},{"type":"tool_use","id":"x1b","name":"Bash","input":{"command":"git -C /tmp/repo commit -m a"}}]}}\n' "$agora"
 } >"$CASA/.claude/projects/$chave/s.jsonl"
 # subagents: sonnet 10k·2 + 10k escrita 5 min·2,5 + 100k lidos·0,1 + 2,5k·10 = 0,08; haiku com
 # 100.000 exatos = faixa baixa (100k·0,1 + 1k·0,5 = 0,0105); com 100.001 = alta (1·0,5 + 100k·0,05
@@ -741,7 +744,7 @@ done
 case "$med" in *"<synthetic>"*) echo "divergiu: medir-modelos listou <synthetic> como modelo"; FALHAS=$((FALHAS + 1)) ;; esac
 # effort pedido na chamada do subagent (o hook de modelo não olha), a data da tabela de preços e
 # a verificação antes do commit: dos 3 commits, só a repetição que veio depois do pytest conta
-for re in '^verificação antes do commit: 3 commit\(s\) · 1 com teste ou build · 0 com revisor · 0 com executor · 2 sem nenhuma$' '^effort na chamada do subagent: 1 chamada\(s\) · max=1$' '^pendências ao encerrar: 2 lembrete\(s\) do hook · 1 com pergunta em seguida$' '^custo estimado a preço de lista de 20[0-9]{2}-[0-9]{2}-[0-9]{2} '; do
+for re in '^verificação antes do commit: 3 commit\(s\) · 1 com teste ou build · 0 com revisor · 0 com executor · 2 sem nenhuma$' '^effort na chamada do subagent: 1 chamada\(s\) · max=1$' '^pendências ao encerrar: 2 lembrete\(s\) do hook · 1 com pergunta em seguida$' '^commits em sandbox \(fora das contas\): 2$' '^custo estimado a preço de lista de 20[0-9]{2}-[0-9]{2}-[0-9]{2} '; do
   printf '%s\n' "$med" | grep -Eq "$re" || { echo "divergiu: medir-modelos sem /$re/: $med"; FALHAS=$((FALHAS + 1)); }
 done
 # período sem requisição: as seções saem com zeros, sem quebrar
@@ -830,6 +833,18 @@ s = importlib.util.spec_from_file_location("m", sys.argv[1]); m = importlib.util
 print(*(int(m.verifica(c)) for c in sys.argv[2:]))' skills/medir/medir-modelos.py \
   'cd x && timeout 540 bash scripts/testar.sh >f 2>&1' 'timeout 60 pytest -q' 'echo timeout 5 pytest' 'timeout 5 cat testar.sh' | tr -d '\r')
 [ "$v" = "1 1 0 0" ] || { echo "divergiu: medir: verifica com timeout devolveu '$v'"; FALHAS=$((FALHAS + 1)); }
+# medir: commit de sandbox é o que entra numa pasta temporária (cd, git -C, variável do próprio
+# comando) antes de commitar; caminho temporário em outro argumento e a palavra na mensagem, não;
+# comando que commita no sandbox e depois no projeto conta como do projeto
+v=$(sh scripts/py.sh -c 'import importlib.util, sys
+s = importlib.util.spec_from_file_location("m", sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+print(*(int(m.em_sandbox(c)) for c in sys.argv[2:]))' skills/medir/medir-modelos.py \
+  'S="$(cygpath -m -l "$TEMP")/claude/a/scratchpad/s"; cd "$S/proj" && git commit -qm a' \
+  'cd "$(mktemp -d)" && git init -q && git commit -qm a' 'git -C /tmp/repo commit -m a' \
+  'cd "C:/proj" && git commit -q -F "C:/Users/u/AppData/Local/Temp/claude/scratchpad/msg.txt"' \
+  'git commit -m "arruma o sandbox"' 'cd /x && git commit -m a' \
+  'cd "$(mktemp -d)" && git init -q && git commit -qm a; cd "C:/proj" && git commit -m real' | tr -d '\r')
+[ "$v" = "1 1 1 0 0 0 0" ] || { echo "divergiu: medir: em_sandbox devolveu '$v'"; FALHAS=$((FALHAS + 1)); }
 # C5 e C7: os filtros de execução desperdiçada, tirados do arquivo como o padrão de segredo.
 # s1 rodou por push e por pull_request (C5 conta a de push); a 1ª de main terminou com a 2ª já
 # aberta (C7); a cancelada não conta; outro workflow no mesmo commit não é duplicata.

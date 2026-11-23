@@ -105,6 +105,43 @@ def faz_commit(comando: str) -> bool:
     return commits > len(LOTE.findall(comando))
 
 
+# Commit em repositório de sandbox (teste de ponta a ponta, fixture): o comando entra numa
+# pasta temporária por `cd`, `pushd` ou `git -C` antes de commitar. Vale o destino, com as
+# variáveis atribuídas no próprio comando já trocadas — um caminho temporário em outro
+# argumento (`git commit -F <scratchpad>/msg.txt`) não faz do commit um commit de sandbox.
+ATRIBUICAO = re.compile(r"(?:^|[\s;&|(])([A-Za-z_]\w*)=([^\n;&|]*)")
+DESTINO = re.compile(r"(?:\b(?:cd|pushd)|\bgit(?:\.exe)?\s+-C)\s+(\"[^\"]*\"|'[^']*'|\S+)")
+TEMPORARIO = re.compile(
+    r"(?:^|[/\\\"'])te?mp(?:[/\\\"']|$)|scratchpad|sandbox|mktemp|\$\{?(?:TEMP|TMPDIR|TMP)\b", re.I
+)
+
+
+TRECHO_COMMIT = re.compile(r"\bgit(?:\.exe)?\b[^\n;&|]*?\bcommit\b")
+
+
+def em_sandbox(comando: str) -> bool:
+    """Todo commit do comando roda dentro de uma pasta temporária, não no projeto.
+
+    Para cada commit vale o último destino antes dele; um commit sem destino, ou com o
+    destino fora de pasta temporária, é do projeto — e aí o comando conta como do projeto.
+    """
+    valores = {m.group(1): m.group(2) for m in ATRIBUICAO.finditer(comando)}
+    destinos = []
+    for m in DESTINO.finditer(comando):
+        alvo = m.group(1)
+        for _ in range(3):
+            alvo = re.sub(r"\$\{?([A-Za-z_]\w*)\}?", lambda v: valores.get(v.group(1), v.group(0)), alvo)
+        destinos.append((m.start(), bool(TEMPORARIO.search(alvo))))
+    commits = [m.end() for m in TRECHO_COMMIT.finditer(comando)]
+    if not commits:
+        return False
+    for fim in commits:
+        antes = [temp for pos, temp in destinos if pos < fim]
+        if not antes or not antes[-1]:
+            return False
+    return True
+
+
 # Papel fixo, como o hook de modelo aplica: Plan e Explore sempre vão para este
 # modelo; os agentes do plugin, só quando a chamada traz outro `model` (sem ele
 # vale o frontmatter, que já é este).
@@ -341,7 +378,7 @@ def main() -> None:
     uso_advisor: dict = {}
     recusas = sessoes = sem_delegar = 0
     commits = com_docs = lembretes = 0
-    pendencias = com_pergunta = 0
+    pendencias = com_pergunta = em_sandboxes = 0
     # verificação antes do commit: [teste ou build, revisor, executor] e os sem nenhuma
     com_verif = [0, 0, 0]
     sem_verif = 0
@@ -423,6 +460,14 @@ def main() -> None:
                     c.get("name") in ("Bash", "PowerShell")
                     and c.get("id") not in ids_commit
                     and faz_commit(str(i.get("command") or ""))
+                    and em_sandbox(str(i.get("command") or ""))
+                ):
+                    # commit de sandbox: fora das contas de documentação e de verificação
+                    em_sandboxes += 1
+                elif (
+                    c.get("name") in ("Bash", "PowerShell")
+                    and c.get("id") not in ids_commit
+                    and faz_commit(str(i.get("command") or ""))
                 ):
                     commits += 1
                     com_docs += docs_antes
@@ -467,6 +512,8 @@ def main() -> None:
     print(f"pendências ao encerrar: {pendencias} lembrete(s) do hook · {com_pergunta} com pergunta em seguida")
     print(f"verificação antes do commit: {commits} commit(s) · {com_verif[0]} com teste ou build"
           f" · {com_verif[1]} com revisor · {com_verif[2]} com executor · {sem_verif} sem nenhuma")
+    if em_sandboxes:
+        print(f"commits em sandbox (fora das contas): {em_sandboxes}")
     if com_effort:
         print(f"effort na chamada do subagent: {sum(com_effort.values())} chamada(s) · "
               + "  ".join(f"{e}={n}" for e, n in com_effort.most_common()))

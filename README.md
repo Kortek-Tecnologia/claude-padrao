@@ -178,6 +178,7 @@ Haiku perto de zero com muita entrada no Opus = leitura que devia ter ido ao col
 estimativa a preço de lista, da data que o cabeçalho mostra; o que mais pesa é o contexto grande na sessão principal. Commit sem
 verificação = nem teste ou build rodado na sessão, nem revisor, nem lote pelo executor desde o
 commit anterior (só mede: não há hook cobrando; teste com nome fora do comum não é reconhecido).
+Commit feito dentro de pasta temporária (sandbox de teste) fica fora dessas contas, numa linha à parte.
 Commit sem a `atualizar-docs` antes = o Claude repetiu o commit depois do lembrete sem rodar a skill, ou o
 hook não rodou naquela sessão (plugin antigo, `jq` ausente).
 

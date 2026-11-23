@@ -37,6 +37,8 @@ Leitura:
   comuns (`pytest`, `npm test`, `cargo test`, `tsc`, `testar.sh`…); teste do projeto com outro
   nome não entra, e commit só de documentação também aparece como "sem nenhuma". Muitos sem
   nenhuma em diff de código = caso para pedir a verificação na ficha ou um gate.
+- Commits em sandbox (só aparece se houve): commits feitos dentro de pasta temporária (teste de
+  ponta a ponta, fixture), fora das contas de documentação e de verificação.
 - Tokens: o custo está em "entrada" e "saída"; "cache lido" sai bem mais barato. Opus com muita
   entrada e haiku perto de zero = leitura que devia ir ao coletor.
 - `effort na chamada do subagent` (só aparece se houve): chamadas `Agent` que pediram um

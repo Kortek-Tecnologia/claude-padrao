@@ -533,8 +533,15 @@ pelo `padrao:executor`; a verificação vista antes de uma tentativa recusada va
 repetição. É o modo de observação de um gate que não existe: neste repositório, em 14 dias,
 21 de 26 commits tiveram teste ou build antes, e os 5 sem nenhuma decidem se o gate vale.
 Conferidos um a um em 2026-11-23 (11 sem nenhuma em 38): nenhum dos identificados era commit só
-de documentação, e pelo menos 5 eram commits em repositório de sandbox do scratchpad, que a
-conta não separa dos do projeto — o número de "sem nenhuma" sai para mais. Cada `message.id` é uma requisição: o custo estimado
+de documentação, e pelo menos 5 eram commits em repositório de sandbox do scratchpad. Desde a
+2.15.1 esses saem das contas de documentação e de verificação e aparecem numa linha à parte
+("commits em sandbox"): é de sandbox o commit cujo último destino antes dele — `cd`, `pushd` ou
+`git -C`, com as variáveis do próprio comando trocadas — é pasta temporária; caminho temporário
+em outro argumento, como `git commit -F <scratchpad>/msg.txt`, não conta, e comando que commita
+no sandbox e depois no projeto conta como do projeto. Neste repositório a conta ficou em 27
+commits, os 27 com teste ou build, e 13 de sandbox, conferidos um a um. Não visto: o `cd` feito
+num comando anterior da sessão (o commit segue na conta do projeto) e o commit de depois de um
+subshell `( cd <sandbox> && … )`, que sai como de sandbox. Cada `message.id` é uma requisição: o custo estimado
 sai da tabela `PRECO` (preço de lista por milhão, com a data da fonte em `PRECO_EM`, que sai no
 cabeçalho; modelo casado por prefixo, escrita de cache de
 1 h à parte da de 5 min); contexto = entrada + cache lido + escrita, distribuído em faixas na
