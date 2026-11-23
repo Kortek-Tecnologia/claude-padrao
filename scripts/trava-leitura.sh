@@ -12,8 +12,8 @@
 # - Qualquer outra ferramenta do matcher (PowerShell, MCP...): negada inteira;
 #   o agente tem Read/Grep/Glob e o Bash travado. Ferramenta nova que executa
 #   ou grava entra no matcher do hooks.json.
-# - Sem jq (ou sem os .awk): o agente que só lê é negado (fechado por padrão);
-#   os demais seguem.
+# - Sem jq, sem os .awk ou com o jq falhando: o agente que só lê é negado
+#   (fechado por padrão); os demais seguem.
 #
 # Custo: este hook roda em todo Bash, e no Windows abrir um processo custa de
 # 100 a 800 ms. A sessão principal sai sem abrir nenhum (a entrada é lida pelo
@@ -27,17 +27,27 @@ while IFS= read -r linha || [ -n "$linha" ]; do entrada="$entrada$linha$nl"; don
 case "$entrada" in *'"agent_type"'*) ;; *) exit 0 ;; esac
 case "$0" in */*) aqui=${0%/*} ;; *) aqui=. ;; esac
 
-if ! command -v jq >/dev/null 2>&1 || ! [ -r "$aqui/segmentos.awk" ] || ! [ -r "$aqui/so-le.awk" ]; then
-  # sem como analisar: nega o agente que só lê (o tipo sai por regex), o resto segue
+# sem_analise MOTIVO: sem como analisar, nega o agente que só lê (o tipo sai por
+# regex) e deixa o resto seguir.
+sem_analise() {
   tipo=$(printf '%s' "$entrada" | tr '\n' ' ' |
     sed -nE "s/.*\"agent_type\"[[:space:]]*:[[:space:]]*\"($SO_LEEM)\".*/\\1/p")
   [ -n "$tipo" ] &&
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s so le: jq ausente, nao consigo analisar o comando. Use Read/Grep/Glob."}}\n' "$tipo"
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s so le: %s, nao consigo analisar o comando. Use Read/Grep/Glob."}}\n' "$tipo" "$1"
   exit 0
-fi
+}
+command -v jq >/dev/null 2>&1 || sem_analise "jq ausente"
+[ -r "$aqui/segmentos.awk" ] && [ -r "$aqui/so-le.awk" ] || sem_analise "segmentos.awk ou so-le.awk ausente"
 
-# Um jq tira o agente, a ferramenta e o comando; o awk decide (so-le.awk).
+# Um jq tira o agente, a ferramenta e o comando; o awk decide (so-le.awk). O jq
+# que falha (entrada cortada, erro ao abrir) não devolve nada: sem o tipo o awk
+# não tem como decidir e sai com 3, e a chamada cai na saída de quem não tem jq.
+# Os dois seguem num pipe só (rodam juntos: em série a trava ficava ~50 ms mais
+# lenta no Windows).
 jq -r '(.agent_type // "" | tostring), (.tool_name // "Bash" | tostring), (.tool_input.command // "" | tostring)' 2>/dev/null <<EOF |
 $entrada
 EOF
   awk -v cab=1 -v so_leem="$SO_LEEM" -f "$aqui/segmentos.awk" -f "$aqui/so-le.awk"
+rc=$?
+[ "$rc" -eq 3 ] && sem_analise "o jq falhou"
+exit "$rc"

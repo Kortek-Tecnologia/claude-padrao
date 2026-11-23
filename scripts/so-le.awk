@@ -45,9 +45,10 @@ function junta(ch) {
 # ${X}, $1, $@...) fica como está escrita, e EXP_OPCAO diz se alguma pode virar
 # opção ou pedaço de uma: colada a um `-` (`-$X`, `--out$X`), ou seguida de `-`
 # quando vier vazia ou partir a palavra (`$1-o`, `a$IFS-o`). GLOB diz se há
-# curinga fora de aspas.
+# curinga fora de aspas; EXP, se há alguma expansão de variável (ela pode partir
+# a palavra em duas: `a${IFS}b`, `"$@"`).
 function palavras(s, w,    i, c, d, k, q, n, aberta) {
-  n = 0; q = ""; aberta = 0; PAL = ""; PECA = ""; APOS = 0; EXP_OPCAO = 0; GLOB = 0
+  n = 0; q = ""; aberta = 0; PAL = ""; PECA = ""; APOS = 0; EXP_OPCAO = 0; GLOB = 0; EXP = 0
   for (i = 1; i <= length(s); i++) {
     c = substr(s, i, 1)
     if (c == M_GT) c = ">"
@@ -58,6 +59,7 @@ function palavras(s, w,    i, c, d, k, q, n, aberta) {
       if (match(d, /^[A-Za-z_][A-Za-z0-9_]*/) || match(d, /^[{][A-Za-z_][A-Za-z0-9_]*[}]/)) k = RLENGTH
       else if (d ~ /^[0-9@*#?$!-]/) k = 1
       if (k) {
+        EXP = 1
         if (PECA ~ /^-[A-Za-z0-9-]*$/) EXP_OPCAO = 1
         if (q == "") { PECA = ""; APOS = 1 } else if (PECA == "") APOS = 1
         PAL = PAL substr(s, i, k + 1); aberta = 1; i += k
@@ -100,9 +102,11 @@ function motivo(s,    w, nw, i, n, t, sub_git, grava) {
   t = t " " s
   if (w[1] == "sort") return (t ~ /[ \t](-[A-Za-z]*o|--o|--co)/) ? grava : ""
   if (w[1] == "uniq") {
-    # `uniq ENTRADA SAIDA` grava SAIDA: nega com dois operandos, e com curinga
-    # (`uniq [ab].txt` vira dois).
+    # `uniq ENTRADA SAIDA` grava SAIDA: nega com dois operandos, com curinga
+    # (`uniq [ab].txt` vira dois) e com variável, que o shell pode partir em duas
+    # palavras (`uniq a${IFS}b` grava b).
     if (GLOB) return "uniq com curinga (o segundo arquivo seria gravado)"
+    if (EXP) return "uniq com variavel (o shell pode parti-la em dois arquivos, e o segundo seria gravado): escreva o nome"
     n = 0
     for (i = 2; i <= nw; i++) {
       if (w[i] ~ /^-[fsw]$/) { i++; continue }
@@ -126,8 +130,9 @@ function motivo(s,    w, nw, i, n, t, sub_git, grava) {
   if (w[1] == "awk") {
     if (w[2] != "--sandbox") return "sed e awk so com --sandbox logo apos o nome"
     # o --sandbox não impede -d/-p/-o (gravam variáveis, perfil e programa em
-    # arquivo) nem o depurador (-D)
-    return (t ~ /[ \t](-[A-Za-z]*[dDpo]|--d|--pr)/) ? grava : ""
+    # arquivo) nem o depurador (-D); -W leva as mesmas opções pelo nome, na palavra
+    # seguinte (`-W dump-variables=f`)
+    return (t ~ /[ \t](-[A-Za-z]*[dDpoW]|--d|--pr)/) ? grava : ""
   }
   if (w[1] == "find") return (t ~ /-(exec|execdir|ok|okdir|delete|fprint|fls)/) ? grava : ""
   # Só resta o git. -c/--config-env mudam config na hora (core.fsmonitor,
@@ -140,7 +145,13 @@ function motivo(s,    w, nw, i, n, t, sub_git, grava) {
   sub_git = ""
   for (i = 2; i <= nw; i++) {
     if (w[i] == "-C") { i++; continue }
-    if (w[i] ~ /^-/) continue
+    if (w[i] ~ /^-/) {
+      # Opção global com o valor na palavra seguinte faria o valor passar por
+      # subcomando (`git --namespace log commit` commita): antes do subcomando só
+      # entram as que não levam valor.
+      if (w[i] !~ /^(--no-pager|-P|--no-optional-locks|--no-replace-objects|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--no-advice)$/) return "opcao global do git fora da lista (antes do subcomando, so -C dir e --no-pager)"
+      continue
+    }
     sub_git = w[i]; break
   }
   if (sub_git ~ /^(log|show|diff|blame|grep|status|ls-files|ls-tree|rev-parse|rev-list|cat-file|shortlog|merge-base|name-rev|describe)$/) return ""
@@ -154,6 +165,9 @@ cab && NR == 2 { ferramenta = $0; next }
 
 END {
   if (negou) exit 0
+  # com cabeçalho, o jq sempre entrega as duas linhas dele: menos que isso é jq
+  # que falhou, e quem chamou (trava-leitura.sh) nega o agente que só lê
+  if (cab && NR < 2) exit 3
   if (quem == "") quem = "subagent"
   if (cab) {
     if (tipo !~ ("^(" so_leem ")$")) exit 0

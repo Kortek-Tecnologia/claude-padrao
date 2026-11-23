@@ -195,12 +195,12 @@ flowchart TD
 
 | Comando | Recusado quando |
 |---|---|
-| `sed`, `awk` | sem `--sandbox` logo após o nome; com `-i` (sed) ou `-d/-p/-o/-D` (gawk), que o sandbox não impede |
-| `git` | subcomando fora de `log show diff blame grep status ls-files ls-tree rev-parse rev-list cat-file shortlog merge-base name-rev describe`; `-c`, `--config-env`, `--output`, `--ext-diff`, `--exec-path`, `--git-dir`, `--work-tree`, `-O` |
+| `sed`, `awk` | sem `--sandbox` logo após o nome; com `-i` (sed) ou `-d/-p/-o/-D/-W` (gawk), que o sandbox não impede |
+| `git` | subcomando fora de `log show diff blame grep status ls-files ls-tree rev-parse rev-list cat-file shortlog merge-base name-rev describe`; `-c`, `--config-env`, `--output`, `--ext-diff`, `--exec-path`, `--git-dir`, `--work-tree`, `-O`; antes do subcomando, opção global que não seja `-C dir`, `--no-pager` ou outra sem valor da lista do `so-le.awk` |
 | `sort`, `uniq`, `find`, `file`, `rg` | opção que grava ou executa (`-o`, dois operandos, `-exec`/`-delete`/`-fprint`, `-C`, `--pre`/`--hostname-bin`) |
-| `sort`, `uniq`, `file`, `rg`, `sed`, `awk`, `find`, `git` | substituição de comando em qualquer ponto (`sort a $(echo -o f)`); variável onde possa virar opção (`-$X`, `$1-o`); curinga no `uniq` |
+| `sort`, `uniq`, `file`, `rg`, `sed`, `awk`, `find`, `git` | substituição de comando em qualquer ponto (`sort a $(echo -o f)`); variável onde possa virar opção (`-$X`, `$1-o`); curinga ou variável no `uniq` |
 | qualquer segmento | `>` fora de aspas que não seja `>/dev/null`, `2>&1` ou `>&2` (o alvo tem de terminar a palavra: `>&1x` grava); primeira palavra que vem de substituição (`$(echo touch) f`) |
-| o comando inteiro | crase, heredoc (`<<`), `${…}` com operador, `$'…'`, barra invertida no fim da linha |
+| o comando inteiro | crase, heredoc (`<<`), `${…}` com operador, `$'…'`, `$"…"`, barra invertida no fim da linha |
 
 - **A regra olha o que o shell entrega, não o que foi escrito.** Até a 2.11.1 as opções eram
   casadas no texto cru e o corte não acompanhava o shell; rodados num sandbox, passavam e
@@ -217,6 +217,25 @@ flowchart TD
   `cat "$(git rev-parse --show-toplevel)/x"` passa. Custo: `git diff $(git merge-base A B)` é
   recusado (a mensagem aponta `A...B`). Regra nova entra no `testar.sh` com a forma entre
   aspas, com barra, com variável e com `$(…)`.
+- **Quatro formas que ainda passavam, fechadas na 2.15.2** (2026-11-23; cada uma rodada num
+  sandbox antes e depois, com o estado do repositório conferido):
+  - `sort $"-o" f`, `sed --sandbox $"-i" …` e `git grep $"-Orm" x`: o bash tira o `$` da aspa de
+    tradução `$"…"` e entrega `-o`, e a trava via `$-o`. O `git grep` apagou o arquivo casado.
+    Agora `$"` nega o comando inteiro.
+  - `git --namespace log commit` e `git --namespace show config …`: o valor da opção global
+    passava por subcomando, e o git commitava e gravava config. Antes do subcomando só entram
+    `-C dir` e as opções sem valor de uma lista (`--no-pager`, `-P`, `--no-optional-locks`…).
+  - `uniq a${IFS}b`: uma palavra para a trava, dois arquivos para o shell, e o segundo é
+    gravado. `uniq` não leva variável.
+  - `awk --sandbox -W dump-variables=f` e `-W pretty-print=f`: o `-W` leva pelo nome, na palavra
+    seguinte, as opções que gravam. `-W` é negado.
+
+  Os 141 comandos da lista anterior do `testar.sh` deram a mesma decisão; tempo igual ao da
+  2.15.1, cinco vezes cada (0,23 a 0,25 s no `git diff HEAD`, 0,22 a 0,27 s em 5 segmentos).
+  Não repetido: a sessão real com `claude -p --agent padrao:coletor`.
+- **O jq que falha fecha, como o jq ausente** (2.15.2). Com a entrada cortada o jq não devolvia
+  nada, o awk não via o tipo do agente e a chamada seguia. Agora o `so-le.awk` sai com 3 quando
+  não recebe o cabeçalho, e a `trava-leitura.sh` nega o agente que só lê (o tipo sai por regex).
 - **A recusa é JSON válido.** Tab ou quebra de linha no trecho citado deixavam a saída do hook
   inválida (`touch<TAB>a`); o motivo sai sem caractere de controle.
 - **Opção longa abreviada conta:** o GNU e o git aceitam `--outp`, `--in-pl`, `--pro`, `--op` no

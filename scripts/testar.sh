@@ -67,6 +67,8 @@ printf '%s' '{"tool_input":{"prompt":"x","model":"fable"}}' | sh "$D/travar-mode
   jq -r '.hookSpecificOutput.permissionDecisionReason' | grep -q 'fora da politica.*Fable e Mythos so na sessao' ||
   { echo "divergiu: recusa do fable sem o texto esperado"; FALHAS=$((FALHAS + 1)); }
 
+# Os dois últimos casos são entrada cortada (o jq falha e não devolve nada): o agente que só
+# lê é negado, como sem jq; os demais seguem.
 rodar trava-leitura.sh raw <<'CASOS'
 PASSA	{"agent_type":"Explore","tool_name":"Bash","tool_input":{"command":"grep -rn x src | head"}}
 PASSA	{"agent_type":"padrao:revisor","tool_name":"Bash","tool_input":{"command":"git diff HEAD"}}
@@ -88,6 +90,8 @@ deny	{"agent_type":"Explore","tool_name":"Workflow","tool_input":{"script":"x"}}
 deny	{"agent_type":"Explore","tool_name":"DesignSync","tool_input":{"method":"write_files"}}
 PASSA	{"agent_type":"general-purpose","tool_name":"mcp__github__create_issue","tool_input":{"title":"x"}}
 PASSA	{"tool_name":"mcp__github__create_issue","tool_input":{"title":"x"}}
+deny	{"agent_type":"padrao:coletor","tool_name":"Bash","tool_input":{"command":"touch f"}
+PASSA	{"agent_type":"general-purpose","tool_name":"Bash","tool_input":{"command":"touch f"}
 CASOS
 
 # O matcher do hooks.json é quem chama a trava: ferramenta que executa, grava ou fala com fora
@@ -228,6 +232,24 @@ deny	cat x >/dev/null\; y; touch f
 deny	echo "a > b" > f
 deny	echo 'a' > f 'b'
 deny	cat <<EOF
+deny	sort $"-o" saida x
+deny	sort $""-o saida x
+deny	sed --sandbox $"-i" s/a/b/ x
+deny	git grep $"-O./evil" x
+deny	git --namespace log commit -m x
+deny	git --namespace show config alias.zz status
+deny	git --namespace=log commit -m x
+deny	git --super-prefix log commit -m x
+deny	git -C sub --namespace log commit -m x
+deny	uniq x${IFS}saida
+deny	uniq x$IFS'saida'
+deny	uniq "$@"
+deny	awk --sandbox -W dump-variables=saida 'BEGIN{}'
+deny	awk --sandbox -W pretty-print=saida 'BEGIN{}'
+PASSA	git --no-pager log --oneline -3
+PASSA	git --no-pager -C sub diff HEAD
+PASSA	grep -n "fim$" x
+PASSA	uniq -c "x y"
 PASSA	grep -n '=>' x
 PASSA	grep -c "<div>" x
 PASSA	git log --format='%an <%ae>' -3

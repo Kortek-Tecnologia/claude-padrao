@@ -21,8 +21,8 @@
 #   sai como M_GT, para ninguém o confundir com redirecionamento.
 #
 # O que o corte não acompanha fica anotado em SEG_RUIM (vazio = nada): crase,
-# heredoc (`<<`), `$'...'`, `${...}` com operador e barra invertida no fim da
-# linha. A trava nega o comando inteiro; o cobrar-docs.sh ignora a anotação, e
+# heredoc (`<<`), `$'...'`, `$"..."`, `${...}` com operador e barra invertida no
+# fim da linha. A trava nega o comando inteiro; o cobrar-docs.sh ignora a anotação, e
 # para ele o corte segue o de sempre (parte na crase e nas chaves).
 #
 # Com -v listar=1 o arquivo funciona sozinho: lê o comando da entrada e imprime
@@ -74,6 +74,9 @@ function segmentar(t, seg,    i, c, d, k, q, s, n, ip, wi, np, ps, pq, pp, pw) {
         s = ""; q = ""; ip = 1; wi = 0; i++
         continue
       }
+      # Fora `${NOME}`, o que segue não é acompanhado. `$"..."` é a aspa de tradução
+      # do bash: ele entrega só o texto, sem o `$` (`sort $"-o" f` roda `sort -o f`),
+      # e quem lê a palavra veria `$-o`.
       if (d == "{") {
         if (match(substr(t, i + 2), /^[A-Za-z_][A-Za-z0-9_]*[}]/)) {
           s = s substr(t, i, RLENGTH + 2); i += RLENGTH + 1; ip = 0
@@ -81,6 +84,7 @@ function segmentar(t, seg,    i, c, d, k, q, s, n, ip, wi, np, ps, pq, pp, pw) {
         }
         ruim("${...} com operador")
       } else if (d == "\047" && q == "") ruim("$'...'")
+      else if (d == "\"" && q == "") ruim("$ colado em aspas duplas (o bash entrega so o texto: tire o $)")
     }
     if (q == "\"") {
       if (c == "\"") q = ""
