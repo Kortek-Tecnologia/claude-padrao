@@ -49,6 +49,13 @@ arquivo: segurança (segredo versionado ou no histórico, debug em produção, d
 vulnerável, permissão do CI, skill com efeito colateral que o modelo dispara sozinho), tempo de CI e execução de CI que não precisava ter rodado. Só o
 item cujo "Vale quando" bate, só com evidência, e os de CI só com o tempo ou a contagem medidos. Cada desvio entra no `INFRA.md` com o id da checagem.
 
+**Padronização.** Em seguida, do mesmo jeito, a lista de `padronizacao.md`, ao lado deste
+arquivo: estrutura de arquivos por convenção (`E1`–`E7`: resíduo versionado, cópia no nome,
+documento solto ou órfão, nomes misturados, arquivo fora da pasta que a ferramenta lê, script
+avulso, fim de linha) e versões fixadas (`V1`–`V6`: lockfile, instalação sem versão, imagem,
+action e runner, runtime, versão do projeto). É ela que dá critério à "estrutura de diretórios"
+do levantamento: a régua é a norma que a ferramenta lê e o que o projeto pratica, não um layout.
+
 ## Trilha C — o que a documentação diz → `CONFRONTO.md`
 
 Confronte `SISTEMA.md` e `INFRA.md` com `CLAUDE.md`, `AGENTS.md`, `.claude/rules/`, `docs/`, os

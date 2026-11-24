@@ -25,7 +25,8 @@ Leitura:
 - Documentação antes do commit: commits da sessão principal (fora os lotes do `arrumar`) e
   quantos tiveram a `padrao:atualizar-docs` desde o commit anterior. Lembrete = o hook recusou a
   primeira tentativa. Commit sem a skill = o Claude repetiu depois do lembrete sem rodá-la (às
-  vezes com razão: dois commits do mesmo diff), ou o hook não rodou naquela sessão.
+  vezes com razão: dois commits do mesmo diff), o commit era só de documentação (o hook o deixa
+  passar sem lembrete), ou o hook não rodou naquela sessão.
 - Pendências ao encerrar: quantas vezes o hook de fim de turno cobrou (a resposta fechava com
   oferta ou item em aberto) e em quantas o Claude abriu o `AskUserQuestion` em seguida. Muito
   lembrete sem pergunta = a detecção por frases está disparando à toa, ou o Claude encerrou de
@@ -34,8 +35,11 @@ Leitura:
   teste, build, checagem de tipos ou lint rodado na sessão, uma chamada ao `padrao:revisor` (ou
   skill de revisão) ou um lote pelo `padrao:executor` — um commit pode contar em mais de uma — e
   quantos saíram sem nenhuma. Só mede: não há hook cobrando. O comando é reconhecido pelos nomes
-  comuns (`pytest`, `npm test`, `cargo test`, `tsc`, `testar.sh`…); teste do projeto com outro
-  nome não entra, e commit só de documentação também aparece como "sem nenhuma". Muitos sem
+  comuns (`pytest`, `npm test`, `cargo test`, `tsc`, `testar.sh`…) e pelos que o projeto declara
+  em `env.PADRAO_VERIFICACAO` do `.claude/settings.json` (separados por `;`; a linha de baixo os
+  lista). Teste do projeto com outro nome e não declarado não entra — se a conta de "sem
+  nenhuma" for alta e o projeto tiver um, diga ao usuário qual chave declara —, e commit só de
+  documentação também aparece como "sem nenhuma". Muitos sem
   nenhuma em diff de código = caso para pedir a verificação na ficha ou um gate.
 - Commits em sandbox (só aparece se houve): commits feitos dentro de pasta temporária (teste de
   ponta a ponta, fixture), fora das contas de documentação e de verificação.

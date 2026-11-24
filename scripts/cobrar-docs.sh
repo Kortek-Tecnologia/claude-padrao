@@ -17,6 +17,8 @@
 #   velha.
 # - Commit do /padrao:arrumar (mensagem que começa por `arrumar: lote `) passa:
 #   o plano já cuidou da documentação.
+# - Mudança só de documentação (todo caminho do `git status` é .md, .mdx, .rst ou
+#   .adoc) passa sem lembrete: não há o que a skill corrigir.
 #
 # A anotação é por sessão (`session_id`), não por repositório: ~12% dos commits
 # do histórico rodam fora do cwd da sessão (`cd outro && git commit`, `git -C`).
@@ -62,7 +64,12 @@ if [ "$ferramenta" = Skill ]; then
 fi
 case "$ferramenta" in Bash | PowerShell) ;; *) exit 0 ;; esac
 
-cmd=$(printf '%s' "$entrada" | jq -r '.tool_input.command // ""' 2>/dev/null | tr -d '\r')
+# Um jq tira a pasta da sessão (1ª linha) e o comando (o resto).
+saida=$(printf '%s' "$entrada" | jq -r '(.cwd // "" | tostring), (.tool_input.command // "" | tostring)' 2>/dev/null | tr -d '\r')
+case "$saida" in
+  *"$nl"*) pasta=${saida%%"$nl"*}; cmd=${saida#*"$nl"} ;;
+  *) pasta=$saida; cmd= ;;
+esac
 case "$0" in */*) SEGMENTOS_DIR=${0%/*} ;; *) SEGMENTOS_DIR=. ;; esac
 lib="$SEGMENTOS_DIR/segmentos.sh"
 [ -r "$lib" ] && [ -r "$SEGMENTOS_DIR/segmentos.awk" ] || exit 0
@@ -107,6 +114,27 @@ lotes=$(printf '%s\n' "$cmd" | awk -v q="[\"']" '
   { ant = $0 }
   END { print n + 0 }')
 [ "${lotes:-0}" -ge "$commits" ] 2>/dev/null && exit 0
+
+# Mudança só de documentação: a skill não teria o que corrigir (ela mesma encerra em uma
+# linha nesse caso), e o lembrete custaria um turno à toa. Passa sem lembrete e sem gastar
+# a anotação. Só quando dá para saber onde o commit roda: a entrada traz a pasta da sessão
+# e o comando não muda de pasta (`cd`, `pushd`, `git -C`: ~12% do histórico). Olha o
+# `git status` inteiro, porque o `git add` do mesmo comando ainda não rodou: um caminho
+# que não seja .md, .mdx, .rst ou .adoc (ou nada a commitar, ou o git falhando) e o
+# lembrete sai como antes.
+so_docs() {
+  [ -n "$pasta" ] || return 1
+  case "$cmd" in *cd\ * | *pushd* | *\ -C\ *) return 1 ;; esac
+  git -C "$pasta" status --porcelain 2>/dev/null | awk '
+    { n = split(substr($0, 4), a, " -> ")
+      for (i = 1; i <= n; i++) {
+        x = tolower(a[i]); sub(/"$/, "", x)
+        if (x !~ /\.(md|mdx|rst|adoc)$/) codigo = 1
+      }
+      total++ }
+    END { exit (total > 0 && !codigo) ? 0 : 1 }'
+}
+so_docs && exit 0
 
 if [ -f "$nota" ]; then
   rm -f "$nota"

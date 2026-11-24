@@ -3,6 +3,8 @@ name: atualizar-docs
 description: Antes de commitar, acha a documentação que o diff atual deixou desatualizada — comando, porta, variável de ambiente, caminho, endpoint, chave de config, nome renomeado ou removido — e corrige só ela, no mínimo. Use quando o diff mexe em algo que docs, CLAUDE.md, comentários ou docstrings citam, ou quando o usuário pedir para conferir a doc do diff.
 argument-hint: "[ref, padrão HEAD — ex.: main...HEAD]"
 user-invocable: false
+context: fork
+model: sonnet
 ---
 
 # Documentação do diff
@@ -13,6 +15,9 @@ falso; não melhora, não amplia e não reescreve o resto.
 
 Diff: `git diff $ARGUMENTS` (sem argumento: `git diff HEAD` — staged e não staged). Rode até o
 fim sem perguntar, salvo o caso DIVERGENTE (passo 4).
+
+Você roda num subagent à parte, sem a conversa da sessão: tudo o que precisa está no diff e
+nos arquivos. O que você devolve no passo 5 é o que a sessão principal vê.
 
 ## Escopo
 
@@ -36,8 +41,9 @@ Diff só de documentação, ou sem nenhum termo desses → diga isso em uma linh
 ## 2. Onde a documentação cita
 
 Procure cada valor **antigo** no escopo (`grep -rn --exclude='.env*'`, para nunca imprimir um
-valor de segredo). Nos `.env*`, só nomes: `grep -no '^NOME=' .env*`. Muitos termos ou
-repositório grande → delegue a busca ao `padrao:coletor`, pedindo `arquivo:linha` e o trecho.
+valor de segredo). Nos `.env*`, só nomes: `grep -no '^NOME=' .env*` (arquivo que a
+permissão do projeto negar, pule). Muitos termos → um `grep -rnE` com os termos juntos, em vez
+de um por termo.
 
 ## 3. Corrija
 

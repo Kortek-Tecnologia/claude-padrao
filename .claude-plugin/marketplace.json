@@ -1,8 +1,8 @@
 {
   "name": "claude-padrao",
-  "description": "Padrão de Claude Code igual em todos os projetos: Opus decide, Sonnet executa lote com ficha, Haiku coleta; tudo no projeto, global limpo; documentação que não mente e checagens de segurança e de CI.",
+  "description": "Padrão de Claude Code igual em todos os projetos: Opus decide, Sonnet executa lote com ficha, Haiku coleta; tudo no projeto, global limpo; documentação que não repete o código, estrutura de arquivos por convenção, versões fixadas e checagens de segurança e de CI.",
   "owner": { "name": "Kortek" },
   "plugins": [
-    { "name": "padrao", "source": "./", "description": "Padrão de Claude Code igual em todos os projetos: Opus decide, Sonnet executa lote com ficha, Haiku coleta; tudo no projeto, global limpo; documentação que não mente e checagens de segurança e de CI.", "category": "claude-code" }
+    { "name": "padrao", "source": "./", "description": "Padrão de Claude Code igual em todos os projetos: Opus decide, Sonnet executa lote com ficha, Haiku coleta; tudo no projeto, global limpo; documentação que não repete o código, estrutura de arquivos por convenção, versões fixadas e checagens de segurança e de CI.", "category": "claude-code" }
   ]
 }

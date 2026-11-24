@@ -448,7 +448,26 @@ espera "sem CLAUDE_PLUGIN_DATA" PASSA "$(cmd_de sd 'git commit -m a' | env -u CL
 : >"$DADOS/arquivo"
 espera "pasta de dados invalida" PASSA "$(cmd_de sd 'git commit -m a' | CLAUDE_PLUGIN_DATA="$DADOS/arquivo/x" sh "$D/cobrar-docs.sh")"
 espera "sem jq" PASSA "$(CLAUDE_PLUGIN_DATA="$DADOS" semjq cobrar-docs.sh "$(cmd_de semjq 'git commit -m a')")"
-rm -rf "$DADOS"
+# Mudança só de documentação passa sem lembrete e sem gastar a anotação; basta um arquivo que
+# não seja documentação (novo ou alterado), nada a commitar, ou o comando mudar de pasta, e o
+# lembrete sai como antes. A pasta vem do `cwd` da entrada (aqui, um repositório de teste).
+REPO=$(mktemp -d)
+git -C "$REPO" init -q && git -C "$REPO" config user.email t@t && git -C "$REPO" config user.name t
+printf 'a\n' >"$REPO/app.sh"; printf '# x\n' >"$REPO/README.md"; mkdir "$REPO/docs"; printf 'x\n' >"$REPO/docs/Guia.MD"
+git -C "$REPO" add -A 2>/dev/null && git -C "$REPO" commit -qm base
+cwd_de() { jq -cn --arg s "$1" --arg c "$2" --arg d "$(cygpath -w "$REPO" 2>/dev/null || printf '%s' "$REPO")" '{session_id: $s, cwd: $d, tool_name: "Bash", tool_input: {command: $c}}'; }
+espera "nada a commitar" deny "$(docs "$(cwd_de d0 'git commit -m a')")"
+printf '# y\n' >"$REPO/README.md"; printf 'y\n' >"$REPO/docs/Guia.MD"; printf 'n\n' >"$REPO/docs/novo com espaco.md"
+espera "so documentacao" PASSA "$(docs "$(cwd_de d1 'git add -A && git commit -m "docs: y"')")"
+[ ! -e "$DADOS/docs-d1" ] || { echo "divergiu: cobrar-docs: commit so de documentacao gastou ou criou anotacao"; FALHAS=$((FALHAS + 1)); }
+espera "so documentacao, mas o comando muda de pasta" deny "$(docs "$(cwd_de d2 'cd sub && git commit -m a')")"
+espera "so documentacao, com git -C" deny "$(docs "$(cwd_de d3 'git -C outro commit -m a')")"
+printf 'b\n' >"$REPO/app.sh"
+espera "documentacao e codigo" deny "$(docs "$(cwd_de d4 'git commit -am a')")"
+git -C "$REPO" checkout -q app.sh; printf 'x\n' >"$REPO/requirements.txt"
+espera "arquivo novo que nao e documentacao" deny "$(docs "$(cwd_de d5 'git add -A && git commit -m a')")"
+espera "pasta que nao e repositorio" deny "$(jq -cn --arg d "$DADOS" '{session_id: "d6", cwd: $d, tool_name: "Bash", tool_input: {command: "git commit -m a"}}' | CLAUDE_PLUGIN_DATA="$DADOS" sh "$D/cobrar-docs.sh" | jq -r '.hookSpecificOutput.permissionDecision')"
+rm -rf "$DADOS" "$REPO"
 # Pendência em aberto no fim do turno (cobrar-pergunta.sh, evento Stop): recusa uma vez a
 # resposta que termina com oferta ou pendência; passam a continuação, a resposta sem
 # pendência, a frase só dentro de código, a entrada inválida e a falta do jq (falha ABERTA).
@@ -480,6 +499,40 @@ SEGUE
 case "$(para 'Não fiz commit.' | sh "$D/cobrar-pergunta.sh" | jq -r .reason)" in *AskUserQuestion*"nao e erro"* | *"nao e erro"*AskUserQuestion*) ;; *) echo "divergiu: cobrar-pergunta: motivo sem a instrucao"; FALHAS=$((FALHAS + 1)) ;; esac
 [ "$(jq -c '[.hooks.Stop[].hooks[] | select(.command | contains("cobrar-pergunta.sh")) | .onFailure]' hooks/hooks.json | tr -d '\r')" = '["continue"]' ] ||
   { echo "divergiu: hooks.json: Stop sem o cobrar-pergunta.sh com onFailure continue"; FALHAS=$((FALHAS + 1)); }
+
+# Instrução da compactação (instruir-compactacao.sh, evento PreCompact): o stdout vira instrução
+# do resumo. Sai na automática e no /compact sem foco; cala quando o usuário passou o foco dele;
+# entrada vazia não o cala (nunca falha nem bloqueia).
+comp() { printf '%s' "$1" | sh "$D/instruir-compactacao.sh"; }
+for e in '{"hook_event_name":"PreCompact","trigger":"auto","custom_instructions":null}' '{"trigger": "manual", "custom_instructions": null}' ''; do
+  case "$(comp "$e")" in *"plano aprovado"*"decisoes tomadas"*"arquivos alterados"*"ultima verificacao"*) ;; *) echo "divergiu: instruir-compactacao calou em: $e"; FALHAS=$((FALHAS + 1)) ;; esac
+done
+# no subagent (a entrada traz agent_type) a instrução é outra: os fatos já coletados e o que falta
+case "$(comp '{"agent_id":"a1","agent_type":"padrao:coletor","hook_event_name":"PreCompact","trigger":"auto","custom_instructions":null}')" in
+  *"plano aprovado"*) echo "divergiu: instruir-compactacao deu ao subagent a instrucao da sessao"; FALHAS=$((FALHAS + 1)) ;;
+  *"tarefa recebida"*"fato ja coletado"*"arquivo:linha"*"falta ler"*) ;;
+  *) echo "divergiu: instruir-compactacao sem a instrucao do subagent"; FALHAS=$((FALHAS + 1)) ;;
+esac
+[ -z "$(comp '{"trigger":"manual","custom_instructions":"so o plano de migracao"}')" ] ||
+  { echo "divergiu: instruir-compactacao falou por cima do foco do usuario"; FALHAS=$((FALHAS + 1)); }
+[ "$(jq -c '[.hooks.PreCompact[].hooks[] | select(.command | contains("instruir-compactacao.sh")) | .onFailure]' hooks/hooks.json | tr -d '\r')" = '["continue"]' ] ||
+  { echo "divergiu: hooks.json: PreCompact sem o instruir-compactacao.sh com onFailure continue"; FALHAS=$((FALHAS + 1)); }
+
+# Toda skill do menu só roda quando o usuário chama (gravam no global, commitam, movem código);
+# a atualizar-docs é a única que o modelo dispara, e fica fora do menu.
+for s in skills/*/SKILL.md; do
+  case "$s" in
+    skills/atualizar-docs/SKILL.md) grep -q '^user-invocable: false$' "$s" || { echo "divergiu: $s sem user-invocable: false"; FALHAS=$((FALHAS + 1)); } ;;
+    *) grep -q '^disable-model-invocation: true$' "$s" || { echo "divergiu: $s sem disable-model-invocation: true"; FALHAS=$((FALHAS + 1)); } ;;
+  esac
+done
+# Frontmatter que a política depende: coletor e leitor compactam aos 100K (acima disso o Haiku
+# paga a requisição inteira no preço alto), e a atualizar-docs roda num subagent em Sonnet.
+for a in coletor leitor; do
+  grep -q '^autoCompactWindow: 100000$' "agents/$a.md" || { echo "divergiu: agents/$a.md sem autoCompactWindow: 100000"; FALHAS=$((FALHAS + 1)); }
+done
+grep -q '^context: fork$' skills/atualizar-docs/SKILL.md && grep -q '^model: sonnet$' skills/atualizar-docs/SKILL.md ||
+  { echo "divergiu: skills/atualizar-docs/SKILL.md sem context: fork e model: sonnet"; FALHAS=$((FALHAS + 1)); }
 [ -z "$SEMJQ" ] || rm -rf "$SEMJQ"
 # onFailure no hooks.json: as travas bloqueiam se o hook falhar; o lembrete da documentação
 # deixa seguir, e por extenso — no Code Mode, hook que falha sem a chave recusa a chamada.
@@ -557,6 +610,22 @@ done
 # modelSettings do projeto que não é objeto: acusa campo a campo e NÃO cala os avisos seguintes
 jq '.modelSettings = "x"' skills/aplicar/modelos/settings.json >"$PROJ/.claude/settings.json"
 case "$(conferir | jq -r .systemMessage)" in *"modelSettings[\"claude-sonnet-5-5\"].effortLevel do projeto e ''"*"chaves fora do padrao"*) ;; *) echo "divergiu: modelSettings que nao e objeto calou o hook"; FALHAS=$((FALHAS + 1)) ;; esac
+# teto de effort: projeto de antes dele é acusado, modelo a modelo
+jq 'del(.modelSettings[].maxEffortLevel)' skills/aplicar/modelos/settings.json >"$PROJ/.claude/settings.json"
+saida=$(conferir | jq -r .systemMessage)
+for m in claude-opus-5-5 claude-sonnet-5-5 claude-haiku-5-5; do
+  case "$saida" in *"modelSettings[\"$m\"].maxEffortLevel do projeto e '', o padrao e 'high'"*) ;; *) echo "divergiu: conferir-padrao nao acusou o teto de effort ausente em $m"; FALHAS=$((FALHAS + 1)) ;; esac
+done
+# permissions.deny: as regras do modelo têm de estar no projeto; as que ele tem a mais (e o
+# allow dele) não contam; faltando uma, ou a chave inteira, o aviso diz quais
+jq '.permissions.deny += ["Read(./segredos/**)"] | .permissions.allow = ["WebSearch"]' skills/aplicar/modelos/settings.json >"$PROJ/.claude/settings.json"
+case "$(conferir | jq -r .systemMessage)" in *"permissions.deny do projeto"*) echo "divergiu: conferir-padrao acusou o deny completo"; FALHAS=$((FALHAS + 1)) ;; esac
+jq '.permissions.deny -= ["Read(**/.env)"]' skills/aplicar/modelos/settings.json >"$PROJ/.claude/settings.json"
+case "$(conferir | jq -r .systemMessage)" in *"permissions.deny do projeto sem Read(**/.env) (o padrao"*) ;; *) echo "divergiu: conferir-padrao nao acusou a regra de deny ausente"; FALHAS=$((FALHAS + 1)) ;; esac
+jq 'del(.permissions)' skills/aplicar/modelos/settings.json >"$PROJ/.claude/settings.json"
+case "$(conferir | jq -r .systemMessage)" in *"permissions.deny do projeto sem Read(**/.env), Read(**/.env.local), Read(**/.env.*.local), Read(**/.env.production) (o padrao"*) ;; *) echo "divergiu: conferir-padrao nao acusou o deny ausente"; FALHAS=$((FALHAS + 1)) ;; esac
+jq '.permissions = "x"' skills/aplicar/modelos/settings.json >"$PROJ/.claude/settings.json"
+case "$(conferir | jq -r .systemMessage)" in *"permissions.deny do projeto sem Read(**/.env), "*"chaves fora do padrao"*) ;; *) echo "divergiu: permissions que nao e objeto calou o hook"; FALHAS=$((FALHAS + 1)) ;; esac
 rm -rf "$CASA" "$PROJ"
 
 # Carimbo dos modelos: o hook de abertura compara só o `modelo X` da 1ª linha.
@@ -569,9 +638,41 @@ while read -r arq carimbo soma; do
     { echo "divergiu: modelo $arq mudou (carimbo '$tem_c', soma $tem_s): suba o 'modelo X' da 1a linha e registre os dois em testar.sh"; FALHAS=$((FALHAS + 1)); }
 done <<'CARIMBOS'
 claude-md.md 2.15.0 2011460674
-agente/padrao-modelos.md 2.14.0 729659925
-agente/padrao-configuracao.md 2.14.0 2664263774
+agente/padrao-modelos.md 2.16.0 921711471
+agente/padrao-configuracao.md 2.16.0 364377542
 CARIMBOS
+
+# Este repositório usa o próprio padrão: as cópias seguem iguais aos modelos, e o hook de
+# abertura, com um global limpo, fica calado nele (o settings.local.json é pessoal e fica fora do
+# git: sem ele só pode sair o aviso do syncClaudeAiPlugins). O bloco mora em .claude/CLAUDE.md,
+# porque a raiz do plugin não pode ter CLAUDE.md.
+for doc in padrao-modelos.md padrao-configuracao.md; do
+  cmp -s "skills/aplicar/modelos/agente/$doc" "docs/agente/$doc" ||
+    { echo "divergiu: docs/agente/$doc difere do modelo: copie de skills/aplicar/modelos/agente/"; FALHAS=$((FALHAS + 1)); }
+done
+cmp -s skills/aplicar/modelos/settings.json .claude/settings.json ||
+  { echo "divergiu: .claude/settings.json difere do modelo: copie de skills/aplicar/modelos/"; FALHAS=$((FALHAS + 1)); }
+bloco=$(awk '/^<!-- padrao:inicio/ { d = 1 } d { print } /^<!-- padrao:fim -->/ { d = 0 }' .claude/CLAUDE.md)
+[ "$bloco" = "$(cat skills/aplicar/modelos/claude-md.md)" ] ||
+  { echo "divergiu: o bloco do padrao em .claude/CLAUDE.md difere de skills/aplicar/modelos/claude-md.md"; FALHAS=$((FALHAS + 1)); }
+CASA=$(mktemp -d); mkdir -p "$CASA/.claude"
+cp skills/aplicar/modelos/global.json "$CASA/.claude/settings.json"; cp statusline/statusline.py "$CASA/.claude/"
+saida=$(printf '{}' | HOME="$CASA" CLAUDE_PROJECT_DIR="$PWD" sh "$D/conferir-padrao.sh" | jq -r '.systemMessage // empty' | tr -d '\r' |
+  grep '^- ' | grep -v 'syncClaudeAiPlugins')
+[ -z "$saida" ] || { echo "divergiu: o hook de abertura acusa este repositorio: $saida"; FALHAS=$((FALHAS + 1)); }
+# projeto sem CLAUDE.md na raiz e sem o bloco no .claude/CLAUDE.md: acusado; com CLAUDE.md na
+# raiz, é ele que vale
+PROJ=$(mktemp -d); mkdir -p "$PROJ/.claude" "$PROJ/docs/agente"
+cp skills/aplicar/modelos/settings.json skills/aplicar/modelos/settings.local.json "$PROJ/.claude/"
+cp skills/aplicar/modelos/agente/padrao-*.md "$PROJ/docs/agente/"
+printf '# Projeto\n' >"$PROJ/.claude/CLAUDE.md"
+conf_proj() { printf '{}' | HOME="$CASA" CLAUDE_PROJECT_DIR="$PROJ" sh "$D/conferir-padrao.sh" | jq -r '.systemMessage // empty'; }
+case "$(conf_proj)" in *"bloco do padrao no CLAUDE.md ausente"*) ;; *) echo "divergiu: conferir-padrao nao acusou o .claude/CLAUDE.md sem o bloco"; FALHAS=$((FALHAS + 1)) ;; esac
+cat skills/aplicar/modelos/claude-md.md >>"$PROJ/.claude/CLAUDE.md"
+[ -z "$(conf_proj)" ] || { echo "divergiu: conferir-padrao acusou o bloco em .claude/CLAUDE.md: $(conf_proj)"; FALHAS=$((FALHAS + 1)); }
+printf '# Raiz sem bloco\n' >"$PROJ/CLAUDE.md"
+case "$(conf_proj)" in *"bloco do padrao no CLAUDE.md ausente"*) ;; *) echo "divergiu: conferir-padrao nao deu preferencia ao CLAUDE.md da raiz"; FALHAS=$((FALHAS + 1)) ;; esac
+rm -rf "$CASA" "$PROJ"
 
 # Status line principal: o padrão na linha 1 (vermelho = \033[31m).
 SL=statusline/statusline.py
@@ -830,6 +931,82 @@ printf -- '---\nname: release\ndisable-model-invocation: true\n---\nCorte a rele
 s7=$(cd "$REPO" && grep -L '^disable-model-invocation: *true' .claude/skills/*/SKILL.md .claude/commands/*.md 2>/dev/null | tr -d '\r')
 [ "$s7" = ".claude/skills/deploy/SKILL.md" ] || { echo "divergiu: checagem S7 devolveu '$s7'"; FALHAS=$((FALHAS + 1)); }
 rm -rf "$REPO"
+# Checagens de padronizacao do arrumar (estrutura de arquivos e versoes fixadas): todo item
+# traz os cinco campos, e cada padrao casa os casos que devem virar candidato e nao casa os
+# que nao devem; os comandos de E1 e E3 rodam num repositorio de teste.
+PD=skills/arrumar/padronizacao.md
+itens=$(grep -c '^### [EV][0-9]' "$PD")
+[ "$itens" -ge 13 ] || { echo "divergiu: padronizacao com $itens itens"; FALHAS=$((FALHAS + 1)); }
+for campo in 'Vale quando' 'Conferir' 'Desvio' 'Gravidade' 'Correção'; do
+  n=$(grep -c "^- $campo: " "$PD")
+  [ "$n" = "$itens" ] || { echo "divergiu: padronizacao: campo '$campo' em $n de $itens itens"; FALHAS=$((FALHAS + 1)); }
+done
+pad() { sed -n "s/^    $1='\(.*\)'\$/\1/p" "$PD"; }
+# casa NOME OPCOES SIM... -- NAO...: cada linha de SIM tem de casar o padrao, e as de NAO, nao
+casa() {
+  local nome="$1" op="$2" p lado=sim; shift 2
+  p=$(pad "$nome")
+  [ -n "$p" ] || { echo "divergiu: padronizacao sem o padrao $nome"; FALHAS=$((FALHAS + 1)); return; }
+  for t in "$@"; do
+    if [ "$t" = -- ]; then lado=nao; continue; fi
+    if printf '%s\n' "$t" | grep -E $op -q -- "$p"; then
+      [ "$lado" = sim ] || { echo "divergiu: padrao $nome casou '$t'"; FALHAS=$((FALHAS + 1)); }
+    else
+      [ "$lado" = nao ] || { echo "divergiu: padrao $nome nao casou '$t'"; FALHAS=$((FALHAS + 1)); }
+    fi
+  done
+}
+casa LIXO '' 'a/node_modules/x.js' 'src/__pycache__/m.pyc' 'app.log' '.DS_Store' 'sub/Thumbs.db' 'notas.md~' 'x.orig' \
+  -- 'src/app.py' 'docs/catalog.md' 'dist/index.js' 'logs.md' 'src/venvs.py'
+casa COPIA -i 'relatorio_final.md' 'app-old.js' 'Documento (2).md' 'handler_v2.py' 'conf.new.json' 'x_BKP.sql' 'notas copia.txt' \
+  -- 'api/v2/users.py' 'news.md' 'renew.py' 'final.md' 'README.pt-br.md' 'src/novo/app.py'
+casa RAIZ -i 'README.md' 'readme.md' 'README.pt-br.md' 'LICENSE.md' 'CONTRIBUTING.md' 'AGENT_LEARNINGS.md' 'SECURITY.rst' \
+  -- 'notas.md' 'README-antigo-de-verdade.txt' 'arquitetura.md' 'TODO.md'
+casa LOCK '' 'package-lock.json' 'web/pnpm-lock.yaml' 'uv.lock' 'api/poetry.lock' 'go.sum' 'bun.lockb' \
+  -- 'package.json' 'lock.md' 'docs/yarn.lock.md' 'my-package-lock.json'
+casa REQ -i 'requirements.txt' 'api/requirements-dev.txt' 'constraints.txt' -- 'docs/requirements.md' 'requirements/base.in'
+# FIXA casa a linha que NAO e desvio (comentario, opcao, versao exata, url presa)
+casa FIXA '' 'flask==3.0.3' '# comentario' '-r base.txt' '' 'pkg @ git+https://x/y@abc' '--index-url x' \
+  -- 'flask' 'flask>=3' 'requests~=2.31' 'uvicorn[standard]'
+casa INSTALA '' 'RUN pip install flask' 'run: npm install -g pnpm' '  npx prettier .' 'go install x/y@latest' 'pipx run ruff' \
+  -- 'RUN npm ci' 'pnpm install --frozen-lockfile' 'echo instalar' 'uv sync'
+casa FLUT '' 'FROM node' 'FROM node:latest' 'FROM node:alpine' '    image: postgres' 'image: "redis:latest"' \
+  'FROM --platform=linux/amd64 python AS build' '      - image: nginx:stable' \
+  -- 'FROM node:22.11.0-alpine' 'FROM node@sha256:abc' 'image: ghcr.io/x/y:1.2.3' 'FROM python:3.12 AS build' \
+  '# FROM node' 'COPY --from=build /a /b' 'image: postgres:16.4'
+casa MOVEL '' '      - uses: x/y@main' 'uses: actions/checkout' 'runs-on: ubuntu-latest' '        os: [windows-latest, macos-14]' \
+  'uses: docker://alpine' \
+  -- 'uses: actions/checkout@v4' 'uses: ./.github/actions/local' 'runs-on: ubuntu-24.04' 'uses: x/y@0123456789abcdef0123456789abcdef01234567 # v1' \
+  'uses: x/y@maintenance-1'
+# PRESA casa a action que NAO e desvio (SHA inteiro, ou do GitHub por tag)
+casa PRESA '' 'uses: x/y@0123456789abcdef0123456789abcdef01234567 # v1' 'uses: actions/checkout@v4' 'uses: github/codeql-action/init@v3' \
+  -- 'uses: x/y@v4' 'uses: docker/build-push-action@v6' 'uses: x/y@0123456'
+casa VERSAO '' '  "version": "1.2.3",' 'version = "0.4.0"' '__version__ = "2.0.1"' 'appVersion: 1.16.0' 'VERSION = "3.1"' \
+  -- '"versions": ["1.2"]' 'python_version = 3' '# version history' '"lockfileVersion": 3'
+
+# NOMES: so saem as pastas com mais de um estilo e 5 ou mais nomes compostos da mesma extensao
+N=$(pad NOMES)
+n=$(printf '%s\n' src/user_repo.py src/order_repo.py src/stock_item.py src/pay_gateway.py src/checkoutFlow.py src/main.py \
+  web/UserCard.tsx web/OrderList.tsx lib/a_b.py lib/c_d.py lib/e_f.py lib/g_h.py lib/i_j.py README.md |
+  awk -F/ "$N" | sort | tr '\n' '|')
+[ "$n" = 'src/*.py camel=1|src/*.py snake=4|' ] || { echo "divergiu: padrao NOMES devolveu '$n'"; FALHAS=$((FALHAS + 1)); }
+
+# E1 e E3 num repositorio de teste: versionado apesar do .gitignore; documento solto e orfao
+REPO=$(mktemp -d)
+(
+  cd "$REPO" && git init -q . && git config user.email t@t && git config user.name t && mkdir docs &&
+  printf 'x\n' >debug.log && printf '# p\nVeja docs/uso.md.\n' >README.md && printf 'u\n' >docs/uso.md &&
+  printf 'o\n' >docs/orfao.md && printf 'n\n' >notas.md && git add -A && git commit -qm um &&
+  printf '*.log\n' >.gitignore && git add .gitignore && git commit -qm dois
+) >/dev/null 2>&1
+R=$(pad RAIZ)
+e1=$(cd "$REPO" && git ls-files -ci --exclude-standard | tr -d '\r' | tr '\n' ' ')
+solto=$(cd "$REPO" && git ls-files | grep -v / | grep -Ei '\.(md|mdx|rst|adoc)$' | grep -Eiv "$R" | tr '\n' ' ')
+orfao=$(cd "$REPO" && git ls-files 'docs/*.md' | while IFS= read -r f; do git grep -qIF -- "${f##*/}" -- . ":(exclude)$f" || echo "$f"; done | tr '\n' ' ')
+[ "$e1" = 'debug.log ' ] || { echo "divergiu: checagem E1 devolveu '$e1'"; FALHAS=$((FALHAS + 1)); }
+[ "$solto" = 'notas.md ' ] || { echo "divergiu: checagem E3 (solto) devolveu '$solto'"; FALHAS=$((FALHAS + 1)); }
+[ "$orfao" = 'docs/orfao.md ' ] || { echo "divergiu: checagem E3 (orfao) devolveu '$orfao'"; FALHAS=$((FALHAS + 1)); }
+rm -rf "$REPO"
 # Ênfase na carga fixa (trilha C): o padrão casa a instrução em maiúsculas e não casa a mesma
 # palavra em minúsculas, nome de variável nem palavra maior que a contém.
 ENF=$(sed -n "s/^    ENF='\(.*\)'\$/\1/p" skills/arrumar/levantar.md)
@@ -845,7 +1022,7 @@ done
 # arquivo de apoio (levantar.md, regras-docs.md), que o SKILL.md tem de citar.
 tam=$(wc -c <skills/arrumar/SKILL.md)
 [ "$tam" -le 15000 ] || { echo "divergiu: skills/arrumar/SKILL.md com $tam bytes (teto 15000): mova texto para arquivo de apoio"; FALHAS=$((FALHAS + 1)); }
-for apoio in levantar.md regras-docs.md checagens.md; do
+for apoio in levantar.md regras-docs.md checagens.md padronizacao.md; do
   [ -s "skills/arrumar/$apoio" ] && grep -q "$apoio" skills/arrumar/SKILL.md skills/arrumar/levantar.md ||
     { echo "divergiu: arrumar: $apoio ausente ou sem citacao"; FALHAS=$((FALHAS + 1)); }
 done
@@ -855,6 +1032,35 @@ s = importlib.util.spec_from_file_location("m", sys.argv[1]); m = importlib.util
 print(*(int(m.verifica(c)) for c in sys.argv[2:]))' skills/medir/medir-modelos.py \
   'cd x && timeout 540 bash scripts/testar.sh >f 2>&1' 'timeout 60 pytest -q' 'echo timeout 5 pytest' 'timeout 5 cat testar.sh' | tr -d '\r')
 [ "$v" = "1 1 0 0" ] || { echo "divergiu: medir: verifica com timeout devolveu '$v'"; FALHAS=$((FALHAS + 1)); }
+# medir: o comando de verificação que o projeto declara (env.PADRAO_VERIFICACAO, itens separados
+# por `;`) conta como os nomes comuns: no começo do segmento, com lançador e `timeout` na frente;
+# citado, lido por outro comando ou como prefixo de outro nome, não. O settings.local.json vence.
+PV=$(mktemp -d); mkdir -p "$PV/.claude"
+printf '{"env":{"PADRAO_VERIFICACAO":"scripts/validar.sh; make  smoke"}}' >"$PV/.claude/settings.json"
+decl() { sh scripts/py.sh -c 'import importlib.util, pathlib, sys
+s = importlib.util.spec_from_file_location("m", sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+itens, extra = m.declarada(pathlib.Path(sys.argv[2]))
+print("|".join(itens), *(int(m.verifica(c, extra)) for c in sys.argv[3:]))' skills/medir/medir-modelos.py "$@" | tr -d '\r'; }
+v=$(decl "$PV" 'bash scripts/validar.sh --tudo' 'cd x && timeout 60 make smoke' 'cat scripts/validar.sh' 'make smoketest' 'echo "make smoke"' 'pytest -q')
+[ "$v" = "scripts/validar.sh|make smoke 1 1 0 0 0 1" ] || { echo "divergiu: medir: verificacao declarada devolveu '$v'"; FALHAS=$((FALHAS + 1)); }
+printf '{"env":{"PADRAO_VERIFICACAO":"tools/check"}}' >"$PV/.claude/settings.local.json"
+v=$(decl "$PV" 'tools/check' 'scripts/validar.sh')
+[ "$v" = "tools/check 1 0" ] || { echo "divergiu: medir: o settings.local.json nao venceu na verificacao declarada: '$v'"; FALHAS=$((FALHAS + 1)); }
+# script de PowerShell declarado: com `pwsh` (e opções) na frente, pelo caminho e pelo operador `&`
+printf '{"env":{"PADRAO_VERIFICACAO":"testar.ps1"}}' >"$PV/.claude/settings.local.json"
+v=$(decl "$PV" 'pwsh ./testar.ps1 glpi' 'pwsh -NoProfile -File ./testar.ps1' '& ./testar.ps1' 'cd x; .\testar.ps1 ad' 'Get-Content testar.ps1' 'pwsh ./outro.ps1')
+[ "$v" = "testar.ps1 1 1 1 1 0 0" ] || { echo "divergiu: medir: verificacao declarada em PowerShell devolveu '$v'"; FALHAS=$((FALHAS + 1)); }
+# pre-commit do projeto: o medir avisa que a verificação de dentro do commit fica fora da conta
+gancho() { sh scripts/py.sh -c 'import importlib.util, pathlib, sys
+s = importlib.util.spec_from_file_location("m", sys.argv[1]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m)
+print(m.pre_commit(pathlib.Path(sys.argv[2])) or "nenhum")' skills/medir/medir-modelos.py "$1" | tr -d '\r'; }
+[ "$(gancho "$PV")" = nenhum ] || { echo "divergiu: medir: pre-commit onde nao ha: $(gancho "$PV")"; FALHAS=$((FALHAS + 1)); }
+mkdir -p "$PV/.githooks" && : >"$PV/.githooks/pre-commit"
+[ "$(gancho "$PV")" = .githooks/pre-commit ] || { echo "divergiu: medir: pre-commit nao reconhecido: $(gancho "$PV")"; FALHAS=$((FALHAS + 1)); }
+printf 'nao e json' >"$PV/.claude/settings.json"; rm "$PV/.claude/settings.local.json"
+v=$(decl "$PV" 'scripts/validar.sh' 'npm test')
+[ "$v" = " 0 1" ] || { echo "divergiu: medir: settings invalido na verificacao declarada: '$v'"; FALHAS=$((FALHAS + 1)); }
+rm -rf "$PV"
 # medir: commit de sandbox é o que entra numa pasta temporária (cd, git -C, variável do próprio
 # comando) antes de commitar; caminho temporário em outro argumento e a palavra na mensagem, não;
 # comando que commita no sandbox e depois no projeto conta como do projeto

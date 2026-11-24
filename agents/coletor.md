@@ -4,6 +4,7 @@ description: Coleta fatos sem concluir — busca no código, leitura de arquivos
 model: haiku
 effort: medium
 maxTurns: 30
+autoCompactWindow: 100000
 disallowedTools: Write, Edit, NotebookEdit
 tools: Read, Grep, Glob, Bash
 ---

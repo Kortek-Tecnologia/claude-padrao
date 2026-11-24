@@ -1,4 +1,4 @@
-<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.14.0; edite no plugin, não aqui -->
+<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.16.0; edite no plugin, não aqui -->
 # Modelos e delegação
 
 Tudo na família **5.5, com 1M de contexto** (nativo nela), fixado no `.claude/settings.json`:
@@ -27,7 +27,9 @@ própria sessão; a próxima volta ao padrão:
 2. **Um nível de effort:** `/effort high` (com `s` no seletor nem grava no global) para bug em
    código antigo ou caso de borda; `ultrathink` no prompt sobe só aquele turno. Mais effort não
    conserta abordagem errada: aí replaneje.
-3. **Passou de high, troque de modelo** em vez de ir a xhigh ou max: abra `/model`, escolha o
+3. **Passou de high, troque de modelo** em vez de ir a xhigh ou max (no Opus, no Sonnet e no
+   Haiku o teto é high: `modelSettings["<modelo>"].maxEffortLevel`, e o que pedir mais roda em
+   high): abra `/model`, escolha o
    Fable 5.2 e tecle `s` (só a sessão; Enter ou `/model fable` gravam no global, e o hook de
    abertura acusa). O Mythos 5.2 é o mesmo degrau, com o mesmo preço, para a organização que
    tem acesso a ele: o que segue vale para os dois. No Fable, medium para o trabalho interativo e high para a parte difícil ou longa sem
@@ -72,7 +74,8 @@ paralelo, só com arquivos disjuntos. Subagent não abre subagent
    persistente, contrato público, concorrência) → `padrao:revisor` antes do commit, quem quer
    que tenha escrito. Diff pequeno segue sem ele.
 
-- **Opus → executor:** arquivos, o que muda, critério de aceite, os comandos de verificação e as
+- **Opus → executor:** arquivos, o que muda, critério de aceite, os comandos de verificação
+  (os do projeto estão em `env.PADRAO_VERIFICACAO` do `.claude/settings.json`, quando há) e as
   entradas de `AGENT_LEARNINGS.md` que valem para a tarefa (subagent não lê esse arquivo
   sozinho). Faltando, o sonnet decide — e decidir é do Opus.
 - **Coletor coleta, não conclui:** peça fatos com `arquivo:linha`; o Opus confere a linha antes de agir.

@@ -127,6 +127,13 @@ saida=$(MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' jq -rn --arg raiz "$raiz" \
     | select($v != null and ($v | tostring) != $quer)
     | "\(.[0]) em .claude/settings.local.json e '\''\($v | tostring)'\'' e vence o do projeto (o padrao e '\''\($quer)'\''): tire a chave"
   else empty end),
+  # as regras de `permissions.deny` do modelo (leitura de .env): o projeto une as dele, mas
+  # tem de trazer estas; a comparação é por regra, e o que o projeto tem a mais não conta
+  (if $M and $P then
+    (($M.permissions.deny // []) - (try ($P.permissions.deny // []) catch []))
+    | select(length > 0)
+    | "permissions.deny do projeto sem \(join(", ")) (o padrao nega a leitura de .env)"
+  else empty end),
   (if $P and ($P.env // {} | has("CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING")) then
     "checkpoints (/rewind) desligados: tire env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING do .claude/settings.json" else empty end),
   (if $P and (($P.extraKnownMarketplaces["claude-padrao"].autoUpdate // false) != true) then
@@ -215,7 +222,12 @@ em_dia() { # em_dia MODELO ARQUIVO_DO_PROJETO MARCA NOME_NO_AVISO
     anota "$4 ausente ou de outro modelo do padrao (tem '${tem:-nenhum}', o plugin traz '$quer')"
   fi
 }
-em_dia claude-md.md CLAUDE.md '<!-- padrao:inicio' "bloco do padrao no CLAUDE.md"
+# O Claude Code lê o CLAUDE.md da raiz ou o `.claude/CLAUDE.md`: projeto que só tem o segundo
+# (a raiz de um plugin não pode ter CLAUDE.md, que o `claude plugin validate` acusa) leva o
+# bloco lá.
+md=CLAUDE.md
+[ -r "$raiz/CLAUDE.md" ] || { [ -r "$raiz/.claude/CLAUDE.md" ] && md=.claude/CLAUDE.md; }
+em_dia claude-md.md "$md" '<!-- padrao:inicio' "bloco do padrao no CLAUDE.md"
 for doc in padrao-modelos.md padrao-configuracao.md; do
   em_dia "agente/$doc" "docs/agente/$doc" '<!-- gerado pelo plugin padrao' "docs/agente/$doc"
 done

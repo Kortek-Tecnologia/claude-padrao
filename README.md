@@ -22,7 +22,8 @@ verdadeira. Funciona no Windows (Git Bash) e no Linux.
 |---|---|
 | Configuração solta no `~/.claude` muda o comportamento de um projeto para outro sem ninguém ver | Leva tudo para o projeto, versionado; o global fica só com a interface do terminal |
 | O Opus, o modelo caro, fazendo trabalho braçal — ler arquivo, varrer log — e subagents herdando o modelo da sessão | Papel fixo por modelo, travado por hook; quem só coleta roda em Haiku |
-| Documentação que mente (porta errada, comando velho) e `CLAUDE.md` inchado, pago em toda sessão | `/padrao:arrumar` levanta e corrige com um OK; antes de cada commit, a doc que o diff deixou falsa é corrigida |
+| Documentação que mente (porta errada, comando velho) e `CLAUDE.md` inchado, pago em toda sessão | `/padrao:arrumar` levanta e corrige com um OK; antes de cada commit, a doc que o diff deixou falsa é corrigida. O que o código responde não se documenta: texto que o repete desatualiza e o contradiz |
+| Arquivo fora do lugar, cópia `_final`, resíduo versionado e versão solta (`latest`, branch, sem lockfile) que muda o build sem ninguém mexer | `/padrao:arrumar` confere a estrutura pela convenção do próprio projeto e fixa as versões na que está em uso |
 
 ## Visão geral
 
@@ -35,6 +36,7 @@ flowchart LR
   S --- H3["Trava de leitura<br/>quem só lê, só lê"]
   S --- D["Lembrete da doc<br/>atualizar-docs antes do commit"]
   S --- P["Lembrete das pendências<br/>pergunta com opções ao encerrar"]
+  S --- K["Instrução da compactação<br/>o resumo guarda plano e fatos"]
   S -.->|"a doc envelheceu"| R["/padrao:arrumar<br/>levanta, um OK, executa"]
   S -.->|"de tempos em tempos"| M["/padrao:medir<br/>a delegação pegou?"]
   H1 -.->|"global sujo"| A
@@ -46,11 +48,12 @@ flowchart LR
 |---|---|---|
 | `/padrao:aplicar` | ao adotar o padrão, ou quando o hook de abertura avisar | um OK no plano |
 | `/padrao:arrumar [foco]` | quando a documentação ou o `CLAUDE.md` envelhecerem | um OK no plano |
+| `/padrao:reorganizar [de → para]` | para mover os arquivos-fonte que o `arrumar` deixou no relatório | um OK na lista |
 | `/padrao:medir` | para ver se a política de modelos pegou | nenhuma |
 | `/padrao:code-mode ligar` (ou `desligar`) | opcional: o Code Mode do Claude Code, nesta máquina | nenhuma |
 | `/padrao:advisor ligar` (ou `desligar`) | opcional: o Fable 5.2 como advisor, neste projeto | nenhuma |
 
-Os cinco só rodam quando você os chama: o Claude não dispara nenhum sozinho
+Os seis só rodam quando você os chama: o Claude não dispara nenhum sozinho
 (`disable-model-invocation`). Quando o hook de abertura avisa, ele pede que você rode o
 `/padrao:aplicar`.
 
@@ -72,7 +75,7 @@ flowchart TD
 | Item do global | Vai para |
 |---|---|
 | `model`, `effortLevel`, `modelSettings`, `fallbackModel`, `cleanupPeriodDays` | descartados: o padrão fixa |
-| `env`, `hooks`, `permissions.deny/ask`, `enabledPlugins` | `.claude/settings.json` (time, no git) |
+| `env`, `hooks`, `permissions.deny/ask`, `enabledPlugins` | `.claude/settings.json` (time, no git); o `deny` se une às regras do padrão, que negam a leitura de `.env`, `.env.local`, `.env.*.local` e `.env.production` (`.env.example` segue legível) |
 | `env` com nome de segredo (TOKEN, KEY, SECRET, PASS, URL…), idioma, tema | `.claude/settings.local.json` (pessoal, fora do git) |
 | `permissions.allow` | pergunta regra a regra: do time ou pessoal |
 | `CLAUDE.md` global, memórias | `CLAUDE.md` do projeto, só o que é fato durável dele |
@@ -91,6 +94,11 @@ oferece o plugin oficial de LSP no escopo do projeto, em vez de deixá-lo ir par
 diálogo do Claude Code. É oferta, não padrão: no teste, busca e renomeação saíram com o mesmo
 custo com e sem ele; o ganho é o erro de tipo apontado na hora da edição.
 
+Projeto com comando de verificação próprio (`scripts/validar.sh`, `make smoke`): o plano propõe
+declará-lo em `env.PADRAO_VERIFICACAO` do `.claude/settings.json` — um ou mais, separados por
+`;`, sem aspas. É o que o `/padrao:medir` passa a contar como verificação antes do commit;
+`pytest`, `npm test`, `cargo test` e afins já são reconhecidos sem a chave.
+
 Projeto com `AGENTS.md`: com um `CLAUDE.md` na pasta, o Claude Code deixa de ler o `AGENTS.md`
 sozinho. O plano inclui `@AGENTS.md` na primeira linha do `CLAUDE.md` (e, para `AGENTS.md` de
 subpasta, um `CLAUDE.md` ao lado só com o import), para as instruções do time não saírem do
@@ -102,7 +110,7 @@ contexto sem aviso.
 flowchart TD
   subgraph F1["1 · Levantar"]
     E["ESCOPO.md"] --> A["Trilha A: o sistema segundo o código<br/>padrao:leitor, sem o CLAUDE.md no contexto"]
-    E --> B["Trilha B: infraestrutura"]
+    E --> B["Trilha B: infraestrutura,<br/>estrutura de arquivos, versões fixadas"]
     A --> C["Trilha C: o que a documentação diz<br/>e o peso do CLAUDE.md"]
     B --> C
     C --> P["PENDENCIAS.md"]
@@ -125,7 +133,7 @@ flowchart TD
 
 - **Uma pergunta só.** O levantamento só lê e não pergunta nada; cada dúvida chega ao OK já com
   a resposta recomendada, e você aprova tudo, escolhe alguns lotes ou pede só o diagnóstico.
-- **O que muda:** documentação, `CLAUDE.md` (o que não vale em toda sessão vai para
+- **O que muda:** documentação, estrutura de arquivos, versões fixadas, `CLAUDE.md` (o que não vale em toda sessão vai para
   `docs/agente/<tema>.md`, apontado por um índice; instrução reforçada com maiúsculas ou
   "IMPORTANTE" volta a texto simples) e infraestrutura. Código, só comentário e
   docstring; regra documentada que o código contraria fica, e o código vai para o relatório.
@@ -138,10 +146,50 @@ flowchart TD
   os de CI só com medição: CI rápido não ganha sugestão de tempo, e desperdício só conta a partir
   de 5 execuções ou 10 minutos somados nas últimas 100. O que se corrige em configuração entra em lote; o que pede mudança de
   código ou troca de chave vai para o relatório.
+- **Estrutura de arquivos, por convenção.** Não há árvore de pastas obrigatória: a régua de
+  cada checagem (`skills/arrumar/padronizacao.md`, `E1`–`E7`) é a norma que uma ferramenta do
+  projeto lê (o runner dos testes, o `git`, o `.editorconfig`), a norma da linguagem (PEP 8,
+  layout do Maven) e, sem norma, o que o próprio projeto pratica em 4 de cada 5 casos. Confere:
+  artefato gerado ou resíduo versionado, cópia ou versão no nome (`_final`, `_old`, `(2)`),
+  documento solto na raiz ou que ninguém cita, estilos de nome misturados na mesma pasta, teste
+  e arquivo do Claude Code fora da pasta que a ferramenta lê, script avulso na raiz e fim de
+  linha misturado. A estrutura não é documentada — o repositório já a responde —, é conferida.
+- **Versões fixadas** (`V1`–`V6`): lockfile versionado e respeitado pelo CI, instalação sem
+  versão exata, imagem de contêiner com tag que anda (`latest`, `alpine`), action por branch ou
+  de terceiro por tag e runner `-latest`, versão do runtime sem fonte única entre arquivo, CI e
+  `Dockerfile`, e versão do projeto que não bate entre manifestos e tag. Fixar não é atualizar:
+  a referência solta vira a versão que ela resolve hoje; sem como saber qual é, o item sai
+  `não verificável`, sem palpite.
+- **O que move e o que só relata:** documentação, configuração, CI, `.gitignore` e script que o
+  código não importa entram em lote — o arquivo movido leva junto, no mesmo commit, toda
+  referência ao caminho antigo. Mover ou renomear arquivo-fonte e gerar lockfile mudam o
+  comportamento: vão para o relatório, com a lista "de → para" e o comando. Quem executa a
+  lista é o `/padrao:reorganizar`.
 - **Seguro de desfazer:** um commit por lote no branch `padrao/arrumar-<data>`, sem push;
   `git revert <hash>` desfaz um lote. O
   rascunho fica em `_audit/` (fora do git) e, se a execução parar, rodar de novo retoma.
-- **Foco opcional:** `/padrao:arrumar só docs`, `só infra`, `só o CLAUDE.md`.
+- **Foco opcional:** `/padrao:arrumar só docs`, `só infra`, `só a estrutura`, `só as versões`,
+  `só o CLAUDE.md`.
+
+### `/padrao:reorganizar` — mover código, com a verificação como juiz
+
+O `arrumar` não altera código: arquivo-fonte fora da convenção (nome no estilo errado, teste
+fora da pasta que o runner lê, script na raiz que importa código) sai no relatório como uma
+lista "de → para". Este comando executa a lista.
+
+- **Só com verificação que roda.** O comando vem de `env.PADRAO_VERIFICACAO` ou do teste que
+  o projeto já tem, e a linha de base tem de passar antes de qualquer movimento. Sem
+  verificação, ou com ela falhando, o comando para.
+- **Só move e acerta referência.** `git mv` (o histórico segue com o arquivo) e a troca em cada
+  consumidor — import, manifesto, CI, `Dockerfile`, documentação. Sem refatorar nem renomear
+  função ou classe.
+- **Um OK, um lote por commit.** A lista chega com os consumidores de cada par e o risco; aprovada,
+  cada lote passa pelo executor, pela verificação, pelo revisor e pela `atualizar-docs`, e vira
+  um commit no branch `padrao/reorganizar-<data>`, sem push. Lote que falha na verificação
+  depois de uma correção é desfeito inteiro.
+- **Fica de fora:** nome que é contrato com quem está fora do repositório (pacote publicado,
+  `exports`, rota) e arquivo carregado por nome montado em tempo de execução.
+- Sem argumento, usa a lista de `_audit/`; com argumento, os pares dados, um por linha.
 
 ### `/padrao:medir` — a delegação pegou?
 
@@ -177,7 +225,9 @@ Haiku acima de 100K: 0 de 4 requisições · sobrepreço US$ 0.00
 Haiku perto de zero com muita entrada no Opus = leitura que devia ter ido ao coletor. O custo é
 estimativa a preço de lista, da data que o cabeçalho mostra; o que mais pesa é o contexto grande na sessão principal. Commit sem
 verificação = nem teste ou build rodado na sessão, nem revisor, nem lote pelo executor desde o
-commit anterior (só mede: não há hook cobrando; teste com nome fora do comum não é reconhecido).
+commit anterior (só mede: não há hook cobrando; teste com nome fora do comum só é reconhecido
+se o projeto o declarar em `env.PADRAO_VERIFICACAO`, e aí a saída ganha uma linha com o que foi declarado;
+projeto com hook de pre-commit ganha outra, avisando que o que roda dentro do commit não entra na conta).
 Commit feito dentro de pasta temporária (sandbox de teste) fica fora dessas contas, numa linha à parte.
 Commit sem a `atualizar-docs` antes = o Claude repetiu o commit depois do lembrete sem rodar a skill, ou o
 hook não rodou naquela sessão (plugin antigo, `jq` ausente).
@@ -225,8 +275,9 @@ modelos, e cada comando só grava ou tira uma chave. Sem argumento, mostra o est
 | Hook de abertura | toda sessão | avisa (nunca corrige) se algo voltou para o global, se o projeto saiu do padrão (inclusive por chave no `settings.local.json`, que vence a do projeto), se o bloco do `CLAUDE.md` ou os `docs/agente/padrao-*.md` são de outro modelo, ou se há versão nova do plugin |
 | Hook de modelo | toda chamada de subagent | corrige o modelo dos papéis fixos e recusa modelo fora da política |
 | Trava de leitura | Bash, MCP e ferramentas que gravam, nos agentes que só leem | deixa `Explore`, coletor, leitor e revisor só lerem: grava, redireciona ou executa → recusa, dizendo o motivo |
-| `atualizar-docs` | antes de cada commit | corrige só a documentação que o diff deixou falsa (porta, comando, variável, caminho) |
-| Lembrete da documentação | todo `git commit` que o Claude roda | se a `atualizar-docs` não rodou desde o commit anterior, recusa uma vez e manda rodá-la; a repetição passa |
+| `atualizar-docs` | antes de cada commit | corrige só a documentação que o diff deixou falsa (porta, comando, variável, caminho); roda num subagent em Sonnet, fora do contexto da sessão |
+| Lembrete da documentação | todo `git commit` que o Claude roda | se a `atualizar-docs` não rodou desde o commit anterior, recusa uma vez e manda rodá-la; a repetição passa; mudança só de documentação (`.md`, `.mdx`, `.rst`, `.adoc`) passa sem lembrete |
+| Instrução da compactação | toda compactação, da sessão e dos subagents | diz ao resumo o que preservar: na sessão, plano, decisões, arquivos alterados, última verificação e autorizações; no subagent, a tarefa e os fatos já coletados. `/compact <foco>` vale sozinho |
 | Lembrete das pendências | todo fim de turno da sessão principal | se a resposta termina com oferta ou pendência em aberto ("quer que eu…?", "não fiz commit", "sugiro…"), recusa uma vez e manda só perguntar, com opções, a recomendada primeiro (nada além disso por conta própria) |
 | Status lines | sempre; a dos subagents, onde o plugin está ligado | modelo, effort, contexto, limites e cache na linha; uma linha por subagent, que vem de um mod do próprio plugin (2.1.326+), com o custo e o aviso de Haiku acima de 100K |
 
@@ -254,7 +305,9 @@ flowchart LR
 ```
 
 - Tudo na **família 5.5 com 1M de contexto**, effort **medium**. Toda sessão abre em medium; o
-  `/effort` muda só a sessão em curso (o projeto vence o global na próxima).
+  `/effort` muda só a sessão em curso (o projeto vence o global na próxima). No Opus, no Sonnet
+  e no Haiku o teto é **high** (`modelSettings["<modelo>"].maxEffortLevel`): pedido acima
+  disso roda em high.
 - **Teto de 400K na sessão:** a compactação automática dispara aos 400K tokens
   (`modelSettings["<modelo>"].autoCompactWindow`), não perto de 1M — cada requisição relê
   o contexto inteiro. Vale no Opus e também no Fable 5.2 e no Mythos 5.2: não são do padrão, mas
@@ -280,7 +333,8 @@ flowchart LR
   subagent não abre subagent (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`).
 - Agentes do plugin: `padrao:coletor` e `padrao:leitor` (haiku, só leem; o leitor roda sem o
   `CLAUDE.md`, para análise que não pode se contaminar pela documentação), `padrao:executor` e
-  `padrao:revisor` (sonnet).
+  `padrao:revisor` (sonnet). Coletor e leitor compactam aos 100K (`autoCompactWindow` no
+  frontmatter): acima disso o Haiku paga a requisição inteira cinco vezes mais caro.
 
 ## Onde mora cada configuração
 
@@ -319,7 +373,8 @@ Requisitos:
 - Claude Code **v2.1.326+**: a linha dos subagents é um módulo (mod) do plugin e só existe daí
   em diante, em conta com os mods de plugin liberados; sem isso o resto funciona e a linha fica
   a do Claude Code. Antes da 2.1.317, subagent herda o effort da sessão em vez do effort do
-  próprio modelo; o Fable 5.2 pede a v2.1.321 e o Code Mode, a v2.1.323.
+  próprio modelo: é o mínimo que o manifesto declara (`engines`). O Fable 5.2 pede a v2.1.321
+  e o Code Mode, a v2.1.323.
 - Windows: **Git Bash** (os hooks rodam em `bash`).
 - **jq** — `winget install jqlang.jq` | `sudo apt install jq`. Sem ele, os agentes que só leem
   ficam sem Bash e o hook de abertura se cala: falha fechado. O lembrete da documentação
@@ -377,7 +432,14 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
   `git commit` uma vez e a segunda tentativa sempre passa — o hook não sabe se o diff tem algo
   documentado, e commit preso é pior que doc velha. Vê só o commit que o Claude roda pelo Bash ou
   pelo PowerShell (o seu, no terminal, não passa por ele) e não cobra os lotes do
-  `/padrao:arrumar`. Se o hook falhar, o commit segue.
+  `/padrao:arrumar` nem a mudança só de documentação (quando o comando não muda de pasta e
+  todo caminho do `git status` é `.md`, `.mdx`, `.rst` ou `.adoc`). Se o hook falhar, o commit
+  segue.
+- **Leitura de `.env` negada.** O `.claude/settings.json` do padrão nega `Read` em `.env`,
+  `.env.local`, `.env.*.local` e `.env.production`, na raiz e em qualquer subpasta; vale também
+  para o `cat .env` pelo Bash. É regra de permissão do Claude Code, não sandbox: comando que
+  ele não analisa (`source .env`, um laço com o nome do arquivo em variável, um script que lê o
+  arquivo) passa. O hook de abertura acusa a regra que faltar.
 - **Lembrete das pendências, aberto por padrão.** Reconhece a pendência por frases, em português
   e inglês, e erra para os dois lados: resposta com outra redação passa, e frase citada pode
   disparar. Por isso recusa uma vez por turno e deixa o Claude encerrar de novo se não houver
@@ -394,10 +456,10 @@ Depois `/padrao:aplicar` troca o `extraKnownMarketplaces` e o `enabledPlugins`.
 
 ```
 .claude-plugin/   manifesto do plugin e do marketplace (version: semver) e o ícone
-hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc, lembrete das pendências; register.ts: a linha dos subagents (mod)
+hooks/            hooks.json: abertura, modelo do subagent, trava de leitura, lembrete da doc, lembrete das pendências, instrução da compactação; register.ts: a linha dos subagents (mod)
 scripts/          os hooks em sh (a regra da trava de leitura em awk), py.sh, opcional.py e testar.sh
 agents/           coletor, leitor, revisor, executor
-skills/           aplicar (+ inventário e modelos), arrumar (+ levantamento, regras de documentação e checagens), medir, code-mode, advisor, atualizar-docs
+skills/           aplicar (+ inventário e modelos), arrumar (+ levantamento, regras de documentação, checagens de segurança e CI, e de padronização: estrutura e versões), reorganizar, medir, code-mode, advisor, atualizar-docs
 statusline/       status line principal
 .claude/          CLAUDE.md deste repositório (contexto de quem mantém, não do plugin)
 docs/             como funciona por dentro

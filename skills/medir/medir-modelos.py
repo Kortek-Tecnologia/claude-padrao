@@ -13,7 +13,8 @@ projeto e conta:
 - sessões sem nenhuma delegação (preocupa só a sessão longa);
 - commits da sessão principal: quantos tiveram verificação desde o commit anterior
   (teste ou build rodado na sessão, `padrao:revisor`, lote pelo `padrao:executor`) e
-  quantos saíram sem nenhuma — só mede, não há hook cobrando;
+  quantos saíram sem nenhuma — só mede, não há hook cobrando; o projeto declara os
+  comandos de verificação dele em `env.PADRAO_VERIFICACAO` do `.claude/settings.json`;
 - commits da sessão principal: quantos tiveram a `padrao:atualizar-docs` antes e
   quantas vezes o hook da documentação precisou lembrar;
 - lembretes do hook das pendências (fim de turno) e quantos tiveram um
@@ -75,14 +76,19 @@ LOTE = re.compile(r"-m\s*[\"']arrumar: lote |-m\s*\"\$\(cat\s*<<[^\n]*\n\s*arrum
 # Comando que verifica: roda teste, build, checagem de tipos ou lint. Heurística pelos
 # nomes comuns, fora de aspas e de heredoc; script do projeto com outro nome não entra
 # (a conta de "sem nenhuma" sai para mais).
-VERIFICA = re.compile(
-    # no começo de um segmento do comando (como no COMMIT): `echo npm test`, `cat testar.sh`
-    # e `grep pytest` não contam. Na frente podem vir atribuições, um lançador e um caminho.
+# No começo de um segmento do comando (como no COMMIT): `echo npm test`, `cat testar.sh` e
+# `grep pytest` não contam. Na frente podem vir atribuições, um lançador e um caminho.
+INICIO = (
     r"(?:^|[;&|(){}\n`]|\$\()\s*"
     r"(?:(?:time|env|sudo|npx|bunx|uvx|bash|sh|uv\s+run|poetry\s+run|pipenv\s+run|py(?:thon[\d.]*)?\s+-m"
+    r"|(?:pwsh|powershell)(?:\.exe)?(?:\s+-\w+)*"
     r"|timeout(?:\s+-\S+)*\s+\S+)\s+"
     r"|[A-Za-z_]\w*=\S*\s+)*"
-    r"(?:[^\s\"']*[/\\])?(?:"
+    r"(?:[^\s\"']*[/\\])?"
+)
+FIM = r"(?=[\s;&|)]|$)"
+VERIFICA = re.compile(
+    INICIO + r"(?:"
     r"pytest|unittest|tox|nox|ruff|mypy|pyright|"
     r"jest|vitest|playwright|cypress|tsc|eslint|oxlint|biome|"
     r"(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|build|lint|typecheck|check)[\w:-]*|deno\s+test|"
@@ -90,13 +96,49 @@ VERIFICA = re.compile(
     r"(?:mvn|gradle|gradlew)\s+[\w:-]*(?:test|build|check|verify)|dotnet\s+(?:test|build)|"
     r"make\s+(?:test|check|build|lint)|phpunit|rspec|"
     r"testar\.sh|tests?\.sh|run-tests[\w.-]*|claude\s+plugin\s+(?:validate|test)"
-    r")(?=[\s;&|)]|$)"
+    r")" + FIM
 )
+# O projeto declara os comandos de verificação dele em `env.PADRAO_VERIFICACAO` do
+# `.claude/settings.json` (ou do `settings.local.json`, que vence): um ou mais, separados
+# por `;`, sem aspas — `scripts/validar.sh; make smoke`. Contam como os nomes comuns acima.
+DECLARADA = "PADRAO_VERIFICACAO"
 
 
-def verifica(comando: str) -> bool:
-    """O comando roda teste, build, checagem de tipos ou lint."""
-    return bool(VERIFICA.search(ASPAS.sub("''", HEREDOC.sub(" ", comando))))
+def declarada(raiz: Path) -> tuple[list[str], re.Pattern[str] | None]:
+    """Os comandos de verificação que o projeto declara e o padrão que os reconhece."""
+    valor = ""
+    for nome in ("settings.json", "settings.local.json"):
+        try:
+            dados = json.loads((raiz / ".claude" / nome).read_text(encoding="utf-8-sig"))
+            v = dados["env"][DECLARADA]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        if isinstance(v, str):
+            valor = v
+    itens = [" ".join(i.split()) for i in valor.split(";") if i.strip()]
+    if not itens:
+        return [], None
+    alternativas = "|".join(r"\s+".join(re.escape(p) for p in i.split()) for i in itens)
+    return itens, re.compile(INICIO + r"(?:" + alternativas + r")" + FIM)
+
+
+def pre_commit(raiz: Path) -> str:
+    """O hook de pre-commit do projeto, se houver: o que ele roda acontece dentro do
+    `git commit` e não aparece como chamada de ferramenta — fica fora da conta de verificação."""
+    for nome in (".githooks/pre-commit", ".husky/pre-commit", ".pre-commit-config.yaml",
+                 "lefthook.yml", "lefthook.yaml", ".git/hooks/pre-commit"):
+        try:
+            if (raiz / nome).is_file():
+                return nome
+        except OSError:
+            continue
+    return ""
+
+
+def verifica(comando: str, extra: re.Pattern[str] | None = None) -> bool:
+    """O comando roda teste, build, checagem de tipos ou lint (ou o que o projeto declara)."""
+    texto = ASPAS.sub("''", HEREDOC.sub(" ", comando))
+    return bool(VERIFICA.search(texto) or (extra and extra.search(texto)))
 
 
 def faz_commit(comando: str) -> bool:
@@ -382,6 +424,7 @@ def main() -> None:
     # verificação antes do commit: [teste ou build, revisor, executor] e os sem nenhuma
     com_verif = [0, 0, 0]
     sem_verif = 0
+    declaradas, extra = declarada(raiz)
     vistos: set[str] = set()
 
     for arq in pasta.glob("*.jsonl"):
@@ -452,7 +495,7 @@ def main() -> None:
                 nome_skill = str(i.get("skill") or "") if c.get("name") == "Skill" else ""
                 if "review" in nome_skill or "verify" in nome_skill:
                     verif[1] = True
-                if c.get("name") in ("Bash", "PowerShell") and verifica(str(i.get("command") or "")):
+                if c.get("name") in ("Bash", "PowerShell") and verifica(str(i.get("command") or ""), extra):
                     verif[0] = True
                 if c.get("name") == "Skill" and "atualizar-docs" in nome_skill:
                     docs_antes = True
@@ -512,6 +555,11 @@ def main() -> None:
     print(f"pendências ao encerrar: {pendencias} lembrete(s) do hook · {com_pergunta} com pergunta em seguida")
     print(f"verificação antes do commit: {commits} commit(s) · {com_verif[0]} com teste ou build"
           f" · {com_verif[1]} com revisor · {com_verif[2]} com executor · {sem_verif} sem nenhuma")
+    if declaradas:
+        print(f"  verificação declarada pelo projeto ({DECLARADA}): " + "; ".join(declaradas))
+    gancho = pre_commit(raiz)
+    if gancho:
+        print(f"  o projeto tem pre-commit ({gancho}): o que ele roda dentro do commit não entra nesta conta")
     if em_sandboxes:
         print(f"commits em sandbox (fora das contas): {em_sandboxes}")
     if com_effort:
