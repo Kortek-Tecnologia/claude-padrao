@@ -4,6 +4,7 @@ description: Sem o CLAUDE.md do projeto no contexto — lê só código (não .m
 model: haiku
 effort: medium
 maxTurns: 30
+autoCompactWindow: 100000
 omitClaudeMd: true
 disallowedTools: Write, Edit, NotebookEdit
 tools: Read, Grep, Glob, Bash

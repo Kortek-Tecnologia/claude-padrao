@@ -18,6 +18,7 @@ flowchart LR
   BT --> TL["trava-leitura.sh"] --> SL["so-le.awk"] --> SG["segmentos.awk"]
   GC --> CD["cobrar-docs.sh"] --> SH["segmentos.sh"] --> SG
   ST0["Stop"] --> CPG["cobrar-pergunta.sh"]
+  PC["PreCompact"] --> IC["instruir-compactacao.sh"]
   AP["skill aplicar"] -->|"grava a partir de"| MOD["skills/aplicar/modelos/"]
   CP -->|"compara com"| MOD
   AP -->|"copia para ~/.claude/"| ST["statusline/statusline.py"]
@@ -27,10 +28,10 @@ flowchart LR
 
 | Caminho | Papel |
 |---|---|
-| `hooks/hooks.json` | liga os cinco hooks; todos com `shell: bash` e timeout de 10 s (a trava de leitura e o hook de abertura, 30 s); as duas travas com `onFailure: "block"` (falhou, bloqueia), os dois lembretes — o da documentação e o das pendências — com `onFailure: "continue"` (falhou, o commit ou o fim do turno segue — por extenso, porque no Code Mode o hook que falha sem a chave recusa a chamada) |
+| `hooks/hooks.json` | liga os seis hooks; todos com `shell: bash` e timeout de 10 s (a trava de leitura e o hook de abertura, 30 s); as duas travas com `onFailure: "block"` (falhou, bloqueia), os dois lembretes — o da documentação e o das pendências — e a instrução da compactação com `onFailure: "continue"` (falhou, o commit, o fim do turno ou a compactação segue — por extenso, porque no Code Mode o hook que falha sem a chave recusa a chamada) |
 | `skills/aplicar/modelos/` | **fonte única** do padrão: o `aplicar` grava a partir dela e o hook de abertura compara com ela |
 | `scripts/py.sh` | acha `python3`, `python` ou `py` 3.9+ (no Windows o `python3` costuma ser o atalho quebrado da Store) e roda com `-I` |
-| `agents/*.md` | os quatro agentes; os que só leem têm `tools` fechado e `disallowedTools` |
+| `agents/*.md` | os quatro agentes; os que só leem têm `tools` fechado e `disallowedTools`; coletor e leitor, `autoCompactWindow: 100000` — ver [Instrução da compactação](#instrução-da-compactação--instruir-compactacaosh) |
 | `statusline/` | `statusline.py` é de terceiro (Jhonatan de Souza); nossas linhas ficam entre `padrao: início` e `padrao: fim` ou marcadas `# padrao` |
 | `scripts/opcional.py` | liga, desliga e mostra os dois opcionais (Code Mode e Fable como advisor); as skills `code-mode` e `advisor` só o chamam — ver [Os opcionais](#os-opcionais--opcionalpy) |
 | `hooks/register.ts` | o mod da linha dos subagents: hook `ui.render` em `AgentRow`, declarado em `modules` no `hooks.json`; testes em `hooks/register.test.tsx` |
@@ -45,7 +46,8 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 
 | Confere | Contra |
 |---|---|
-| `model`, `effortLevel`, `modelSettings` (todos os campos que o modelo define em cada modelo, inclusive `autoCompactWindow`, que o modelo fixa em 400K no Opus, no Fable 5.2 e no Mythos 5.2; campo ou modelo só do projeto não conta) e as chaves de `env` do projeto | `modelos/settings.json` |
+| `model`, `effortLevel`, `modelSettings` (todos os campos que o modelo define em cada modelo, inclusive `autoCompactWindow`, que o modelo fixa em 400K no Opus, no Fable 5.2 e no Mythos 5.2, e `maxEffortLevel`, `high` no Opus, no Sonnet e no Haiku; campo ou modelo só do projeto não conta) e as chaves de `env` do projeto | `modelos/settings.json` |
+| `permissions.deny` do projeto | cada regra do `modelos/settings.json` (leitura de `.env`) tem de estar lá; as que o projeto tem a mais, e o `allow` dele, não contam |
 | as mesmas chaves no `.claude/settings.local.json` | o local vence o projeto: chave do padrão lá com outro valor é acusada (ausente ou igual, passa) |
 | `fallbackModel` em `settings.json` ou `settings.local.json`; `CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING` | têm de estar ausentes |
 | `disableClaudeAiConnectors` (projeto) e `syncClaudeAiPlugins: false` (local, único lugar em que vale) | `true` / `false` |
@@ -53,6 +55,7 @@ que achar vai ao usuário (`systemMessage`) e ao Claude (`additionalContext`), a
 | `~/.claude/` | sem `CLAUDE.md`, agents, commands, rules, workflows, skills pessoais (menos `synced/` e ocultas), `statusline.py` diferente da do plugin, `subagent-statusline.py` sobrando |
 | `~/.claude.json` e `~/.claude/projects/<chave>/memory` | sem MCP de escopo user nem local deste projeto; sem memória deste projeto |
 | versão instalada × `~/.claude/plugins/marketplaces/claude-padrao` | por **diferença**, não por ordem: a numeração recomeçou em 1.0.0 |
+| onde mora o bloco | o `CLAUDE.md` da raiz; projeto sem ele e com `.claude/CLAUDE.md` (a raiz de um plugin não pode ter o da raiz) é conferido lá — é o caso deste repositório, que usa o próprio padrão desde a 2.16.0 (o `testar.sh` cobra as cópias iguais aos modelos e o hook calado nele) |
 | carimbo `modelo X` do bloco do `CLAUDE.md` e dos `docs/agente/padrao-*.md` do projeto | o da 1ª linha do arquivo em `modelos/`; só o carimbo, não o texto — quem grava no projeto é o Claude, e espaço ou CRLF dariam aviso falso. A marca vale só no começo da linha (prosa que cita o marcador não conta), e carimbo mais novo que o do plugin manda atualizar o plugin, não rodar o `aplicar` |
 
 **O teto de compactação, conferido em sessão real** (v2.1.326, Windows, `claude -p "/context"`
@@ -105,7 +108,7 @@ com subagent visível, ~0,6 s no Windows). O Claude Code marcou a chave como obs
 linha é a do Claude Code. Medido em 2026-11-17, v2.1.326, em sessão interativa num
 pseudo-terminal (ver [Testes](#testes)), ainda com a reserva:
 
-- **Mod e hooks de comando convivem.** O `hooks.json` leva `modules` ao lado dos cinco hooks de
+- **Mod e hooks de comando convivem.** O `hooks.json` leva `modules` ao lado dos hooks de
   comando; numa sessão real o módulo carregou (`hooks module padrao loaded … events: ui.render`)
   e os hooks em sh agiram (abertura e modelo do `Explore`).
 - **O mod sozinho desenha a linha.** Com a reserva ativa ele já vencia: em 98 de 98 desenhos da
@@ -319,6 +322,16 @@ flowchart TD
   opções globais (`-C dir`, `-c k=v`, `--no-pager`), e subcomando `commit`. Antes do corte sai o
   corpo dos heredocs: o segmentador parte na crase, e texto que cita `git commit` entre crases
   (uma entrada de `AGENT_LEARNINGS.md` gravada por `cat <<EOF`) virava commit.
+- **Mudança só de documentação passa sem lembrete** (2.16.0), e sem gastar a anotação: a skill
+  encerraria em uma linha, e o lembrete custaria um turno. Só quando dá para saber onde o
+  commit roda — a entrada traz o `cwd` da sessão e o comando não muda de pasta (`cd`, `pushd`,
+  `git -C`). O script olha o `git status --porcelain` inteiro, porque o `git add` do mesmo
+  comando ainda não rodou: um caminho que não termine em `.md`, `.mdx`, `.rst` ou `.adoc`, nada
+  a commitar, ou o git falhando, e o lembrete sai como antes. Custa um `git` e um `awk` a mais,
+  só no commit. Motivo, medido em 14 dias nos dois projetos que usam o plugin (2026-11-24):
+  20 de 75 e 3 de 38 commits com a skill antes, para 61 e 37 lembretes — na maioria o Claude
+  repete o commit sem rodá-la. Quanto disso era commit só de documentação o transcript não
+  diz; a linha "documentação antes do commit" do `medir` segue contando esses commits.
 - **Fora:** os lotes do `/padrao:arrumar` (mensagem que começa por `arrumar: lote `, em `-m "…"`
   ou na 1ª linha do heredoc; o plano já cuidou da documentação) e o commit que o usuário roda no
   terminal, que não é chamada de ferramenta. Citar `arrumar: lote` em outro ponto do comando não
@@ -374,9 +387,52 @@ o Claude encerra de novo sem perguntar. O `/padrao:medir` conta os lembretes e q
 em seguida (reconhece a cobrança pelo texto — mudou a frase, mude o `PENDENCIA` do
 `medir-modelos.py`), que é como essa taxa aparece em uso real.
 
+## Instrução da compactação — `instruir-compactacao.sh`
+
+Evento `PreCompact`, sem matcher: roda antes de toda compactação, automática ou `/compact`, da
+sessão principal e dos subagents. O Claude Code usa o stdout do hook (saída 0) como instrução
+do resumo. O script não abre processo nem usa `jq`: lê a entrada com o `read` do shell e
+imprime uma de duas listas.
+
+| Entrada | Instrução |
+|---|---|
+| sessão principal | plano aprovado e o que falta, decisões (e as que o usuário pode querer desfazer), arquivos alterados, saída real da última verificação, autorizações dadas e o escopo de cada uma |
+| subagent (a entrada traz `agent_type`) | a tarefa recebida e o formato pedido, cada fato já coletado com `arquivo:linha` e o trecho exato, o que foi alterado e a saída das verificações, o que falta ler ou fazer |
+| `/compact <foco>` (`custom_instructions` não é `null`) | nada: o foco do usuário vale sozinho |
+
+Medido em sessão real (v2.1.331, Windows, `claude -p --plugin-dir` com o HOME real, numa pasta
+do scratchpad só com o `modelos/settings.json`, Opus 5.5; 2026-11-24):
+
+- **O `/compact` roda em `claude -p --resume <id> "/compact"`**, e o log (`--debug`) mostra
+  `PreCompact:manual … completed with status 0` antes da requisição de `source=compact`.
+- **Com e sem o hook, a mesma tarefa** (trocar uma porta, a `atualizar-docs`, um commit
+  autorizado; uma sessão por braço). Com o hook, o resumo trouxe "Authorization: commit only…
+  Push and deploy were not authorized", "Last verification command" com o resultado e
+  "Decision the user may want to undo". Sem o plugin na compactação, nenhum dos três. É uma
+  amostra por braço, e a sessão de teste não tinha o bloco do `CLAUDE.md` (a seção
+  `Compact instructions` dele não foi comparada com o hook).
+- **O hook alcança o subagent.** Um plugin-sonda gravou a entrada: cinco disparos numa coleta
+  longa do `padrao:coletor`, todos com `agent_id`, `agent_type: "padrao:coletor"`,
+  `trigger: "auto"` e `custom_instructions: null`.
+
+**`autoCompactWindow: 100000` no coletor e no leitor** (frontmatter; Claude Code 2.1.296+, o
+mínimo aceito é 100000). Acima de 100K o Haiku paga a requisição inteira no preço alto: nos 14
+dias medidos, 137 de 489 requisições do Haiku num projeto e 5 de 13 no outro (sobrepreço de
+US$ 2,49 e US$ 0,14). Medido na mesma data, com o coletor lendo oito arquivos de 68 KB em 16
+leituras:
+
+- o campo vale em agente de plugin chamado como subagent: a compactação dispara perto de 66K e
+  o contexto não passou de 67K em nenhuma requisição (quatro a cinco compactações por rodada);
+  com `claude -p --agent padrao:coletor` (o agente como sessão principal) ele não vale — o
+  `/context` mostra 1M;
+- **compactar custa fato.** Com a instrução da sessão (a única, na primeira versão do hook),
+  uma de duas rodadas devolveu só dois dos oito fatos pedidos: o resumo soltou os outros. Com a
+  instrução própria do subagent, duas de duas devolveram os oito certos. São duas rodadas por
+  braço: mexeu no texto, repita a coleta (o roteiro está em [Testes](#testes)).
+
 ## As skills
 
-**`aplicar`** — `disable-model-invocation` desde a 2.14.0, como as outras quatro do menu: grava
+**`aplicar`** — `disable-model-invocation` desde a 2.14.0, como as outras do menu: grava
 no global e em outros projetos, e a documentação do Claude Code recomenda a chave para fluxo com
 efeito colateral. Por isso o bloco do `CLAUDE.md`, o `padrao-configuracao.md` e o aviso do hook de
 abertura mandam pedir ao usuário que rode o comando, em vez de "rode". Sondado em sessão real
@@ -532,13 +588,89 @@ execução superada), contada nas últimas 100 do `gh run list`.
   não há check obrigatório. A sessão excluiu por conta própria o commit raiz, que o comando da
   `C6` contava como só documentação (sem pai, o `diff-tree` vinha vazio): desde a 2.11.1 o
   comando leva `--root`, e os números da tabela acima já são os corrigidos.
+- **Padronização** (2.16.0): `skills/arrumar/padronizacao.md`, no mesmo formato, com sete
+  checagens de estrutura de arquivos (`E1`–`E7`) e seis de versões fixadas (`V1`–`V6`). É o que
+  dá critério à "estrutura de diretórios" da trilha B, que antes era avaliação solta: dos 24
+  lotes que o `arrumar` commitou num projeto real, nenhum tinha título de reorganização de
+  arquivos.
+  - **Convenção, não layout.** A régua de cada item é a norma que uma ferramenta lê, a norma da
+    linguagem ou o que o projeto pratica em 4 de cada 5 casos; sem maioria, não é desvio. Um
+    layout prescrito erraria em toda stack que não fosse a dele.
+  - **Estrutura não se documenta.** O achado nunca é "documente a árvore": o repositório a
+    responde, e a regra de `regras-docs.md` vale aqui.
+  - **Fixar não é atualizar.** A referência solta vira a versão que resolve hoje; subir versão
+    muda comportamento e vai para o relatório. Sem fonte para a versão em uso, `não verificável`.
+  - **Arquivo-fonte não se move em lote** (`código`): quebra import. Vai para o relatório com a
+    lista "de → para". Documentação, configuração e script sem import movem, com as referências
+    ao caminho antigo no mesmo commit e um `git grep` vazio como verificação.
+  - **Os padrões moram no arquivo** (`LIXO`, `COPIA`, `RAIZ`, `NOMES`, `LOCK`, `REQ`, `FIXA`,
+    `INSTALA`, `FLUT`, `MOVEL`, `PRESA`, `VERSAO`) e o `testar.sh` os tira dali, como o padrão de
+    segredo: cada um com casos que casam e que não casam, e os comandos de `E1` e `E3` num
+    repositório de teste. Padrão novo entra com os dois lados. Listam candidatos; quem decide é
+    o texto de "Desvio" (`handler_v2.py` casa `COPIA` e só é desvio com o irmão ao lado).
+  - **Medido em sessão real** (v2.1.331, Windows, `claude -p "/padrao:arrumar só infra"` com o
+    HOME real, numa pasta do scratchpad; uma rodada, US$ 1,07, 2026-11-24), num serviço Flask
+    com onze desvios plantados e cinco controles: os onze saíram com `arquivo:linha` (`E1`–`E7`,
+    `V2`–`V5`), `V1` e `V6` saíram `não se aplica`, e nenhum controle foi acusado
+    (`gunicorn==22.0.0`, `actions/checkout@v4`, o script já em `scripts/`, o documento citado, o
+    teste em `tests/`). O plano pôs em lote o resíduo, o fim de linha, o script avulso, os
+    documentos e a versão do Python (3.11, a do CI, como decisão assumida); deixou de fora o
+    arquivo a renomear e o teste a mover (`código`), o `requirements.txt` e — como
+    `não verificável`, com o Docker parado e o `gh api` sem resposta — as tags de imagem e os
+    SHAs das actions.
+  - **Fase 3, na mesma sessão** (`--resume <id> "Aprovar e executar"`, uns US$ 1,75): oito
+    lotes, um commit cada no branch `padrao/arrumar-<data>`. O `app.log` saiu do git; entrou o
+    `.gitattributes` (`* text=auto eol=lf`) com a renormalização, e o script com CRLF ficou em
+    LF no índice; o `backup.sh` foi para `scripts/` como renomeação (`git diff -M`); a nota de
+    deploy virou uma linha do README e os três documentos soltos, órfãos ou duplicados saíram;
+    o CI passou a ler a versão do Python do `.python-version`. Nenhum arquivo de `src/` nem de
+    `tests/` mudou, e um `git grep` pelos caminhos antigos saiu vazio. Três lotes fecharam
+    `(parcial)` por verificação que pedia o Docker ligado. Não medido: lote que move arquivo
+    citado por CI ou manifesto, e projeto de outra stack.
 - **Não medido:** a fase 3 com um lote de `C5`–`C7`, `C2` e `C4` com tempo de CI real e outra
   stack que não Node. O `revisor` não lê a
   lista: entra depois de haver uma avaliação dele.
 
+**`reorganizar`** (2.16.0) — executa a lista "de → para" de arquivos-fonte que o `arrumar` deixa
+no relatório (`E2`, `E4`, `E5`, `E6` com correção `código`). É skill à parte, e não uma fase do
+`arrumar`, para o contrato dele seguir de pé: o `arrumar` não altera código; quem altera é um
+comando que o usuário chama sabendo disso, e que só anda com verificação.
+
+- **Três condições, ou para:** árvore limpa (desfazer um lote não pode levar trabalho do
+  usuário), um comando de verificação que o projeto já tem (`env.PADRAO_VERIFICACAO` ou o teste
+  do manifesto) e a linha de base passando.
+- **Só mover e acertar referência**, com `git mv`; lote que falha na verificação depois de uma
+  correção é desfeito inteiro (`git restore --source=HEAD --staged --worktree -- .`).
+- **A `atualizar-docs` entra antes de cada commit:** caminho antigo citado em documentação é o
+  caso dela, e o lembrete do commit não precisa de exceção para `reorganizar: lote`.
+- **Medido em sessão real** (v2.1.331, Windows, HOME real, Opus 5.5, 2026-11-24), num serviço
+  Node com onze desvios plantados. O `claude -p "/padrao:arrumar só a estrutura e as versões"`
+  (US$ 1,01) achou os onze com `arquivo:linha`, deu `E7` e `V6` como `sem desvio` e mandou para
+  o relatório, como `código`, o arquivo em `camelCase` entre cinco em `kebab-case`, o teste
+  fora de `tests/` e o `seed.js` da raiz — este citado no `package.json`, no CI e no README, e
+  ele mesmo importando código. O `claude -p "/padrao:reorganizar"` (US$ 0,24) rodou a linha de
+  base (2 de 2), listou os três pares com cada consumidor e a troca exata, e parou no OK; o
+  `--resume <id> "aprovar"` (uns US$ 0,76) fechou três lotes, um commit cada: três renomeações
+  (`git diff -M`), o `require` de cada consumidor, o script do manifesto, a linha do workflow e
+  as duas citações do README trocados; `git grep` pelos nomes antigos vazio; `npm test` com 3
+  de 3 — o teste movido nunca tinha rodado — e o `node scripts/seed.js --dry` funcionando.
+- **Não medido:** lote que falha e é desfeito, projeto com nome montado em tempo de execução, e
+  monorepo. O projeto de teste abriu com o comando de teste quebrado (`node --test tests/` não
+  roda no Node 22): a sessão do `arrumar` não acusou, porque nenhuma checagem roda os testes.
+
 **`atualizar-docs`** — `user-invocable: false`: fora do menu. Quem a dispara é o modelo: o bloco
 do `CLAUDE.md` manda chamá-la antes de todo commit, e o `cobrar-docs.sh` cobra na hora do
-`git commit` (só a linha do bloco, no uso real, cobria cerca de 4% dos commits).
+`git commit` (só a linha do bloco, no uso real, cobria cerca de 4% dos commits). Desde a 2.16.0
+ela roda num subagent (`context: fork`, `model: sonnet`): não vê a conversa — o diff e os
+arquivos bastam — e o que lê e edita fica fora do contexto da sessão, que só recebe o relato.
+Sem `agent:`, o subagent é o `general-purpose`; como não abre outro subagent
+(`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH=1`), a busca que ia para o coletor ela mesma faz. Sem
+injeção de comando (`` !`git diff` ``): comando que falha aborta a skill inteira, e fora de um
+repositório o `git diff` falha. Medido em sessão real (v2.1.331, Windows, `claude -p
+--plugin-dir`, Opus 5.5, uma rodada, US$ 0,22, 2026-11-24): commit recusado uma vez → `Skill`
+(o hook `PreToolUse` de matcher `Skill` dispara com a skill em fork, e a anotação libera o
+commit) → o subagent, em Sonnet, corrigiu a porta no README em cinco turnos (US$ 0,07) → o
+commit passou. Não medido: diff grande, e o caso DIVERGENTE voltando para a sessão.
 
 **`medir`** — lê `~/.claude/projects/<chave>/*.jsonl` e os `subagents/`. O modelo de cada chamada
 é o efetivo pela regra do hook; chamada recusada não conta como rodada; tokens por `message.id`
@@ -549,7 +681,19 @@ linha de verificação: teste, build ou lint rodado na sessão desde o commit an
 pelos nomes comuns, no começo de um segmento do comando; desde a 2.15.0 com `timeout N` na
 frente, a forma que o `AGENT_LEARNINGS.md` deste repositório pede), chamada ao `padrao:revisor` ou lote
 pelo `padrao:executor`; a verificação vista antes de uma tentativa recusada vale para a
-repetição. É o modo de observação de um gate que não existe: neste repositório, em 14 dias,
+repetição. O projeto declara os comandos dele em `env.PADRAO_VERIFICACAO` do
+`.claude/settings.json` (o `settings.local.json` vence): itens separados por `;`, sem aspas,
+casados como os nomes comuns — no começo de um segmento, com lançador, caminho e `timeout N`
+na frente — e listados numa linha a mais da saída (2.16.0). Nos dois projetos que usam o
+plugin, 66 de 75 e 29 de 38 commits saíram "sem nenhuma" em 14 dias (2026-11-24): sem a
+declaração, o número não distingue commit sem verificação de verificação que o `medir` não
+reconhece. Script de PowerShell declarado casa com `pwsh` e opções na frente (`pwsh -NoProfile
+-File ./testar.ps1`) e pelo operador `&`. No primeiro projeto, declarar o `testar.ps1` mudou a
+conta de 66 para 65: quem roda os testes lá é o hook de pre-commit do git (`core.hooksPath`),
+dentro do `git commit`, onde o transcript não vê. Por isso o `medir` avisa, numa linha a mais,
+quando o projeto tem pre-commit (`.githooks/`, `.husky/`, `.pre-commit-config.yaml`,
+`lefthook.yml`, `.git/hooks/`) — e por isso o gate de verificação não foi feito: onde havia o
+que cobrar, o git já cobra; no segundo, uma busca por comando de teste não achou nenhum para declarar. É o modo de observação de um gate que não existe: neste repositório, em 14 dias,
 21 de 26 commits tiveram teste ou build antes, e os 5 sem nenhuma decidem se o gate vale.
 Conferidos um a um em 2026-11-23 (11 sem nenhuma em 38): nenhum dos identificados era commit só
 de documentação, e pelo menos 5 eram commits em repositório de sandbox do scratchpad. Desde a
@@ -571,6 +715,54 @@ Claude Code; no Code Mode, cada chamada feita de dentro do código) não é requ
 Consulta ao advisor: os tokens do modelo consultado vêm em `usage.iterations` (entrada
 `advisor_message`), fora do uso de topo da mensagem; o script os soma numa linha `advisor`
 (consultas, tokens e custo), fora das faixas de contexto e dos turnos.
+
+## Teto de effort, leitura de `.env` e o que ficou de fora (2.16.0)
+
+Conferido contra a documentação em 2026-11-24 e, onde indicado, em sessão real (v2.1.331):
+
+- **`maxEffortLevel: "high"`** em `modelSettings` do Opus, do Sonnet e do Haiku. A documentação:
+  pedido acima do teto roda no teto, venha do `/effort`, do seletor, do `--effort` ou do
+  `effort` do frontmatter de skill e de subagent; com teto em mais de um escopo, vale o menor. É
+  a regra "passou de high, troque de modelo" em chave, e fecha o `effort` da chamada de
+  subagent que o hook de modelo não olha. O Fable e o Mythos ficam sem teto (a política admite
+  xhigh neles com ganho medido). Conferido: a sessão abre com a chave (`/context`: Opus 5.5,
+  400k) e o hook de abertura acusa o projeto sem ela. Não medido: um `/effort xhigh` sendo
+  rebaixado, e o `ultrathink` (a documentação não diz).
+- **`permissions.deny` para `.env`.** `Read(**/.env)`, `Read(**/.env.local)`,
+  `Read(**/.env.*.local)` e `Read(**/.env.production)`. Não é o `Read(./.env.*)` do exemplo
+  oficial: ele fecharia o `.env.example`, que o `arrumar` cria e a `atualizar-docs` lê, e regra
+  de `allow` não abre exceção em `deny`. Em sessão real: `Read` do `.env` recusado ("File is in
+  a directory that is denied by your permission settings"), `cat .env` pelo Bash recusado, o
+  `.env.example` lido, e o valor falso não apareceu na saída. A primeira versão era relativa à
+  raiz (`./.env`) e deixava de fora o `.env` de subpasta; com `**/`, numa segunda sessão, o
+  `Read` foi recusado na raiz, em `api/.env` e em `api/cfg/.env.production`, e `api/.env.example`
+  e `api/env.txt` foram lidos (a documentação não mostra essa forma: foi conferida aqui). O
+  limite apareceu na mesma sessão: um laço `for f in …; do cat "$f" >/dev/null; done` leu o
+  `.env` — o Claude Code só aplica a regra ao comando de Bash que consegue analisar, e variável
+  no lugar do nome do arquivo ele não analisa. É regra de permissão, não sandbox.
+- **`engines`** no `plugin.json` (`claude-code >= 2.1.317`; o campo existe desde a 2.1.323, e
+  versões até a 2.1.75 recusam o manifesto que o traz). O `plugin validate` não confere o
+  intervalo, e com `--plugin-dir` um intervalo impossível (`>=9.9.9`) carregou do mesmo jeito:
+  é declaração. Não medido: plugin instalado pelo marketplace numa versão fora do intervalo.
+
+Avaliado e não adotado:
+
+- **`availableModels`** restringe sessão, subagents, skills e advisor, e vale em settings de
+  projeto; o `deniedModels` só em managed. O hook de modelo e o hook de abertura já cobrem
+  o que ele cobriria, e a documentação não diz se a entrada `claude-opus-5-5` permite o
+  `claude-opus-5-5[1m]` do padrão — errar aí troca o modelo da sessão em todo projeto.
+- **`userConfig`** (opções por instalação): os valores vão para `pluginConfigs` no settings do
+  usuário, e o `claude plugin install` — o caminho do README — não pergunta por eles. É
+  configuração no global, que o padrão existe para evitar.
+- **Limites de saída** (`bashOutputMaxChars`, `MAX_MCP_OUTPUT_TOKENS`). Medido nos transcripts
+  de 14 dias do projeto com 11 servidores MCP: de 1.707 saídas de Bash, a mediana tem 539
+  caracteres, o p99 19.615, e uma chegou ao limite de 30.000; de 1.857 saídas de MCP, mediana de
+  448, p99 de 19.886, e dez passaram de 29.000. Baixar o limite mexeria em menos de 1% das
+  chamadas, e o excedente já vai para arquivo. O que pesa é o contexto relido a cada
+  requisição, não o tamanho de cada saída.
+- **Gate de verificação antes do commit.** Medido com a verificação declarada (ver `medir`): no
+  projeto que tem testes, o pre-commit do git já os roda a cada commit; no outro não achei o que
+  rodar. Um hook do plugin repetiria o primeiro e não teria o que cobrar no segundo.
 
 ## Os opcionais — `opcional.py`
 
@@ -704,11 +896,16 @@ modelos não mudou e o Code Mode segue opcional.
 
 `bash scripts/testar.sh` (e o CI, no Ubuntu) confere:
 
-- as decisões dos cinco hooks, inclusive sem `jq` e as brechas já fechadas da trava (opção
+- as decisões dos seis hooks, inclusive sem `jq` e as brechas já fechadas da trava (opção
   entre aspas, com barra, com variável e vinda de `$(…)`; comentário, heredoc e várias linhas),
   e o matcher do `hooks.json` que chama a trava;
 - o lembrete da documentação: as formas de commit do histórico, o que não é commit, a sequência
-  recusa → repetição → commit seguinte, a skill liberando só a própria sessão e a falha aberta;
+  recusa → repetição → commit seguinte, a skill liberando só a própria sessão, a falha aberta e
+  a mudança só de documentação (num repositório de teste: passa; com um arquivo de código, com
+  o comando mudando de pasta ou sem nada a commitar, o lembrete sai);
+- a instrução da compactação (sessão, subagent, `/compact` com foco, entrada vazia), o
+  `autoCompactWindow` do coletor e do leitor, o fork da `atualizar-docs`, o teto de effort e as
+  regras de `deny` no hook de abertura, e a verificação declarada no `medir`;
 - que o `--sandbox` do sed e do gawk segura de verdade o que a trava deixa passar;
 - o hook de abertura com HOME e projeto falsos, limpo e sujo;
 - que nenhum modelo de `skills/aplicar/modelos/` mudou sem subir o carimbo (soma do texto);
@@ -716,6 +913,8 @@ modelos não mudou e o Code Mode segue opcional.
   imprime valor do `env` nem credencial da URL de MCP; lê settings com BOM) e as contas do `medir`
   (inclusive custo, faixas de contexto, Haiku acima de 100K, consulta ao advisor e período sem
   requisição);
+- as checagens de padronização do `arrumar`: os cinco campos em todo item, cada padrão contra
+  casos dos dois lados, e os comandos de `E1` e `E3` num repositório de teste;
 - as checagens do `arrumar`: todo item com os cinco campos, e o padrão de segredo casando token
   nos formatos conhecidos (na árvore e no histórico, sem imprimir o valor) e não casando prosa;
 - a regra de "o que é commit" nas suas duas cópias: as mesmas entradas passam pelo
@@ -730,8 +929,8 @@ que é a raiz do plugin, o validador o acusa: é contexto do repositório, não 
 na 2.1.330 que ele carrega dali — `claude -p "/context"` o lista em "Memory Files"), a reserva
 `subagentStatusLine` foi removida e o plugin ganhou ícone (`.claude-plugin/icon.png`). Ele fecha
 com
-"Hosts: api.github.com (declared), github.com (declared)" e "Hosts not read for: hooks (3),
-skills (6)". A segunda é nota, não aviso, e não some: hooks e skills rodam processos, e o
+"Hosts: api.github.com (declared), github.com (declared)" e "Hosts not read for: hooks (4),
+skills (7)". A segunda é nota, não aviso, e não some: hooks e skills rodam processos, e o
 validador não lê que hosts eles alcançam. O campo `network.hosts` do `plugin.json` (v2.1.328+)
 é só declaração — a documentação diz que ele não libera nem bloqueia host. O plugin declara o
 que as skills fazem o Claude alcançar em todo projeto: `gh run` e `gh api` no `arrumar`,
@@ -809,6 +1008,17 @@ Não cobre o texto das skills. Para elas, o **teste de ponta a ponta**:
    `git commit` e nenhuma recusa; com o bloco sem a linha "Antes de todo commit", recusa →
    `Skill` → commit. O que o hook recebe (campos, `if`, `CLAUDE_PLUGIN_DATA`) se sonda com um
    plugin de um hook só que grava a entrada, num `--plugin-dir` a mais.
+
+6. Compactação: `claude -p --resume <session_id> "/compact"` compacta de verdade (com
+   `--debug`, o log traz `PreCompact:manual`), e o resumo fica no transcript, na linha com
+   `isCompactSummary`. Para a do subagent, peça ao `padrao:coletor` uma coleta que passe de
+   100K — oito arquivos de ~68 KB, cada um em duas leituras com `offset` e `limit` (inteiro, o
+   `Read` cortou o arquivo na linha 656 de 1.100) — e confira no transcript dele (`<sessão>/subagents/`) as
+   linhas `compact_boundary`, o contexto de cada requisição e se a resposta traz todos os
+   fatos. Uma rodada custa de US$ 0,11 a US$ 0,21. Com o HOME real (sem copiar token), tire
+   `enabledPlugins` e `extraKnownMarketplaces` do settings do projeto de teste, senão o plugin
+   instalado carrega junto com o do `--plugin-dir`; os transcripts ficam em
+   `~/.claude/projects` até o `cleanupPeriodDays`.
 
 O que só a interface mostra (linha dos subagents, status line, diálogos) não aparece no
 `claude -p`. Para isso, uma sessão interativa num pseudo-terminal: um script Node com

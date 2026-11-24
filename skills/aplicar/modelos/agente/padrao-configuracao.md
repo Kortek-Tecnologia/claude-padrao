@@ -1,4 +1,4 @@
-<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.14.0; edite no plugin, não aqui -->
+<!-- gerado pelo plugin padrao (/padrao:aplicar), modelo 2.16.0; edite no plugin, não aqui -->
 # Configuração: no projeto, nada no global
 
 `.claude/settings.json` (time, no git) e `.claude/settings.local.json` (pessoal: idioma, tela —
@@ -15,6 +15,12 @@ voltou para o global (o `/model` grava lá), se o projeto saiu do padrão ou se 
 peça ao usuário para rodar `/padrao:aplicar` (só ele chama esse comando). O effort que o
 `/effort` salva no global não conta: o projeto vence e a sessão abre em medium. Transcripts
 ficam 14 dias, só para o `/resume`; checkpoints (`/rewind`) ligados.
+
+O `.claude/settings.json` nega a leitura de `.env`, `.env.local`, `.env.*.local` e
+`.env.production`, em qualquer pasta (`permissions.deny`): valor de segredo não entra na conversa nem no
+transcript; para saber que variáveis existem, leia o `.env.example`. O comando de verificação
+do projeto que os nomes comuns não cobrem fica em `env.PADRAO_VERIFICACAO` (um ou mais,
+separados por `;`): é o que o `/padrao:medir` conta como verificação antes do commit.
 
 Dois opcionais, desligados por padrão e fora da política de modelos. O Code Mode
 (`/padrao:code-mode`) é a única variável de `env` que fica no global

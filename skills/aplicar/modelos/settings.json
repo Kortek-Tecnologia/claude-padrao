@@ -4,13 +4,16 @@
   "modelSettings": {
     "claude-opus-5-5": {
       "effortLevel": "medium",
+      "maxEffortLevel": "high",
       "autoCompactWindow": 400000
     },
     "claude-sonnet-5-5": {
-      "effortLevel": "medium"
+      "effortLevel": "medium",
+      "maxEffortLevel": "high"
     },
     "claude-haiku-5-5": {
-      "effortLevel": "medium"
+      "effortLevel": "medium",
+      "maxEffortLevel": "high"
     },
     "claude-fable-5-2": {
       "autoCompactWindow": 400000
@@ -28,6 +31,14 @@
     "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
     "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1",
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+  },
+  "permissions": {
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.production)"
+    ]
   },
   "disableClaudeAiConnectors": true,
   "extraKnownMarketplaces": {

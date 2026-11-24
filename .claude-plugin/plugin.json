@@ -1,10 +1,13 @@
 {
   "name": "padrao",
-  "version": "2.15.2",
+  "version": "2.16.0",
   "license": "MIT",
-  "description": "Padrão de Claude Code igual em todos os projetos: Opus decide, Sonnet executa lote com ficha, Haiku coleta; tudo no projeto, global limpo; documentação que não mente e checagens de segurança e de CI.",
+  "description": "Padrão de Claude Code igual em todos os projetos: Opus decide, Sonnet executa lote com ficha, Haiku coleta; tudo no projeto, global limpo; documentação que não repete o código, estrutura de arquivos por convenção, versões fixadas e checagens de segurança e de CI.",
   "author": {
     "name": "Christian Jorge"
+  },
+  "engines": {
+    "claude-code": ">=2.1.317"
   },
   "network": {
     "hosts": ["github.com", "api.github.com"]

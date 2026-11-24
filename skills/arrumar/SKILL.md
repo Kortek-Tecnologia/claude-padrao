@@ -1,6 +1,6 @@
 ---
 name: arrumar
-description: Audita e corrige a documentação, a infraestrutura e o CLAUDE.md do projeto — levanta tudo, volta com o plano completo para um único OK e, aprovado, executa todos os lotes, um commit por lote num branch novo, sem push. O padrao:executor aplica, o padrao:revisor confere e a verificação roda de verdade.
+description: Audita e corrige a documentação, a infraestrutura, a estrutura de arquivos (por convenção), as versões fixadas e o CLAUDE.md do projeto — levanta tudo, volta com o plano completo para um único OK e, aprovado, executa todos os lotes, um commit por lote num branch novo, sem push. O padrao:executor aplica, o padrao:revisor confere e a verificação roda de verdade.
 argument-hint: "[foco opcional — ex.: só docs, só infra, só o CLAUDE.md]"
 disable-model-invocation: true
 ---
@@ -9,8 +9,9 @@ disable-model-invocation: true
 
 Três fases numa invocação só:
 
-1. **Levantar**, sem perguntar nada: o que o sistema é segundo o código, a infraestrutura, o
-   que a documentação diz e o peso do `CLAUDE.md`. Só lê o repositório; grava em `_audit/`.
+1. **Levantar**, sem perguntar nada: o que o sistema é segundo o código, a infraestrutura
+   (com a estrutura de arquivos e as versões fixadas), o que a documentação diz e o peso do
+   `CLAUDE.md`. Só lê o repositório; grava em `_audit/`.
 2. **Plano e um OK**: o plano completo em lotes, com cada dúvida já respondida pela opção
    recomendada. Uma pergunta ao usuário: aprovar.
 3. **Executar tudo**: num branch novo, lote a lote — executor aplica, revisor confere, você roda
@@ -106,7 +107,9 @@ seguem as regras de documentação de lá.
    traz um porquê contra o código (o erro pode estar no código) entra aqui: recomende manter a
    documentação e listar o código no relatório — este fluxo não altera código.
 3. **Lotes**, independentes e na ordem de execução. Recorte sugerido, ajuste ao caso:
-   `CLAUDE.md` enxuto · rules · docs consolidadas · infra. Ficha por lote:
+   `CLAUDE.md` enxuto · rules · docs consolidadas · infra · estrutura de arquivos · versões
+   fixadas. Lote que move arquivo leva junto as referências ao caminho antigo (regra em
+   `padronizacao.md`, ao lado deste arquivo). Ficha por lote:
    - título e ids que resolve;
    - o que muda: arquivos e a mudança em cada um;
    - **verificação** checável — grep, existência ou ausência de arquivo, contagem de linhas,
@@ -115,7 +118,7 @@ seguem as regras de documentação de lá.
    - depende de; e `Situação: pendente`.
 4. **Fica de fora**: ids que dependem de decisão sem resposta recomendável, os
    `não verificável`, os de arquivos com alteração sem commit (o commit do lote misturaria o
-   trabalho do usuário) e os desvios de `checagens.md` com correção `código` ou `usuário`.
+   trabalho do usuário) e os desvios de `checagens.md` e de `padronizacao.md` com correção `código` ou `usuário`.
 5. **Critérios de sucesso**: métricas verificáveis para o fim (ex.: carga fixa ≤ 150 linhas,
    nenhuma Divergência alta aberta, todo `docs/agente/*.md` no índice).
 6. **Execução**: branch `padrao/arrumar-<AAAA-MM-DD>`, um commit por lote, sem push.
@@ -179,7 +182,8 @@ usuário viaja junto e não entra em commit nenhum.
 **Depois do último lote**, confira o conjunto: carga fixa medida de novo (como em `levantar.md`); o índice
 `## Contexto sob demanda` (todo `docs/agente/*.md`, menos `padrao-*`, tem linha; toda linha
 aponta para arquivo que existe; nenhuma usa `@`); links e âncoras entre os .md; nenhum arquivo
-de código mudou fora de comentário ou docstring (`git diff --stat <origem>..HEAD`); a checagem
+de código mudou fora de comentário ou docstring nem foi movido (`git diff --stat -M
+<origem>..HEAD`); nenhuma referência a caminho que um lote moveu; a checagem
 de segredos. Algo quebrado → um lote final de correção, pelo mesmo ciclo.
 
 ### Relatório — a resposta final
@@ -192,7 +196,8 @@ de segredos. Algo quebrado → um lote final de correção, pelo mesmo ciclo.
 - Segredo exposto (checagens S1 e S2), se houver, antes de tudo: arquivo ou commit, nunca o
   valor, e o que só o usuário faz — revogar e trocar a chave.
 - O que ficou: o "Fica de fora", os ids abertos e o que os destrava; código que diverge de
-  regra documentada; regra com ênfase que pede hook ou `deny`; entradas de `AGENT_LEARNINGS.md`
+  regra documentada; arquivo-fonte a mover ou renomear e versão a fixar que muda o que se
+  instala (a lista "de → para" e o comando); regra com ênfase que pede hook ou `deny`; entradas de `AGENT_LEARNINGS.md`
   que ficaram falsas. Depois do relatório, o que ficou e só o usuário decide vira uma pergunta
   com opções, a recomendada primeiro (a regra do bloco do `CLAUDE.md`); merge e push seguem dele.
 - Como revisar e desfazer: `git log --oneline <origem>..padrao/arrumar-<data>`,

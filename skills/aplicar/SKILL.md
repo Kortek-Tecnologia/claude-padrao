@@ -137,7 +137,9 @@ migração.
 
 - `.claude/settings.json` (time, git): mescle `modelos/settings.json`. As chaves do modelo
   vencem — `model` é sempre `claude-opus-5-5[1m]`, `effortLevel` `medium`, `modelSettings` com
-  effort `medium` para Opus, Sonnet e Haiku 5.5 e o teto de compactação automática em 400K no
+  effort `medium` e teto de effort `high` (`maxEffortLevel`: acima disso, `/effort`, seletor e
+  frontmatter rodam em high — passou de high, o degrau é trocar de modelo na sessão) para Opus,
+  Sonnet e Haiku 5.5 e o teto de compactação automática em 400K no
   Opus, no Fable 5.2 e no Mythos 5.2 (`modelSettings["<modelo>"].autoCompactWindow: 400000`; nos
   dois últimos só o teto, sem effort: não são do padrão, mas a sessão pode escolhê-los), os aliases
   (`env.ANTHROPIC_DEFAULT_{OPUS,SONNET,HAIKU}_MODEL` na família 5.5 e
@@ -153,7 +155,17 @@ migração.
   e `extraKnownMarketplaces.claude-padrao` com `autoUpdate: true` (marketplace de terceiro vem sem
   atualização automática),
   exceto `permissions`, `hooks`, `env` (una) e chaves que o projeto tenha e o modelo não cite
-  (preserve). Some as chaves `time` vindas do global. Projeto de marketplace antigo: tire
+  (preserve). Em `permissions.deny`, una as regras do modelo às do projeto: `Read(**/.env)`,
+  `Read(**/.env.local)`, `Read(**/.env.*.local)` e `Read(**/.env.production)` — o Claude não lê
+  valor de segredo; `.env.example` segue legível, e o hook de abertura acusa a regra que
+  faltar. Some as chaves `time` vindas do global.
+- Verificação do projeto: se o projeto tem um comando de teste, build ou validação que os
+  nomes comuns não cobrem (`scripts/validar.sh`, `make smoke`; `pytest`, `npm test`,
+  `cargo test` e afins já são reconhecidos), ponha uma linha no plano propondo
+  `env.PADRAO_VERIFICACAO` no `.claude/settings.json` com ele — um ou mais, separados por `;`,
+  sem aspas. É o que o `/padrao:medir` conta como verificação antes do commit; sem a chave,
+  nada muda. Não invente comando: só o que o projeto já tem (README, CI, `package.json`,
+  `Makefile`). Projeto de marketplace antigo: tire
   `enabledPlugins["padrao@padrao"]`, `enabledPlugins["padrao@kortek-tools"]`,
   `extraKnownMarketplaces.padrao` e `extraKnownMarketplaces.kortek-tools` (este só se nenhum
   outro plugin `@kortek-tools` estiver ligado) e reinstale como no README do plugin.
@@ -199,7 +211,10 @@ usuário rodar `/padrao:aplicar` lá quando abrir.
 
 ## 7. Regras no `CLAUDE.md`
 
-Insira `modelos/claude-md.md` no fim do `CLAUDE.md` da raiz (o texto do projeto vem antes). Se
+Insira `modelos/claude-md.md` no fim do `CLAUDE.md` da raiz (o texto do projeto vem antes);
+projeto que não tem `CLAUDE.md` na raiz e tem `.claude/CLAUDE.md` (a raiz de um plugin não pode
+ter o da raiz) leva o bloco lá — o Claude Code lê os dois, e o hook de abertura confere o que
+existir. Se
 já houver o bloco entre `<!-- padrao:inicio` e `<!-- padrao:fim -->`, substitua só ele, onde
 estiver. Se o projeto já tiver seção
 própria de modelos/subagents, mostre a sobreposição e pergunte qual fica. A primeira linha do
