@@ -238,7 +238,8 @@ listados no índice dele (sem `@`: import carrega sempre e não economiza contex
 1. Grave `~/.claude/settings.json` como `modelos/global.json`, mais `permissions.defaultMode`,
    `skipDangerousModePermissionPrompt` e `env.CLAUDE_CODE_EXPERIMENTAL_CODE_MODE` só se o
    usuário já os tinha (com o mesmo valor; não os crie), `<PYTHON>` = o interpretador que o `py.sh` acha nesta máquina (`python3`,
-   `python` ou `py`) e `<HOME>` = o home com `/` (no Git Bash, `cygpath -m "$HOME"`; trocar as
+   `python` ou `py`; no Windows, o que `command -v` mostra na pasta `WindowsApps` só se não
+   houver outro: é o atalho da Store, que abre devagar) e `<HOME>` = o home com `/` (no Git Bash, `cygpath -m "$HOME"`; trocar as
    barras do caminho do Windows à mão come as barras). Copie `<plugin>/statusline/statusline.py`
    para `~/.claude/` (rodar a skill de novo o atualiza; o hook de abertura avisa se ficar
    velho). Apague `~/.claude/subagent-statusline.py`, se houver: a linha dos subagents roda

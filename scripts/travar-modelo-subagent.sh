@@ -16,19 +16,50 @@
 #   Mythos são degrau de escalada da sessão (/model, só a sessão), não de subagent;
 # - deixa o `fork` passar (roda no modelo da sessão e ignora `model`).
 #
+# Custo: no Windows abrir um processo custa de 100 a 800 ms. A entrada é lida
+# pelo `read` do shell e um jq só tira os campos, decide e monta a saída (até a
+# 2.16.0 eram um `cat` e de dois a três jq por chamada).
+#
 # Sem jq não dá para reescrever a chamada: os de papel fixo fora do modelo são
 # recusados com o modelo certo na mensagem. Os campos saem por regex: dentro de
 # `prompt` as aspas vêm escapadas (\"model\"), então só as chaves de verdade casam.
-entrada=$(cat)
-tem_jq() { command -v jq >/dev/null 2>&1; }
+nl='
+'
+entrada=
+while IFS= read -r linha || [ -n "$linha" ]; do entrada="$entrada$linha$nl"; done
+
+if command -v jq >/dev/null 2>&1; then
+  # Sem saída = a chamada segue. O jq que falha (entrada inválida) não devolve
+  # nada, e a chamada segue, como antes.
+  # ($q é a aspa simples, que não cabe no programa entre aspas simples do shell.)
+  jq -c --arg q "'" '
+    def negar(r): {hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny",
+      permissionDecisionReason: (r | gsub("[\"\\\\]"; ""))}};
+    (.tool_input.subagent_type // "" | tostring) as $t
+    | (.tool_input.model // "" | tostring) as $m
+    | {Plan: "opus", Explore: "haiku", "padrao:coletor": "haiku", "padrao:leitor": "haiku",
+       "padrao:revisor": "sonnet", "padrao:executor": "sonnet"}[$t] as $x
+    | if $t == "fork" then empty
+      elif $x then
+        if $m == $x or ($m == "" and ($t | startswith("padrao:"))) then empty
+        else {hookSpecificOutput: {
+          hookEventName: "PreToolUse",
+          permissionDecision: "allow",
+          permissionDecisionReason: ("padrao: \($t) travado em model=\($x)"),
+          updatedInput: (.tool_input + {model: $x}),
+          additionalContext: ("padrao: o subagent \($t) roda em model=\($x) (papel fixo); a chamada foi corrigida.")}}
+        end
+      elif $m == "" or $m == "haiku" or $m == "sonnet" or $m == "opus" then empty
+      else negar("model=\($q)\($m)\($q) fora da politica. Use opus (decidir, planejar, o dificil), sonnet (executar lote com ficha fechada, revisar diff) ou haiku (coletar: busca, leitura, log); sem model o subagent roda em sonnet. Fable e Mythos so na sessao (/model, tecla s), nunca em subagent. Detalhes em docs/agente/padrao-modelos.md.")
+      end' 2>/dev/null <<EOF
+$entrada
+EOF
+  exit 0
+fi
 
 campo() {
-  if tem_jq; then
-    printf '%s' "$entrada" | jq -r ".tool_input.$1 // \"\""
-  else
-    printf '%s' "$entrada" | tr '\n' ' ' |
-      sed -nE "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]*)\".*/\\1/p" | head -n 1
-  fi
+  printf '%s' "$entrada" | tr '\n' ' ' |
+    sed -nE "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"([^\"\\\\]*)\".*/\\1/p" | head -n 1
 }
 
 negar() {
@@ -50,14 +81,7 @@ case "$tipo" in
 esac
 if [ -n "$exigido" ]; then
   [ "$modelo" = "$exigido" ] && exit 0
-  tem_jq || negar "O subagent '$tipo' roda em model=$exigido (papel fixo): chame de novo com model=$exigido."
-  printf '%s' "$entrada" | jq -c --arg m "$exigido" --arg t "$tipo" '{hookSpecificOutput: {
-    hookEventName: "PreToolUse",
-    permissionDecision: "allow",
-    permissionDecisionReason: ("padrao: \($t) travado em model=\($m)"),
-    updatedInput: (.tool_input + {model: $m}),
-    additionalContext: ("padrao: o subagent \($t) roda em model=\($m) (papel fixo); a chamada foi corrigida.")}}'
-  exit 0
+  negar "O subagent '$tipo' roda em model=$exigido (papel fixo): chame de novo com model=$exigido."
 fi
 
 case "$modelo" in "" | haiku | sonnet | opus) exit 0 ;; esac

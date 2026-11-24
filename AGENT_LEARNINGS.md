@@ -97,6 +97,11 @@ suposição errada, um hook recusou, algo foi refeito. Deslize que não mudou na
 - Evitar: mandar para segundo plano, sem limite de tempo, um script de shell que só passou pela checagem de sintaxe.
 - Fazer: rodar o script uma vez à mão com `timeout 60` e comparar a saída com a da versão anterior antes da rodada longa; todo comando de segundo plano que chama código novo leva `timeout`.
 
+### Tempo medido por um caminho que não é o de uso (2026-11-24)
+- Erro: medi a status line por `sh scripts/py.sh statusline.py` (636 a 824 ms) e a dei como a peça mais lenta; a instalada roda por `<PYTHON> -I` direto (175 a 351 ms), e o tempo a mais era do `py.sh`. O usuário escolheu o que fazer com o número errado.
+- Evitar: medir uma peça por um invólucro de teste ou de conveniência e atribuir o tempo a ela.
+- Fazer: medir pelo comando que o Claude Code roda de verdade (o `command` do `hooks.json` ou do `statusLine` no settings) e, se der alto, medir cada parte em separado (interpretador vazio, cada subprocesso) antes de dizer onde está o custo.
+
 ### Tempo de hook medido uma vez só (2026-11-17)
 - Erro: medi a trava de leitura em 4 a 6 s por comando com a máquina carregada e, horas depois, a mesma versão levava 1,3 a 1,6 s; quatro sessões pagas em paralelo estouraram os 10 s do hook em 5 de 12.
 - Evitar: concluir sobre o tempo de um hook por uma medição, ou comparar medições de horas diferentes (no Windows abrir um processo varia de 100 a 800 ms).

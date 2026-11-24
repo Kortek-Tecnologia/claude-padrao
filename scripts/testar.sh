@@ -1114,6 +1114,19 @@ if command -v claude >/dev/null 2>&1; then
     { echo "divergiu: testes do modulo: $(claude plugin test . 2>&1 | tail -n 6)"; FALHAS=$((FALHAS + 1)); }
 fi
 
+# py.sh: o atalho da Store (pasta WindowsApps) fica por último mesmo quando roda (abre o Python
+# bem mais devagar que o instalado); sem outro interpretador, é ele.
+PYT=$(mktemp -d); mkdir -p "$PYT/WindowsApps" "$PYT/bin"
+printf '#!/bin/sh\necho store\n' >"$PYT/WindowsApps/python3"
+printf '#!/bin/sh\necho instalado\n' >"$PYT/bin/python"
+chmod +x "$PYT/WindowsApps/python3" "$PYT/bin/python"
+SH=$(command -v sh)
+[ "$(PATH="$PYT/WindowsApps:$PYT/bin" "$SH" "$D/py.sh" x.py 2>&1 | tr -d '\r')" = instalado ] ||
+  { echo "divergiu: py.sh nao deixou o atalho da Store por ultimo"; FALHAS=$((FALHAS + 1)); }
+[ "$(PATH="$PYT/WindowsApps" "$SH" "$D/py.sh" x.py 2>&1 | tr -d '\r')" = store ] ||
+  { echo "divergiu: py.sh nao usou o atalho da Store quando so ha ele"; FALHAS=$((FALHAS + 1)); }
+rm -rf "$PYT"
+
 # Avaliação do revisor: os casos aplicam, o gabarito tem linha e os testes de cada diff passam
 # (sem chamar o Claude; a rodada de verdade é paga e roda à parte).
 sh "$D/py.sh" avaliacao/revisor/avaliar.py --conferir >/dev/null 2>&1 ||

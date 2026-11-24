@@ -30,7 +30,7 @@ flowchart LR
 |---|---|
 | `hooks/hooks.json` | liga os seis hooks; todos com `shell: bash` e timeout de 10 s (a trava de leitura e o hook de abertura, 30 s); as duas travas com `onFailure: "block"` (falhou, bloqueia), os dois lembretes — o da documentação e o das pendências — e a instrução da compactação com `onFailure: "continue"` (falhou, o commit, o fim do turno ou a compactação segue — por extenso, porque no Code Mode o hook que falha sem a chave recusa a chamada) |
 | `skills/aplicar/modelos/` | **fonte única** do padrão: o `aplicar` grava a partir dela e o hook de abertura compara com ela |
-| `scripts/py.sh` | acha `python3`, `python` ou `py` 3.9+ (no Windows o `python3` costuma ser o atalho quebrado da Store) e roda com `-I` |
+| `scripts/py.sh` | acha `python3`, `python` ou `py` 3.9+ (no Windows o `python3` costuma ser o atalho quebrado da Store) e roda com `-I`; o que mora na pasta `WindowsApps` fica por último mesmo quando roda — ver [Status line principal](#status-line-principal--o-interpretador) |
 | `agents/*.md` | os quatro agentes; os que só leem têm `tools` fechado e `disallowedTools`; coletor e leitor, `autoCompactWindow: 100000` — ver [Instrução da compactação](#instrução-da-compactação--instruir-compactacaosh) |
 | `statusline/` | `statusline.py` é de terceiro (Jhonatan de Souza); nossas linhas ficam entre `padrao: início` e `padrao: fim` ou marcadas `# padrao` |
 | `scripts/opcional.py` | liga, desliga e mostra os dois opcionais (Code Mode e Fable como advisor); as skills `code-mode` e `advisor` só o chamam — ver [Os opcionais](#os-opcionais--opcionalpy) |
@@ -170,6 +170,40 @@ flowchart TD
   no hook, o `medir` conta essas chamadas; se aparecerem, aí se decide recusar `xhigh` e `max`.
 - **Sem jq** não dá para reescrever: os campos saem por regex e o papel fixo fora do modelo é
   recusado com o modelo certo na mensagem.
+- **Um jq por chamada.** Até a 2.16.0 o hook abria um `cat` e de dois a três `jq` (um por
+  campo, outro para montar a correção). Agora lê a entrada com o `read` do shell e um `jq` só
+  tira os campos, decide e monta a saída. Medido lado a lado, cinco vezes cada, em 2026-11-24
+  (régua `sh -c true`: 96 ms):
+
+| Chamada | antes | depois |
+|---|---|---|
+| `Explore` sem `model` (corrige) | 489 a 532 ms | 192 a 217 ms |
+| `general-purpose` com `sonnet` (passa) | 383 a 447 ms | 188 a 214 ms |
+| `model: fable` (recusa) | 456 a 485 ms | 179 a 208 ms |
+
+  Conferido contra a versão anterior em 42 entradas (as do `testar.sh` e formas difíceis: JSON
+  em várias linhas, `model` nulo, vazio, com aspas e barra, entrada cortada): mesma saída e
+  mesmo código de saída em todas; só o erro do `jq` na entrada inválida deixou de ir para o
+  stderr. Não repetido: a sessão real.
+
+## Status line principal — o interpretador
+
+O `aplicar` grava no global o comando `<PYTHON> -I ~/.claude/statusline.py`, com o interpretador
+que o `py.sh` acha. No Windows o `python3` do `PATH` costuma ser o atalho da Microsoft Store
+(pasta `WindowsApps`); com o Python da Store instalado ele roda, mas abre devagar. Medido em
+2026-11-24, cinco vezes cada, numa máquina com os dois (régua `sh -c true`: 84 a 92 ms):
+
+| | atalho da Store (`python3`) | instalado (`python`) |
+|---|---|---|
+| `-I -c pass` | 241 a 256 ms | 104 a 111 ms |
+| a status line inteira | 297 a 351 ms | 175 a 184 ms |
+| `py.sh -c pass` (testa a versão e roda) | 610 a 696 ms | 284 a 321 ms |
+
+Por isso o `py.sh` deixa por último o interpretador cujo caminho passa por `WindowsApps`, e só
+o usa se não houver outro (o `testar.sh` confere as duas situações com interpretadores falsos).
+Do tempo que sobra na status line, cerca de 115 ms são o `git branch --show-current` do código
+do autor, que não mexemos. O hook de abertura não olha o comando da status line: o global que
+já tem `python3` segue com ele até o usuário trocar.
 
 ## Trava de leitura — `trava-leitura.sh` → `so-le.awk` + `segmentos.awk`
 
